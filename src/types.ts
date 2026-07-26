@@ -68,6 +68,12 @@ export interface DeepCleanReport {
   freeAfter: number;
 }
 
+export interface DeepAnalyzeReport {
+  lines: string[];
+  recommended: boolean | null;
+  backupGb: number | null;
+}
+
 export interface ItemResult {
   id: string;
   name: string;
