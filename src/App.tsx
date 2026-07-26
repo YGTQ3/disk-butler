@@ -21,6 +21,18 @@ const NAV_ITEMS: NavItem[] = [
 
 function App() {
   const [page, setPage] = useState<PageId>("insight");
+  // 访问过的页面保持挂载（只隐藏不销毁），切页不丢扫描结果
+  const [visited, setVisited] = useState<Set<PageId>>(new Set(["insight"]));
+
+  function go(id: PageId) {
+    setVisited((prev) => {
+      if (prev.has(id)) return prev;
+      const next = new Set(prev);
+      next.add(id);
+      return next;
+    });
+    setPage(id);
+  }
 
   return (
     <div className="flex h-full w-full overflow-hidden">
@@ -45,7 +57,7 @@ function App() {
               <button
                 key={item.id}
                 disabled={!item.ready}
-                onClick={() => item.ready && setPage(item.id)}
+                onClick={() => item.ready && go(item.id)}
                 className={[
                   "group flex items-center gap-3 rounded-xl px-3 py-2.5 text-left text-sm transition-colors",
                   active
@@ -74,10 +86,16 @@ function App() {
         </div>
       </aside>
 
-      {/* 主内容区 */}
+      {/* 主内容区：访问过的页面常驻内存，切换仅切可见性 */}
       <main className="relative flex-1 overflow-hidden">
-        {page === "insight" && <DiskInsight />}
-        {page === "clean" && <Cleanup />}
+        <div className={page === "insight" ? "h-full" : "hidden"}>
+          <DiskInsight active={page === "insight"} />
+        </div>
+        {visited.has("clean") && (
+          <div className={page === "clean" ? "h-full" : "hidden"}>
+            <Cleanup />
+          </div>
+        )}
       </main>
     </div>
   );
