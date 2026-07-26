@@ -21,6 +21,8 @@ export default function DiskInsight({ active = true }: Props) {
   const [phase, setPhase] = useState<Phase>("idle");
   const [progress, setProgress] = useState<ScanProgress | null>(null);
   const [root, setRoot] = useState<TreeNode | null>(null);
+  /** 当前扫描结果属于哪个盘（挂载点）——标题/面包屑跟结果走，不跟下拉框走 */
+  const [scannedDrive, setScannedDrive] = useState<string>("");
   const [stack, setStack] = useState<TreeNode[]>([]); // 下钻路径栈
   const [selectedNode, setSelectedNode] = useState<TreeNode | null>(null);
   const [error, setError] = useState<string>("");
@@ -63,9 +65,13 @@ export default function DiskInsight({ active = true }: Props) {
 
   const current = stack.length > 0 ? stack[stack.length - 1] : root;
   const currentDrive = drives.find((d) => d.mountPoint === selected);
+  const scannedDriveInfo = drives.find((d) => d.mountPoint === scannedDrive);
+  /** 选中盘 ≠ 已扫描盘：结果与选择不一致，需提示用户扫描新盘 */
+  const driveMismatch = phase === "done" && !!scannedDrive && selected !== scannedDrive;
 
   async function startScan() {
     if (!selected) return;
+    const target = selected; // 锁定本次扫描目标，避免扫描中切换下拉框干扰
     setPhase("scanning");
     setProgress(null);
     setError("");
@@ -73,8 +79,9 @@ export default function DiskInsight({ active = true }: Props) {
     setStack([]);
     setSelectedNode(null);
     try {
-      const tree = await invoke<TreeNode>("scan_drive", { root: selected });
+      const tree = await invoke<TreeNode>("scan_drive", { root: target });
       setRoot(tree);
+      setScannedDrive(target);
       setPhase("done");
     } catch (e) {
       setError(String(e));
@@ -136,10 +143,14 @@ export default function DiskInsight({ active = true }: Props) {
             />
           </div>
 
-          {/* 水位条 */}
+          {/* 水位条：盘与结果不匹配时不用旧结果给新盘着色 */}
           <div className="flex-1">
             {currentDrive && (
-              <CapacityBar root={root} total={currentDrive.total} free={currentDrive.free} />
+              <CapacityBar
+                root={driveMismatch ? null : root}
+                total={currentDrive.total}
+                free={currentDrive.free}
+              />
             )}
           </div>
 
@@ -151,12 +162,18 @@ export default function DiskInsight({ active = true }: Props) {
           >
             {phase === "scanning" ? (
               <Loader2 size={18} className="animate-spin" />
-            ) : phase === "done" ? (
+            ) : phase === "done" && !driveMismatch ? (
               <RotateCcw size={18} />
             ) : (
               <Search size={18} />
             )}
-            {phase === "scanning" ? "扫描中…" : phase === "done" ? "重新扫描" : "开始扫描"}
+            {phase === "scanning"
+              ? "扫描中…"
+              : driveMismatch
+                ? `扫描 ${currentDrive?.letter ?? ""} 盘`
+                : phase === "done"
+                  ? "重新扫描"
+                  : "开始扫描"}
           </button>
         </div>
       </div>
@@ -214,7 +231,14 @@ export default function DiskInsight({ active = true }: Props) {
         {!error && phase === "done" && current && (
           <>
             <div className="flex flex-1 flex-col overflow-hidden rounded-2xl bg-[var(--color-surface)] p-5 shadow-[var(--shadow-card)]">
-              {/* 面包屑 */}
+              {/* 选中盘与结果不一致时的提示条 */}
+              {driveMismatch && (
+                <div className="mb-3 rounded-xl bg-[#FEF3C7] px-4 py-2.5 text-xs leading-relaxed text-[#92400E]">
+                  下方显示的是 <b>{scannedDriveInfo?.letter ?? "?"} 盘</b> 的扫描结果；想查看{" "}
+                  <b>{currentDrive?.letter ?? ""} 盘</b>，请点右上方「扫描 {currentDrive?.letter ?? ""} 盘」。
+                </div>
+              )}
+              {/* 面包屑（盘符标签跟扫描结果走，不跟下拉框走） */}
               <div className="mb-4 flex flex-wrap items-center gap-1 text-sm">
                 {crumbs.map((c, i) => (
                   <div key={c.path} className="flex items-center gap-1">
@@ -228,7 +252,7 @@ export default function DiskInsight({ active = true }: Props) {
                           : "text-[var(--color-text-secondary)]",
                       ].join(" ")}
                     >
-                      {i === 0 ? `${currentDrive?.letter ?? ""} 盘` : c.name}
+                      {i === 0 ? `${scannedDriveInfo?.letter ?? ""} 盘` : c.name}
                     </button>
                   </div>
                 ))}

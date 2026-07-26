@@ -2,6 +2,8 @@ import { useState } from "react";
 import { HardDrive, Sparkles, Rocket, Cpu, ShieldCheck } from "lucide-react";
 import DiskInsight from "./pages/DiskInsight";
 import Cleanup from "./pages/Cleanup";
+import Startup from "./pages/Startup";
+import MemoryCheck from "./pages/MemoryCheck";
 
 type PageId = "insight" | "clean" | "startup" | "memory";
 
@@ -15,8 +17,8 @@ interface NavItem {
 const NAV_ITEMS: NavItem[] = [
   { id: "insight", label: "磁盘透视", icon: <HardDrive size={20} />, ready: true },
   { id: "clean", label: "一键清理", icon: <Sparkles size={20} />, ready: true },
-  { id: "startup", label: "启动管理", icon: <Rocket size={20} />, ready: false },
-  { id: "memory", label: "内存体检", icon: <Cpu size={20} />, ready: false },
+  { id: "startup", label: "启动管理", icon: <Rocket size={20} />, ready: true },
+  { id: "memory", label: "内存体检", icon: <Cpu size={20} />, ready: true },
 ];
 
 function App() {
@@ -80,7 +82,7 @@ function App() {
         </nav>
 
         <div className="mt-auto px-5 py-4 text-[11px] leading-relaxed text-[var(--color-text-secondary)]">
-          v0.2 · 透视 + 安全清理
+          v0.3 · 透视 / 清理 / 启动 / 内存
           <br />
           所有操作都会先告诉你“这是什么”
         </div>
@@ -94,6 +96,16 @@ function App() {
         {visited.has("clean") && (
           <div className={page === "clean" ? "h-full" : "hidden"}>
             <Cleanup />
+          </div>
+        )}
+        {visited.has("startup") && (
+          <div className={page === "startup" ? "h-full" : "hidden"}>
+            <Startup />
+          </div>
+        )}
+        {visited.has("memory") && (
+          <div className={page === "memory" ? "h-full" : "hidden"}>
+            <MemoryCheck />
           </div>
         )}
       </main>
