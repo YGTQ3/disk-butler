@@ -82,7 +82,7 @@ function App() {
         </nav>
 
         <div className="mt-auto px-5 py-4 text-[11px] leading-relaxed text-[var(--color-text-secondary)]">
-          v0.3 · 透视 / 清理 / 启动 / 内存
+          v{__APP_VERSION__.split(".").slice(0, 2).join(".")} · 透视 / 清理 / 启动 / 内存
           <br />
           所有操作都会先告诉你“这是什么”
         </div>
