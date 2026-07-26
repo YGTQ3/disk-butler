@@ -118,6 +118,14 @@ async fn memory_report() -> Result<MemoryReport, String> {
         .map_err(|e| format!("内存体检失败：{}", e))
 }
 
+/// 页面文件一致性核验（注册表配置 vs 本次开机实际启用）。
+#[tauri::command]
+async fn pagefile_check() -> Result<memory::PagefileCheck, String> {
+    tauri::async_runtime::spawn_blocking(memory::pagefile_check)
+        .await
+        .map_err(|e| format!("页面文件核验失败：{}", e))
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
@@ -134,7 +142,8 @@ pub fn run() {
             get_cleanup_stats,
             list_startup_items,
             set_startup_enabled,
-            memory_report
+            memory_report,
+            pagefile_check
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

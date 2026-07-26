@@ -75,6 +75,29 @@ export interface CleanupStats {
   lastAt: number;
 }
 
+/** 页面文件一致性核验 */
+export interface PagefileEntry {
+  path: string;
+  drive: string;
+  initMb: number;
+  maxMb: number;
+  systemManaged: boolean;
+}
+
+export interface ActivePagefile {
+  path: string;
+  drive: string;
+  allocatedMb: number;
+}
+
+export interface PagefileCheck {
+  autoManaged: boolean;
+  configured: PagefileEntry[];
+  active: ActivePagefile[];
+  /** 为空 = 一切正常 */
+  issues: string[];
+}
+
 export interface DeepAnalyzeReport {
   lines: string[];
   recommended: boolean | null;
