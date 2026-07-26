@@ -34,3 +34,14 @@ debug = false
 [profile.dev.package."*"]
 debug = false
 
+# windows 系 API 绑定 crate 体积巨大，O3 优化时 LLVM 内存峰值超 5GB 会在 16GB 机器上 OOM；
+# 它们只是薄壳绑定，降到 O1 对运行性能无影响
+[profile.release.package.windows]
+opt-level = 1
+
+[profile.release.package.windows-sys]
+opt-level = 1
+
+[profile.release.package.webview2-com-sys]
+opt-level = 1
+
