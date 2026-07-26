@@ -6,7 +6,7 @@ mod scan;
 mod startup;
 
 use cache::ScanCache;
-use cleanup::{CleanupReport, CleanupScan, DeepCleanReport};
+use cleanup::{CleanupReport, CleanupScan, DeepAnalyzeReport, DeepCleanReport};
 use memory::MemoryReport;
 use scan::{DriveInfo, TreeNode};
 use startup::StartupItem;
@@ -52,6 +52,14 @@ async fn list_cleanup_items() -> Result<CleanupScan, String> {
     tauri::async_runtime::spawn_blocking(cleanup::list_items)
         .await
         .map_err(|e| format!("扫描清理项失败：{}", e))
+}
+
+/// 高级：DISM 只读分析（需 UAC 授权，约 1~3 分钟，不做任何更改）。
+#[tauri::command]
+async fn run_deep_analyze() -> Result<DeepAnalyzeReport, String> {
+    tauri::async_runtime::spawn_blocking(cleanup::deep_analyze)
+        .await
+        .map_err(|e| format!("分析任务失败：{}", e))?
 }
 
 /// 高级：系统深度清理（DISM 组件存储，需 UAC 授权，耗时 5~20 分钟）。
@@ -105,6 +113,7 @@ pub fn run() {
             load_scan_cache,
             list_cleanup_items,
             run_cleanup,
+            run_deep_analyze,
             run_deep_clean,
             list_startup_items,
             set_startup_enabled,

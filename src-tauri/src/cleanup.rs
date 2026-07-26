@@ -487,20 +487,126 @@ pub struct DeepCleanReport {
     pub free_after: u64,
 }
 
+/// DISM 只读分析报告：原始关键行 + 微软是否推荐清理
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct DeepAnalyzeReport {
+    /// DISM 报告的关键行（如“备份和已禁用的功能 : 19.24 GB”），原样展示保证透明
+    pub lines: Vec<String>,
+    /// 微软官方建议：Some(true)=推荐清理，Some(false)=不必，None=未能识别
+    pub recommended: Option<bool>,
+    /// “备份和已禁用的功能”体积（GB）——可清理主体，供前端大字标注预估释放量
+    pub backup_gb: Option<f64>,
+}
+
+/// 从 DISM 输出中提取关键信息行与推荐结论（中英文系统兼容）
+fn parse_dism_analyze(text: &str) -> DeepAnalyzeReport {
+    let mut lines_out: Vec<String> = Vec::new();
+    let mut recommended: Option<bool> = None;
+    let mut backup_gb: Option<f64> = None;
+    for raw in text.lines() {
+        let line = raw.trim();
+        if line.is_empty() || line.starts_with('[') || line.contains("====") {
+            continue; // 进度条与空行
+        }
+        // 过滤头部信息
+        if line.starts_with("部署映像")
+            || line.starts_with("Deployment Image")
+            || line.starts_with("版本")
+            || line.starts_with("Version")
+            || line.starts_with("映像版本")
+            || line.starts_with("Image Version")
+        {
+            continue;
+        }
+        if !line.contains(':') && !line.contains('：') {
+            continue;
+        }
+        let lower = line.to_lowercase();
+        if line.contains("组件存储清理") || lower.contains("component store cleanup") {
+            let value = line.rsplit([':', '：']).next().unwrap_or("").trim();
+            recommended = Some(value.contains('是') || value.eq_ignore_ascii_case("yes"));
+        }
+        // 提取可清理主体体积：“备份和已禁用的功能 : 19.24 GB”
+        if line.contains("备份和已禁用") || lower.contains("backups and disabled") {
+            let value = line.rsplit([':', '：']).next().unwrap_or("").trim();
+            let mut parts = value.split_whitespace();
+            if let Some(num) = parts.next() {
+                let unit = parts.next().unwrap_or("GB").to_uppercase();
+                if let Ok(n) = num.parse::<f64>() {
+                    backup_gb = Some(match unit.as_str() {
+                        "MB" => n / 1024.0,
+                        "KB" => n / 1024.0 / 1024.0,
+                        "TB" => n * 1024.0,
+                        _ => n,
+                    });
+                }
+            }
+        }
+        lines_out.push(line.to_string());
+    }
+    DeepAnalyzeReport {
+        lines: lines_out,
+        recommended,
+        backup_gb,
+    }
+}
+
+/// 只读分析：DISM /AnalyzeComponentStore，不做任何更改。
+/// 提权运行并把输出写入临时日志，完成后读回（中文系统日志为 GBK 编码）。
+pub fn deep_analyze() -> Result<DeepAnalyzeReport, String> {
+    use std::os::windows::process::CommandExt;
+    const CREATE_NO_WINDOW: u32 = 0x0800_0000;
+
+    let log = std::env::temp_dir().join("diskbutler-dism-analyze.log");
+    let _ = std::fs::remove_file(&log);
+
+    // 用提权的 cmd 重定向输出到日志（cmd 重定向保持原始 ANSI/GBK 编码，便于统一解码）
+    let ps = format!(
+        r#"$p = Start-Process -Verb RunAs -Wait -PassThru -FilePath cmd.exe -ArgumentList '/d','/c','Dism /Online /Cleanup-Image /AnalyzeComponentStore > "{}" 2>&1'; exit $p.ExitCode"#,
+        log.display()
+    );
+    let status = std::process::Command::new("powershell")
+        .args(["-NoProfile", "-Command", &ps])
+        .creation_flags(CREATE_NO_WINDOW)
+        .status()
+        .map_err(|e| format!("启动分析失败：{}", e))?;
+
+    let code = status.code().unwrap_or(-1);
+    if code != 0 {
+        return Err(if code == 1 {
+            "已取消授权，未执行分析。".to_string()
+        } else {
+            format!("分析未完成（退出码 {}），可稍后重试。", code)
+        });
+    }
+
+    let bytes = std::fs::read(&log).map_err(|e| format!("读取分析结果失败：{}", e))?;
+    // 中文系统为 GBK；英文系统的 ASCII 内容用 GBK 解码同样无损
+    let (text, _, _) = encoding_rs::GBK.decode(&bytes);
+    let report = parse_dism_analyze(&text);
+    if report.lines.is_empty() {
+        return Err("分析完成但未能读到报告内容，可稍后重试。".to_string());
+    }
+    Ok(report)
+}
+
 /// 执行 DISM /StartComponentCleanup：清理 Windows 更新的旧版本备份（WinSxS）。
-/// 会弹 UAC 提权窗口与 DISM 控制台进度窗口，耗时 5~20 分钟，同步等待完成。
+/// 与 deep_analyze 同一条已验证通道：提权 cmd + 日志重定向，同步等待 5~20 分钟。
 pub fn deep_clean() -> Result<DeepCleanReport, String> {
     use std::os::windows::process::CommandExt;
     const CREATE_NO_WINDOW: u32 = 0x0800_0000;
 
     let free_before = c_drive_free();
-    // 用 PowerShell 提权启动 Dism 并等待退出码；拒绝 UAC 时 Start-Process 抛异常 -> exit 1
+    let log = std::env::temp_dir().join("diskbutler-dism-clean.log");
+    let _ = std::fs::remove_file(&log);
+
+    let ps = format!(
+        r#"$p = Start-Process -Verb RunAs -Wait -PassThru -FilePath cmd.exe -ArgumentList '/d','/c','Dism /Online /Cleanup-Image /StartComponentCleanup > "{}" 2>&1'; exit $p.ExitCode"#,
+        log.display()
+    );
     let status = std::process::Command::new("powershell")
-        .args([
-            "-NoProfile",
-            "-Command",
-            "$p = Start-Process -Verb RunAs -Wait -PassThru -FilePath Dism.exe -ArgumentList '/Online','/Cleanup-Image','/StartComponentCleanup','/NoRestart'; exit $p.ExitCode",
-        ])
+        .args(["-NoProfile", "-Command", &ps])
         .creation_flags(CREATE_NO_WINDOW)
         .status()
         .map_err(|e| format!("启动清理失败：{}", e))?;
@@ -508,10 +614,23 @@ pub fn deep_clean() -> Result<DeepCleanReport, String> {
     let code = status.code().unwrap_or(-1);
     // 0 = 成功；3010 = 成功但需重启
     if code != 0 && code != 3010 {
+        // 附带日志尾部帮助定位（GBK 解码）
+        let tail = std::fs::read(&log)
+            .ok()
+            .map(|b| {
+                let (t, _, _) = encoding_rs::GBK.decode(&b);
+                t.lines()
+                    .rev()
+                    .filter(|l| !l.trim().is_empty() && !l.starts_with('['))
+                    .take(3)
+                    .collect::<Vec<_>>()
+                    .join(" | ")
+            })
+            .unwrap_or_default();
         return Err(if code == 1 {
             "已取消授权，未执行清理。".to_string()
         } else {
-            format!("系统清理未完成（退出码 {}），可稍后重试。", code)
+            format!("系统清理未完成（退出码 {}）。{}", code, tail)
         });
     }
 
@@ -647,5 +766,35 @@ mod tests {
     #[test]
     fn dir_size_of_missing_path_is_zero() {
         assert_eq!(dir_size(Path::new(r"C:\__no_such_dir_disk_butler__")), 0);
+    }
+
+    #[test]
+    fn parse_dism_analyze_chinese_output() {
+        let sample = "\
+部署映像服务和管理工具\n\
+版本: 10.0.26100.8737\n\
+\n\
+[==========================100.0%==========================]\n\
+组件存储(WinSxS)信息:\n\
+\n\
+组件存储的实际大小 : 27.76 GB\n\
+备份和已禁用的功能 : 19.24 GB\n\
+可回收的程序包 : 15\n\
+推荐使用组件存储清理 : 是\n\
+操作成功完成。\n";
+        let r = parse_dism_analyze(sample);
+        assert_eq!(r.recommended, Some(true));
+        assert!(r.lines.iter().any(|l| l.contains("19.24 GB")));
+        // 可清理主体体积应被正确提取
+        assert!((r.backup_gb.unwrap() - 19.24).abs() < 0.01);
+        // 进度条和版本头应被过滤
+        assert!(!r.lines.iter().any(|l| l.contains("100.0%")));
+        assert!(!r.lines.iter().any(|l| l.starts_with("版本")));
+    }
+
+    #[test]
+    fn parse_dism_analyze_not_recommended() {
+        let sample = "推荐使用组件存储清理 : 否\n";
+        assert_eq!(parse_dism_analyze(sample).recommended, Some(false));
     }
 }

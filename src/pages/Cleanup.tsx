@@ -15,10 +15,10 @@ import {
   Archive,
   Wrench,
 } from "lucide-react";
-import { CleanupItem, CleanupScan, CleanupReport, DeepCleanReport, formatBytes } from "../types";
+import { CleanupItem, CleanupScan, CleanupReport, DeepCleanReport, DeepAnalyzeReport, formatBytes } from "../types";
 
 type Phase = "loading" | "ready" | "confirm" | "cleaning" | "done";
-type DeepPhase = "idle" | "confirm" | "running" | "done";
+type DeepPhase = "idle" | "intro" | "analyzing" | "analyzed" | "confirm" | "running" | "done";
 
 const KIND_META = {
   junk: {
@@ -48,8 +48,9 @@ export default function Cleanup() {
   const [report, setReport] = useState<CleanupReport | null>(null);
   const [error, setError] = useState("");
 
-  // 高级：系统深度清理
+  // 高级：系统深度清理（两步式：先分析 → 用户确认 → 再清理）
   const [deepPhase, setDeepPhase] = useState<DeepPhase>("idle");
+  const [analyzeReport, setAnalyzeReport] = useState<DeepAnalyzeReport | null>(null);
   const [deepReport, setDeepReport] = useState<DeepCleanReport | null>(null);
   const [deepError, setDeepError] = useState("");
 
@@ -111,6 +112,19 @@ export default function Cleanup() {
     } catch (e) {
       setError(String(e));
       setPhase("ready");
+    }
+  }
+
+  async function doDeepAnalyze() {
+    setDeepPhase("analyzing");
+    setDeepError("");
+    try {
+      const r = await invoke<DeepAnalyzeReport>("run_deep_analyze");
+      setAnalyzeReport(r);
+      setDeepPhase("analyzed");
+    } catch (e) {
+      setDeepError(String(e));
+      setDeepPhase("idle");
     }
   }
 
@@ -292,10 +306,64 @@ export default function Cleanup() {
                   ⚠ 清理后将无法卸载/回滚现有的 Windows 更新（系统运行正常则基本无影响）。
                 </div>
 
+                {/* 分析中 */}
+                {deepPhase === "analyzing" && (
+                  <div className="mt-3 flex items-center gap-2 rounded-xl bg-[var(--color-bg)] px-3.5 py-2.5 text-xs text-[var(--color-text-secondary)]">
+                    <Loader2 size={14} className="animate-spin text-[var(--color-primary)]" />
+                    正在分析中（只读，不做任何更改）……约 1~3 分钟。黑色终端窗口会自己关闭，请不要手动关它。
+                  </div>
+                )}
+
+                {(deepPhase === "analyzed" || deepPhase === "confirm") && analyzeReport && (
+                  <div className="mt-3 flex gap-3">
+                    {/* 左：微软原始报告（专业信息保留） */}
+                    <div className="min-w-0 flex-1 rounded-xl bg-[var(--color-bg)] p-3.5">
+                      <div className="mb-1.5 text-xs font-medium">📊 微软 DISM 原始报告</div>
+                      <div className="select-text space-y-0.5 text-[11px] leading-relaxed text-[var(--color-text-secondary)]">
+                        {analyzeReport.lines.map((l, idx) => (
+                          <div key={idx}>{l}</div>
+                        ))}
+                      </div>
+                    </div>
+                    {/* 右：人话重点标注（大字） */}
+                    <div className="flex w-56 shrink-0 flex-col items-center justify-center gap-3 rounded-xl bg-[var(--color-primary-soft)] p-4 text-center">
+                      {analyzeReport.backupGb !== null ? (
+                        <div>
+                          <div className="text-xs text-[var(--color-text-secondary)]">预计可释放</div>
+                          <div className="mt-0.5 text-2xl font-bold text-[var(--color-primary-dark)]">
+                            约 {(analyzeReport.backupGb * 0.5).toFixed(1)}~
+                            {(analyzeReport.backupGb * 0.7).toFixed(1)} GB
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="text-sm text-[var(--color-text-secondary)]">
+                          未能识别可释放量，请看左侧报告
+                        </div>
+                      )}
+                      {analyzeReport.recommended === true && (
+                        <div className="rounded-full bg-[var(--color-safe)] px-4 py-1.5 text-sm font-semibold text-white">
+                          微软推荐清理 ✓
+                        </div>
+                      )}
+                      {analyzeReport.recommended === false && (
+                        <div className="rounded-full bg-[var(--color-keep)] px-4 py-1.5 text-sm font-semibold text-white">
+                          暂不必清理
+                        </div>
+                      )}
+                      <button
+                        onClick={() => setDeepPhase("confirm")}
+                        className="w-full rounded-xl bg-[var(--color-primary)] py-2.5 text-sm font-semibold text-white transition-colors hover:bg-[var(--color-primary-dark)]"
+                      >
+                        确认清理…
+                      </button>
+                    </div>
+                  </div>
+                )}
+
                 {deepPhase === "running" && (
                   <div className="mt-3 flex items-center gap-2 rounded-xl bg-[var(--color-bg)] px-3.5 py-2.5 text-xs text-[var(--color-text-secondary)]">
                     <Loader2 size={14} className="animate-spin text-[var(--color-primary)]" />
-                    正在清理系统组件……会弹出授权和进度窗口，请勿关机。完成后这里会显示结果。
+                    正在清理系统组件（约 5~20 分钟）……进度窗口会自己关闭，请不要手动关它，也请勿关机。
                   </div>
                 )}
                 {deepPhase === "done" && deepReport && (
@@ -311,12 +379,12 @@ export default function Cleanup() {
                   </div>
                 )}
 
-                {deepPhase !== "running" && deepPhase !== "done" && (
+                {(deepPhase === "idle" || deepPhase === "analyzed") && (
                   <button
-                    onClick={() => setDeepPhase("confirm")}
-                    className="mt-3 rounded-xl border border-[var(--color-line)] px-4 py-2 text-xs font-medium transition-colors hover:border-[var(--color-caution)] hover:text-[var(--color-caution)]"
+                    onClick={() => setDeepPhase("intro")}
+                    className="mt-3 rounded-xl border border-[var(--color-line)] px-4 py-2 text-xs font-medium transition-colors hover:border-[var(--color-primary)] hover:text-[var(--color-primary-dark)]"
                   >
-                    开始深度清理…
+                    {deepPhase === "analyzed" ? "重新分析" : "分析（只读）"}
                   </button>
                 )}
               </div>
@@ -402,6 +470,91 @@ export default function Cleanup() {
             )}
           </AnimatePresence>
 
+          {/* 分析前预告弹窗：先告知接下来会发生什么，确认后才开始 */}
+          <AnimatePresence>
+            {deepPhase === "intro" && (
+              <motion.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                className="absolute inset-0 z-30 flex items-center justify-center bg-black/30 p-6"
+                onClick={() => setDeepPhase(analyzeReport ? "analyzed" : "idle")}
+              >
+                <motion.div
+                  initial={{ scale: 0.94, y: 10 }}
+                  animate={{ scale: 1, y: 0 }}
+                  exit={{ scale: 0.94, y: 10 }}
+                  className="w-full max-w-lg rounded-2xl bg-[var(--color-surface)] p-7 shadow-[var(--shadow-card-hover)]"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <div className="text-lg font-semibold">开始分析前，先看这 3 件事</div>
+                  <div className="mt-1 text-xs text-[var(--color-text-secondary)]">
+                    这一步只是“体检”，用来告诉你能清理多少
+                  </div>
+
+                  <div className="mt-5 space-y-3">
+                    <div className="flex items-center gap-3.5 rounded-xl bg-[var(--color-bg)] px-4 py-3">
+                      <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-[var(--color-primary)] text-sm font-bold text-white">
+                        1
+                      </span>
+                      <span className="min-w-0 text-sm">
+                        <span className="font-semibold">弹出系统授权窗口（UAC），请点“是”</span>
+                        <span className="mt-0.5 block text-xs text-[var(--color-text-secondary)]">
+                          这是 Windows 对管理员操作的正常确认
+                        </span>
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-3.5 rounded-xl bg-[var(--color-bg)] px-4 py-3">
+                      <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-[var(--color-primary)] text-sm font-bold text-white">
+                        2
+                      </span>
+                      <span className="min-w-0 text-sm">
+                        <span className="font-semibold">会出现黑色终端窗口，它会自己关闭</span>
+                        <span className="mt-0.5 block text-xs text-[var(--color-text-secondary)]">
+                          那是分析进度窗口，请不要手动关它
+                        </span>
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-3.5 rounded-xl bg-[var(--color-bg)] px-4 py-3">
+                      <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-[var(--color-primary)] text-sm font-bold text-white">
+                        3
+                      </span>
+                      <span className="min-w-0 text-sm">
+                        <span className="font-semibold">全程约 1~3 分钟</span>
+                        <span className="mt-0.5 block text-xs text-[var(--color-text-secondary)]">
+                          期间可以正常使用电脑
+                        </span>
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="mt-4 flex items-center gap-2.5 rounded-xl bg-[var(--color-primary-soft)] px-4 py-3">
+                    <ShieldCheck size={18} className="shrink-0 text-[var(--color-primary-dark)]" />
+                    <span className="text-sm">
+                      <b>只读取信息，不删除、不修改任何东西</b>
+                      <span className="text-[var(--color-text-secondary)]">，分析完由你决定要不要清理</span>
+                    </span>
+                  </div>
+
+                  <div className="mt-6 flex gap-3">
+                    <button
+                      onClick={() => setDeepPhase(analyzeReport ? "analyzed" : "idle")}
+                      className="flex-1 rounded-xl border border-[var(--color-line)] py-3 text-sm font-medium transition-colors hover:bg-[var(--color-bg)]"
+                    >
+                      取消
+                    </button>
+                    <button
+                      onClick={doDeepAnalyze}
+                      className="flex-1 rounded-xl bg-[var(--color-primary)] py-3 text-sm font-semibold text-white transition-colors hover:bg-[var(--color-primary-dark)]"
+                    >
+                      确定开始
+                    </button>
+                  </div>
+                </motion.div>
+              </motion.div>
+            )}
+          </AnimatePresence>
+
           {/* 深度清理确认弹窗 */}
           <AnimatePresence>
             {deepPhase === "confirm" && (
@@ -410,34 +563,77 @@ export default function Cleanup() {
                 animate={{ opacity: 1 }}
                 exit={{ opacity: 0 }}
                 className="absolute inset-0 z-30 flex items-center justify-center bg-black/30 p-6"
-                onClick={() => setDeepPhase("idle")}
+                onClick={() => setDeepPhase("analyzed")}
               >
                 <motion.div
                   initial={{ scale: 0.94, y: 10 }}
                   animate={{ scale: 1, y: 0 }}
                   exit={{ scale: 0.94, y: 10 }}
-                  className="w-full max-w-md rounded-2xl bg-[var(--color-surface)] p-6 shadow-[var(--shadow-card-hover)]"
+                  className="w-full max-w-lg rounded-2xl bg-[var(--color-surface)] p-7 shadow-[var(--shadow-card-hover)]"
                   onClick={(e) => e.stopPropagation()}
                 >
-                  <div className="text-base font-semibold">确认执行系统深度清理？</div>
-                  <div className="mt-3 rounded-xl bg-[#FEF3C7] p-3.5 text-xs leading-relaxed text-[#92400E]">
-                    <b>请确认你了解：</b>
-                    <br />① 会弹出系统授权窗口（UAC），需要点“是”；
-                    <br />② 过程约 5~20 分钟，会显示系统进度窗口，期间请勿关机；
-                    <br />③ 完成后将无法卸载/回滚现有的 Windows 更新——系统运行正常的话，这基本没有影响。
+                  <div className="flex items-center gap-3">
+                    <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-[#FEE2E2]">
+                      <AlertTriangle size={24} className="text-[#DC2626]" />
+                    </span>
+                    <span>
+                      <span className="block text-lg font-semibold">确认执行系统深度清理？</span>
+                      <span className="block text-xs text-[var(--color-text-secondary)]">
+                        开始前请看清下面 3 件事
+                      </span>
+                    </span>
                   </div>
-                  <div className="mt-5 flex gap-3">
+
+                  <div className="mt-5 space-y-3">
+                    <div className="flex items-center gap-3.5 rounded-xl bg-[var(--color-bg)] px-4 py-3">
+                      <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-[var(--color-primary)] text-sm font-bold text-white">
+                        1
+                      </span>
+                      <span className="min-w-0 text-sm">
+                        <span className="font-semibold">弹出系统授权窗口（UAC），请点“是”</span>
+                        <span className="mt-0.5 block text-xs text-[var(--color-text-secondary)]">
+                          之后会出现进度窗口，它会自己关闭，请不要手动关它
+                        </span>
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-3.5 rounded-xl border border-[#FECACA] bg-[#FEF2F2] px-4 py-3.5">
+                      <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-[#DC2626] text-sm font-bold text-white">
+                        !
+                      </span>
+                      <span className="min-w-0">
+                        <span className="block text-base font-bold text-[#B91C1C]">
+                          全程约 5~20 分钟，期间请勿关机
+                        </span>
+                        <span className="mt-0.5 block text-xs text-[#B91C1C] opacity-80">
+                          中途断电可能损坏系统组件，这是唯一需要你保证的事
+                        </span>
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-3.5 rounded-xl bg-[var(--color-bg)] px-4 py-3">
+                      <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-[var(--color-keep)] text-sm font-bold text-white">
+                        3
+                      </span>
+                      <span className="min-w-0 text-sm">
+                        <span className="font-semibold">清理后无法卸载/回滚现有的 Windows 更新</span>
+                        <span className="mt-0.5 block text-xs text-[var(--color-text-secondary)]">
+                          系统运行正常的话，这基本没有影响
+                        </span>
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="mt-6 flex gap-3">
                     <button
-                      onClick={() => setDeepPhase("idle")}
-                      className="flex-1 rounded-xl border border-[var(--color-line)] py-2.5 text-sm font-medium transition-colors hover:bg-[var(--color-bg)]"
+                      onClick={() => setDeepPhase("analyzed")}
+                      className="flex-1 rounded-xl border border-[var(--color-line)] py-3 text-sm font-medium transition-colors hover:bg-[var(--color-bg)]"
                     >
                       再想想
                     </button>
                     <button
                       onClick={doDeepClean}
-                      className="flex-1 rounded-xl bg-[var(--color-caution)] py-2.5 text-sm font-medium text-white transition-colors hover:opacity-90"
+                      className="flex-1 rounded-xl bg-[#DC2626] py-3 text-sm font-semibold text-white transition-colors hover:bg-[#B91C1C]"
                     >
-                      我已了解，开始
+                      我已了解，开始清理
                     </button>
                   </div>
                 </motion.div>

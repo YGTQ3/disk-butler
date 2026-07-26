@@ -26,6 +26,7 @@ jwalk = "0.8"
 sysinfo = "0.32"
 windows-sys = { version = "0.59", features = ["Win32_Foundation", "Win32_UI_Shell"] }
 winreg = "0.52"
+encoding_rs = "0.8"
 
 [profile.dev]
 # 加快扫描相关依赖的运行速度；关闭调试信息以降低编译内存峰值（16GB 内存机器必需）
