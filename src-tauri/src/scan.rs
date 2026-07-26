@@ -1,0 +1,296 @@
+//! 磁盘扫描引擎：并行遍历目录、聚合大小、剪枝生成树，供前端 TreeMap 使用。
+
+use crate::knowledge::{self, Category, Safety};
+use jwalk::WalkDir;
+use serde::Serialize;
+use std::collections::HashMap;
+use std::path::{Path, PathBuf};
+use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::Arc;
+use std::time::{Duration, Instant};
+use tauri::{AppHandle, Emitter};
+
+/// 每层保留的子项数量上限，其余聚合为「其他」。
+const TOP_N_PER_LEVEL: usize = 30;
+/// 返回给前端的树的最大深度（从扫描根算起）。
+const MAX_DEPTH: usize = 4;
+
+/// 树节点，直接序列化给前端。
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct TreeNode {
+    pub name: String,
+    pub path: String,
+    pub size: u64,
+    pub is_dir: bool,
+    /// 该目录是否还有更深内容未展开（前端据此决定能否继续下钻）。
+    pub has_children: bool,
+    pub category: Category,
+    pub friendly_name: String,
+    pub description: String,
+    pub safety: Safety,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub children: Vec<TreeNode>,
+}
+
+/// 扫描进度事件（emit 给前端）。
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ScanProgress {
+    pub files_scanned: u64,
+    pub bytes_scanned: u64,
+    pub current_path: String,
+    pub done: bool,
+}
+
+/// 盘符信息。
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct DriveInfo {
+    pub letter: String,
+    pub mount_point: String,
+    pub total: u64,
+    pub free: u64,
+    pub used: u64,
+}
+
+/// 内部：先把整棵目录的大小聚合到一张「路径 -> (自身大小, 是否目录)」的表里。
+struct SizeIndex {
+    /// 每个目录的递归总大小
+    dir_sizes: HashMap<PathBuf, u64>,
+    /// 每个目录的直接子项（文件或子目录）
+    children: HashMap<PathBuf, Vec<PathBuf>>,
+    /// 文件大小
+    file_sizes: HashMap<PathBuf, u64>,
+}
+
+/// 枚举系统盘符。
+pub fn list_drives() -> Vec<DriveInfo> {
+    use sysinfo::Disks;
+    let disks = Disks::new_with_refreshed_list();
+    let mut out = Vec::new();
+    for disk in disks.list() {
+        let mount = disk.mount_point().to_string_lossy().to_string();
+        let letter = mount.chars().next().map(|c| c.to_string()).unwrap_or_default();
+        let total = disk.total_space();
+        let free = disk.available_space();
+        out.push(DriveInfo {
+            letter,
+            mount_point: mount,
+            total,
+            free,
+            used: total.saturating_sub(free),
+        });
+    }
+    // 去重（同一盘符可能出现多次），按盘符排序
+    out.sort_by(|a, b| a.mount_point.cmp(&b.mount_point));
+    out.dedup_by(|a, b| a.mount_point == b.mount_point);
+    out
+}
+
+/// 并行遍历 root，构建大小索引，同时通过 app 上报进度。
+fn build_index(root: &Path, app: Option<&AppHandle>) -> (SizeIndex, u64) {
+    let files_scanned = Arc::new(AtomicU64::new(0));
+    let bytes_scanned = Arc::new(AtomicU64::new(0));
+    let mut file_sizes: HashMap<PathBuf, u64> = HashMap::new();
+
+    let counter = files_scanned.clone();
+    let byte_counter = bytes_scanned.clone();
+
+    let mut last_emit = Instant::now();
+    let mut last_path = String::new();
+
+    for entry in WalkDir::new(root)
+        .skip_hidden(false)
+        .parallelism(jwalk::Parallelism::RayonDefaultPool {
+            busy_timeout: Duration::from_secs(5),
+        })
+        .into_iter()
+        .flatten()
+    {
+        let path = entry.path();
+        if entry.file_type().is_file() {
+            let size = entry.metadata().map(|m| m.len()).unwrap_or(0);
+            file_sizes.insert(path.clone(), size);
+            counter.fetch_add(1, Ordering::Relaxed);
+            byte_counter.fetch_add(size, Ordering::Relaxed);
+            last_path = path.to_string_lossy().to_string();
+        }
+
+        // 每 500ms 上报一次进度，避免 emit 过于频繁
+        if let Some(app) = app {
+            if last_emit.elapsed() >= Duration::from_millis(500) {
+                let _ = app.emit(
+                    "scan-progress",
+                    ScanProgress {
+                        files_scanned: counter.load(Ordering::Relaxed),
+                        bytes_scanned: byte_counter.load(Ordering::Relaxed),
+                        current_path: last_path.clone(),
+                        done: false,
+                    },
+                );
+                last_emit = Instant::now();
+            }
+        }
+    }
+
+    // 由文件大小自底向上聚合出目录大小与父子关系
+    let mut dir_sizes: HashMap<PathBuf, u64> = HashMap::new();
+    let mut children: HashMap<PathBuf, Vec<PathBuf>> = HashMap::new();
+    let root_buf = root.to_path_buf();
+
+    for (file, size) in &file_sizes {
+        let mut cur = file.parent().map(|p| p.to_path_buf());
+        // 记录直接父子关系
+        if let Some(parent) = file.parent() {
+            children
+                .entry(parent.to_path_buf())
+                .or_default()
+                .push(file.clone());
+        }
+        // 向上累加到 root 为止
+        while let Some(dir) = cur {
+            *dir_sizes.entry(dir.clone()).or_insert(0) += size;
+            if dir == root_buf {
+                break;
+            }
+            // 记录目录的父子关系（子目录 -> 父目录）
+            if let Some(parent) = dir.parent() {
+                let list = children.entry(parent.to_path_buf()).or_default();
+                if !list.contains(&dir) {
+                    list.push(dir.clone());
+                }
+                cur = Some(parent.to_path_buf());
+            } else {
+                break;
+            }
+        }
+    }
+
+    let total = bytes_scanned.load(Ordering::Relaxed);
+    (
+        SizeIndex {
+            dir_sizes,
+            children,
+            file_sizes,
+        },
+        total,
+    )
+}
+
+/// 从索引里构建以 `dir` 为根的树，限制深度与每层数量。
+fn build_tree(index: &SizeIndex, dir: &Path, depth: usize) -> TreeNode {
+    let path_str = dir.to_string_lossy().to_string();
+    let size = index.dir_sizes.get(dir).copied().unwrap_or(0);
+    let hit = knowledge::classify(&path_str);
+    let name = dir
+        .file_name()
+        .map(|n| n.to_string_lossy().to_string())
+        .unwrap_or_else(|| path_str.clone());
+
+    let empty = Vec::new();
+    let child_paths = index.children.get(dir).unwrap_or(&empty);
+    let has_children = !child_paths.is_empty();
+
+    // 达到最大深度：不再展开，只标记是否还有下级
+    if depth >= MAX_DEPTH {
+        return TreeNode {
+            name,
+            path: path_str,
+            size,
+            is_dir: true,
+            has_children,
+            category: hit.category,
+            friendly_name: hit.friendly_name,
+            description: hit.description,
+            safety: hit.safety,
+            children: Vec::new(),
+        };
+    }
+
+    // 收集子节点（目录递归，文件直接建叶子）
+    let mut kids: Vec<TreeNode> = Vec::new();
+    for child in child_paths {
+        if index.dir_sizes.contains_key(child) {
+            kids.push(build_tree(index, child, depth + 1));
+        } else if let Some(fsize) = index.file_sizes.get(child) {
+            let cpath = child.to_string_lossy().to_string();
+            let chit = knowledge::classify(&cpath);
+            let cname = child
+                .file_name()
+                .map(|n| n.to_string_lossy().to_string())
+                .unwrap_or_default();
+            kids.push(TreeNode {
+                name: cname,
+                path: cpath,
+                size: *fsize,
+                is_dir: false,
+                has_children: false,
+                category: chit.category,
+                friendly_name: chit.friendly_name,
+                description: chit.description,
+                safety: chit.safety,
+                children: Vec::new(),
+            });
+        }
+    }
+
+    kids.sort_by(|a, b| b.size.cmp(&a.size));
+
+    // 剪枝：超过 TOP_N 的聚合成「其他」
+    if kids.len() > TOP_N_PER_LEVEL {
+        let overflow: Vec<TreeNode> = kids.split_off(TOP_N_PER_LEVEL);
+        let other_size: u64 = overflow.iter().map(|k| k.size).sum();
+        let count = overflow.len();
+        if other_size > 0 {
+            kids.push(TreeNode {
+                name: format!("其他 ({} 项)", count),
+                path: format!("{}::__others__", path_str),
+                size: other_size,
+                is_dir: false,
+                has_children: false,
+                category: Category::Other,
+                friendly_name: format!("其他 {} 个较小项目", count),
+                description: "这些项目单个占用较小，已合并显示。".to_string(),
+                safety: Safety::Keep,
+                children: Vec::new(),
+            });
+        }
+    }
+
+    TreeNode {
+        name,
+        path: path_str,
+        size,
+        is_dir: true,
+        has_children,
+        category: hit.category,
+        friendly_name: hit.friendly_name,
+        description: hit.description,
+        safety: hit.safety,
+        children: kids,
+    }
+}
+
+/// 扫描一个根目录，返回剪枝后的树。发送进度事件（需要 AppHandle）。
+pub fn scan(root: &str, app: Option<&AppHandle>) -> Result<TreeNode, String> {
+    let root_path = PathBuf::from(root);
+    if !root_path.exists() {
+        return Err(format!("路径不存在：{}", root));
+    }
+    let (index, _total) = build_index(&root_path, app);
+    let tree = build_tree(&index, &root_path, 0);
+
+    if let Some(app) = app {
+        let _ = app.emit(
+            "scan-progress",
+            ScanProgress {
+                files_scanned: index.file_sizes.len() as u64,
+                bytes_scanned: tree.size,
+                current_path: String::new(),
+                done: true,
+            },
+        );
+    }
+    Ok(tree)
+}

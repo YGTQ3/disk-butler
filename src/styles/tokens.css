@@ -1,0 +1,68 @@
+/* C盘管家 · 设计令牌 —— 唯一的样式事实来源，组件禁止硬编码色值 */
+@import "tailwindcss";
+
+@theme {
+  /* 基础色 */
+  --color-bg: #f7f9fb;
+  --color-surface: #ffffff;
+  --color-primary: #14b8a6;
+  --color-primary-dark: #0d9488;
+  --color-primary-soft: #ccfbf1;
+  --color-text-main: #1e293b;
+  --color-text-secondary: #64748b;
+  --color-line: #e2e8f0;
+
+  /* 磁盘分类色（TreeMap / 水位条 / 徽章统一语义） */
+  --color-cat-system: #60a5fa;
+  --color-cat-software: #a78bfa;
+  --color-cat-cache: #fbbf24;
+  --color-cat-personal: #34d399;
+  --color-cat-system-file: #94a3b8;
+  --color-cat-other: #cbd5e1;
+
+  /* 安全等级 */
+  --color-safe: #10b981;
+  --color-caution: #f59e0b;
+  --color-keep: #64748b;
+
+  /* 圆角 */
+  --radius-card: 16px;
+  --radius-btn: 12px;
+
+  /* 字体 */
+  --font-sans: system-ui, "Microsoft YaHei UI", "MiSans", sans-serif;
+
+  /* 阴影 */
+  --shadow-card: 0 1px 3px rgb(15 23 42 / 0.06), 0 8px 24px rgb(15 23 42 / 0.04);
+  --shadow-card-hover: 0 2px 6px rgb(15 23 42 / 0.08), 0 12px 32px rgb(15 23 42 / 0.08);
+}
+
+html,
+body,
+#root {
+  height: 100%;
+  margin: 0;
+  background: var(--color-bg);
+  color: var(--color-text-main);
+  font-family: var(--font-sans);
+  font-size: 14px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+  user-select: none;
+}
+
+/* 全局滚动条：细且柔和 */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--color-line);
+  border-radius: 999px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--color-text-secondary);
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
