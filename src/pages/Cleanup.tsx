@@ -76,11 +76,24 @@ export default function Cleanup() {
 
   return (
     <div className="flex h-full flex-col">
-      <header className="px-8 pt-6 pb-2">
-        <h1 className="text-xl font-semibold">一键清理</h1>
-        <p className="mt-0.5 text-sm text-[var(--color-text-secondary)]">
-          只清理经过验证安全的项目，每一项都告诉你"删了会怎样"
-        </p>
+      <header className="flex items-start justify-between px-8 pt-6 pb-2">
+        <div>
+          <h1 className="text-xl font-semibold">一键清理</h1>
+          <p className="mt-0.5 text-sm text-[var(--color-text-secondary)]">
+            只清理经过验证安全的项目，每一项都告诉你“删了会怎样”
+          </p>
+        </div>
+        {/* 手动刷新：数据保留在页面上，想重新检查时才重新扫描 */}
+        {(phase === "ready" || phase === "confirm") && (
+          <button
+            onClick={load}
+            title="重新检查各项当前大小"
+            className="flex items-center gap-1.5 rounded-xl border border-[var(--color-line)] bg-[var(--color-surface)] px-3.5 py-2 text-xs font-medium text-[var(--color-text-secondary)] transition-colors hover:border-[var(--color-primary)] hover:text-[var(--color-primary-dark)]"
+          >
+            <RotateCcw size={14} />
+            重新检查
+          </button>
+        )}
       </header>
 
       {/* 加载中 */}

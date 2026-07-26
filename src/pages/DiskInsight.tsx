@@ -10,7 +10,12 @@ import DetailPanel from "../components/DetailPanel";
 
 type Phase = "idle" | "scanning" | "done";
 
-export default function DiskInsight() {
+interface Props {
+  /** 页面当前是否可见（保持挂载方案下，重新可见时需重测 TreeMap 尺寸） */
+  active?: boolean;
+}
+
+export default function DiskInsight({ active = true }: Props) {
   const [drives, setDrives] = useState<DriveInfo[]>([]);
   const [selected, setSelected] = useState<string>("");
   const [phase, setPhase] = useState<Phase>("idle");
@@ -44,17 +49,17 @@ export default function DiskInsight() {
     };
   }, []);
 
-  // 测量 TreeMap 可用区域
+  // 测量 TreeMap 可用区域（页面重新可见时也重测，避免隐藏期间窗口缩放导致尺寸归零）
   useLayoutEffect(() => {
-    if (phase !== "done") return;
+    if (phase !== "done" || !active) return;
     const measure = () => {
       const el = mapAreaRef.current;
-      if (el) setMapSize({ w: el.clientWidth, h: el.clientHeight });
+      if (el && el.clientWidth > 0) setMapSize({ w: el.clientWidth, h: el.clientHeight });
     };
     measure();
     window.addEventListener("resize", measure);
     return () => window.removeEventListener("resize", measure);
-  }, [phase]);
+  }, [phase, active]);
 
   const current = stack.length > 0 ? stack[stack.length - 1] : root;
   const currentDrive = drives.find((d) => d.mountPoint === selected);
