@@ -46,3 +46,7 @@ opt-level = 1
 [profile.release.package.webview2-com-sys]
 opt-level = 1
 
+# 本应用自身：I/O 密集型，热点在依赖库（jwalk 等保持 O3），O1 降编译内存峰值
+[profile.release.package.disk-butler]
+opt-level = 1
+
