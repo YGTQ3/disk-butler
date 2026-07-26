@@ -4,12 +4,14 @@ mod knowledge;
 mod memory;
 mod scan;
 mod startup;
+mod stats;
 
 use cache::ScanCache;
 use cleanup::{CleanupReport, CleanupScan, DeepAnalyzeReport, DeepCleanReport};
 use memory::MemoryReport;
 use scan::{DriveInfo, TreeNode};
 use startup::StartupItem;
+use stats::CleanupStats;
 
 /// 枚举系统盘符及容量。
 #[tauri::command]
@@ -64,18 +66,32 @@ async fn run_deep_analyze() -> Result<DeepAnalyzeReport, String> {
 
 /// 高级：系统深度清理（DISM 组件存储，需 UAC 授权，耗时 5~20 分钟）。
 #[tauri::command]
-async fn run_deep_clean() -> Result<DeepCleanReport, String> {
-    tauri::async_runtime::spawn_blocking(cleanup::deep_clean)
-        .await
-        .map_err(|e| format!("深度清理任务失败：{}", e))?
+async fn run_deep_clean(app: tauri::AppHandle) -> Result<DeepCleanReport, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        let r = cleanup::deep_clean()?;
+        stats::record(&app, r.freed);
+        Ok(r)
+    })
+    .await
+    .map_err(|e| format!("深度清理任务失败：{}", e))?
 }
 
 /// 执行清理（只接受白名单 id，路径由后端重新解析）。
 #[tauri::command]
-async fn run_cleanup(ids: Vec<String>) -> Result<CleanupReport, String> {
-    tauri::async_runtime::spawn_blocking(move || cleanup::run(ids))
-        .await
-        .map_err(|e| format!("清理任务失败：{}", e))
+async fn run_cleanup(app: tauri::AppHandle, ids: Vec<String>) -> Result<CleanupReport, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        let r = cleanup::run(ids);
+        stats::record(&app, r.total_freed);
+        r
+    })
+    .await
+    .map_err(|e| format!("清理任务失败：{}", e))
+}
+
+/// 累计清理统计（本地持久化，仅用于成就感展示）。
+#[tauri::command]
+fn get_cleanup_stats(app: tauri::AppHandle) -> CleanupStats {
+    stats::load(&app)
 }
 
 /// 枚举启动项（注册表 Run + 启动文件夹，含建议标签与运行内存）。
@@ -115,6 +131,7 @@ pub fn run() {
             run_cleanup,
             run_deep_analyze,
             run_deep_clean,
+            get_cleanup_stats,
             list_startup_items,
             set_startup_enabled,
             memory_report

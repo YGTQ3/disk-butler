@@ -15,7 +15,15 @@ import {
   Archive,
   Wrench,
 } from "lucide-react";
-import { CleanupItem, CleanupScan, CleanupReport, DeepCleanReport, DeepAnalyzeReport, formatBytes } from "../types";
+import {
+  CleanupItem,
+  CleanupScan,
+  CleanupReport,
+  CleanupStats,
+  DeepCleanReport,
+  DeepAnalyzeReport,
+  formatBytes,
+} from "../types";
 
 type Phase = "loading" | "ready" | "confirm" | "cleaning" | "done";
 type DeepPhase = "idle" | "intro" | "analyzing" | "analyzed" | "confirm" | "running" | "done";
@@ -53,6 +61,19 @@ export default function Cleanup() {
   const [analyzeReport, setAnalyzeReport] = useState<DeepAnalyzeReport | null>(null);
   const [deepReport, setDeepReport] = useState<DeepCleanReport | null>(null);
   const [deepError, setDeepError] = useState("");
+  /** 深度清理完成后的结果弹窗（关闭后卡片内仍保留一行小结） */
+  const [showDeepResult, setShowDeepResult] = useState(false);
+
+  // 累计清理统计（本地持久化的成就感数字）
+  const [stats, setStats] = useState<CleanupStats | null>(null);
+
+  async function loadStats() {
+    try {
+      setStats(await invoke<CleanupStats>("get_cleanup_stats"));
+    } catch {
+      // 统计是锦上添花，失败不打扰用户
+    }
+  }
 
   const items = scan?.items ?? [];
 
@@ -73,6 +94,7 @@ export default function Cleanup() {
 
   useEffect(() => {
     load();
+    loadStats();
   }, []);
 
   const selectedSize = useMemo(
@@ -109,6 +131,7 @@ export default function Cleanup() {
       const r = await invoke<CleanupReport>("run_cleanup", { ids: [...checked] });
       setReport(r);
       setPhase("done");
+      loadStats();
     } catch (e) {
       setError(String(e));
       setPhase("ready");
@@ -135,6 +158,8 @@ export default function Cleanup() {
       const r = await invoke<DeepCleanReport>("run_deep_clean");
       setDeepReport(r);
       setDeepPhase("done");
+      setShowDeepResult(true);
+      loadStats();
     } catch (e) {
       setDeepError(String(e));
       setDeepPhase("idle");
@@ -197,6 +222,12 @@ export default function Cleanup() {
                 {formatBytes(report.freeAfter)}
               </span>
             </div>
+            {stats && stats.totalRuns > 1 && (
+              <div className="mt-2 inline-flex items-center gap-1.5 rounded-full bg-[#FEF3C7] px-3.5 py-1.5 text-xs text-[#B45309]">
+                <ShieldCheck size={13} />
+                历史累计已释放 <b>{formatBytes(stats.totalFreed)}</b>（第 {stats.totalRuns} 次清理）
+              </div>
+            )}
           </div>
           <div className="w-full max-w-xl rounded-2xl bg-[var(--color-surface)] p-5 shadow-[var(--shadow-card)]">
             {report.results.map((r) => (
@@ -235,6 +266,26 @@ export default function Cleanup() {
             {error && (
               <div className="mb-4 rounded-xl bg-[var(--color-surface)] px-4 py-3 text-sm text-[var(--color-caution)] shadow-[var(--shadow-card)]">
                 {error}
+              </div>
+            )}
+
+            {/* 累计清理成就：本地统计，金色盾牌荣誉感 */}
+            {stats && stats.totalRuns > 0 && (
+              <div className="mb-5 flex items-center gap-3.5 rounded-2xl border border-[#FDE68A] bg-gradient-to-r from-[#FFFBEB] to-[var(--color-surface)] px-5 py-3.5 shadow-[var(--shadow-card)]">
+                <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-[#FBBF24] to-[#D97706] shadow-[0_2px_8px_rgba(217,119,6,0.35)]">
+                  <ShieldCheck size={21} className="text-white" />
+                </span>
+                <div className="min-w-0">
+                  <div className="text-sm">
+                    累计已为你释放{" "}
+                    <span className="text-lg font-bold text-[#B45309]">
+                      {formatBytes(stats.totalFreed)}
+                    </span>
+                  </div>
+                  <div className="text-xs text-[var(--color-text-secondary)]">
+                    共清理 {stats.totalRuns} 次 · 每一项都是你亲手确认后才动的
+                  </div>
+                </div>
               </div>
             )}
             {items.length === 0 && !error && (
@@ -636,6 +687,69 @@ export default function Cleanup() {
                       我已了解，开始清理
                     </button>
                   </div>
+                </motion.div>
+              </motion.div>
+            )}
+          </AnimatePresence>
+
+          {/* 深度清理完成：结果弹窗（大字庆祝，替代原先不起眼的一行小字） */}
+          <AnimatePresence>
+            {deepPhase === "done" && deepReport && showDeepResult && (
+              <motion.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                className="absolute inset-0 z-30 flex items-center justify-center bg-black/30 p-6"
+                onClick={() => setShowDeepResult(false)}
+              >
+                <motion.div
+                  initial={{ scale: 0.9, y: 14 }}
+                  animate={{ scale: 1, y: 0 }}
+                  exit={{ scale: 0.94, y: 10 }}
+                  className="w-full max-w-lg rounded-2xl bg-[var(--color-surface)] p-8 text-center shadow-[var(--shadow-card-hover)]"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <motion.div
+                    initial={{ scale: 0.6, opacity: 0 }}
+                    animate={{ scale: 1, opacity: 1 }}
+                    transition={{ delay: 0.1, type: "spring", stiffness: 260 }}
+                    className="mx-auto flex h-20 w-20 items-center justify-center rounded-3xl bg-[var(--color-primary-soft)]"
+                  >
+                    <CheckCircle2 size={44} className="text-[var(--color-primary)]" />
+                  </motion.div>
+
+                  <div className="mt-4 text-lg font-semibold">系统深度清理完成 🎉</div>
+                  <div className="mt-3 text-xs text-[var(--color-text-secondary)]">本次释放</div>
+                  <div className="text-4xl font-bold text-[var(--color-primary-dark)]">
+                    {formatBytes(deepReport.freed)}
+                  </div>
+                  <div className="mt-2 text-sm text-[var(--color-text-secondary)]">
+                    C 盘剩余空间：{formatBytes(deepReport.freeBefore)} →{" "}
+                    <span className="font-semibold text-[var(--color-primary-dark)]">
+                      {formatBytes(deepReport.freeAfter)}
+                    </span>
+                  </div>
+
+                  {deepReport.freed < 300 * 1024 * 1024 && (
+                    <div className="mt-4 rounded-xl bg-[var(--color-bg)] px-4 py-3 text-left text-xs leading-relaxed text-[var(--color-text-secondary)]">
+                      💡 本次释放不多，通常是因为距离上次清理不久，系统还没积累多少旧备份——这是正常现象。等
+                      Windows 更新攒了几个月，这里一次能清出几个 GB。
+                    </div>
+                  )}
+
+                  {stats && stats.totalRuns > 0 && (
+                    <div className="mt-4 inline-flex items-center gap-1.5 rounded-full bg-[#FEF3C7] px-4 py-1.5 text-xs text-[#B45309]">
+                      <ShieldCheck size={13} />
+                      历史累计已释放 <b>{formatBytes(stats.totalFreed)}</b>
+                    </div>
+                  )}
+
+                  <button
+                    onClick={() => setShowDeepResult(false)}
+                    className="mt-6 w-full rounded-xl bg-[var(--color-primary)] py-3 text-sm font-semibold text-white transition-colors hover:bg-[var(--color-primary-dark)]"
+                  >
+                    好的，收下了
+                  </button>
                 </motion.div>
               </motion.div>
             )}
