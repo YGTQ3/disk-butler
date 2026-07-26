@@ -69,6 +69,40 @@ export interface CleanupReport {
   freeAfter: number;
 }
 
+export interface StartupItem {
+  id: string;
+  name: string;
+  command: string;
+  location: string;
+  enabled: boolean;
+  needsAdmin: boolean;
+  memMb: number;
+  advice: "disable" | "keep" | "neutral";
+  reason: string;
+}
+
+export interface MemoryOverview {
+  total: number;
+  used: number;
+  available: number;
+  swapTotal: number;
+  swapUsed: number;
+}
+
+export interface ProcessGroup {
+  name: string;
+  friendlyName: string;
+  description: string;
+  kind: "closable" | "system" | "unknown";
+  count: number;
+  memory: number;
+}
+
+export interface MemoryReport {
+  overview: MemoryOverview;
+  groups: ProcessGroup[];
+}
+
 /** 分类 -> 设计令牌色（与 tokens.css / DESIGN.md 一致） */
 export const CATEGORY_COLOR: Record<Category, string> = {
   system: "var(--color-cat-system)",
