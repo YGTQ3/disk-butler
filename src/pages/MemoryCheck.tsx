@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
-import { Loader2, RotateCcw, Cpu, MemoryStick } from "lucide-react";
-import { MemoryReport, formatBytes } from "../types";
+import { Loader2, RotateCcw, Cpu, MemoryStick, AlertTriangle } from "lucide-react";
+import { MemoryReport, PagefileCheck, formatBytes } from "../types";
 
 type Phase = "loading" | "ready";
 
@@ -21,6 +21,7 @@ const KIND_BADGE = {
 export default function MemoryCheck() {
   const [phase, setPhase] = useState<Phase>("loading");
   const [report, setReport] = useState<MemoryReport | null>(null);
+  const [pagefile, setPagefile] = useState<PagefileCheck | null>(null);
   const [error, setError] = useState("");
 
   async function load() {
@@ -32,6 +33,12 @@ export default function MemoryCheck() {
       setError(String(e));
     }
     setPhase("ready");
+    // 页面文件核验独立加载（涉及一次 WMI 查询，不阻塞主报告）
+    try {
+      setPagefile(await invoke<PagefileCheck>("pagefile_check"));
+    } catch {
+      // 核验失败不打扰用户
+    }
   }
 
   useEffect(() => {
@@ -125,6 +132,29 @@ export default function MemoryCheck() {
                   已用 {formatBytes(ov.swapUsed)} / 共 {formatBytes(ov.swapTotal)}
                   。用得多说明物理内存不够，系统在借硬盘周转
                 </div>
+              </div>
+            </div>
+          )}
+
+          {/* 页面文件配置与实际不一致：黄条预警（正常时什么都不显示） */}
+          {pagefile && pagefile.issues.length > 0 && (
+            <div className="mb-5 rounded-2xl border border-[#FDE68A] bg-[#FFFBEB] p-5 shadow-[var(--shadow-card)]">
+              <div className="flex items-center gap-2 text-sm font-semibold text-[#92400E]">
+                <AlertTriangle size={16} />
+                页面文件配置有问题，值得处理一下
+              </div>
+              <ul className="mt-2 space-y-1.5 text-xs leading-relaxed text-[#92400E]">
+                {pagefile.issues.map((msg, idx) => (
+                  <li key={idx}>{msg}</li>
+                ))}
+              </ul>
+              <div className="mt-3 rounded-xl bg-white/70 px-3.5 py-2.5 text-xs leading-relaxed text-[#92400E]">
+                <b>怎么修：</b>按 Win 键搜索「查看高级系统设置」→ 性能「设置」→ 高级 →
+                虚拟内存「更改」→ 勾选最顶部的「自动管理所有驱动器的分页文件大小」→ 确定后重启。
+                这是最省心也最可靠的方案。
+              </div>
+              <div className="mt-2 text-[11px] text-[#92400E] opacity-70">
+                检测依据：系统配置（注册表）与本次开机实际启用的页面文件（Win32_PageFileUsage）逐盘比对
               </div>
             </div>
           )}

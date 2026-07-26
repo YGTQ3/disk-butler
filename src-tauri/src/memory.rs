@@ -32,6 +32,160 @@ pub struct MemoryReport {
     pub groups: Vec<ProcessGroup>,
 }
 
+// ---------- 页面文件一致性核验（源自一次真实排查：配置正确但系统拒绝启用） ----------
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PagefileEntry {
+    /// 如 "c:\pagefile.sys"
+    pub path: String,
+    /// 盘符大写，如 "C"
+    pub drive: String,
+    pub init_mb: u64,
+    pub max_mb: u64,
+    /// init/max 均为 0 = 该盘"系统托管大小"
+    pub system_managed: bool,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ActivePagefile {
+    pub path: String,
+    pub drive: String,
+    /// 本次开机实际分配大小（MB）
+    pub allocated_mb: u64,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PagefileCheck {
+    /// 是否勾选了"自动管理所有驱动器的分页文件大小"
+    pub auto_managed: bool,
+    pub configured: Vec<PagefileEntry>,
+    pub active: Vec<ActivePagefile>,
+    /// 人话问题列表；为空 = 配置与实际一致，不打扰用户
+    pub issues: Vec<String>,
+}
+
+/// 解析注册表 PagingFiles 多字符串：
+/// "?:\pagefile.sys" = 自动管理；"c:\pagefile.sys 800 800" = 自定义；init/max 为 0 = 托管
+fn parse_config(vals: &[String]) -> (Vec<PagefileEntry>, bool) {
+    let mut auto = false;
+    let mut out = Vec::new();
+    for v in vals {
+        let v = v.trim();
+        if v.is_empty() {
+            continue;
+        }
+        if v.starts_with('?') {
+            auto = true;
+            continue;
+        }
+        let mut parts = v.split_whitespace();
+        let path = parts.next().unwrap_or("").to_string();
+        let init_mb: u64 = parts.next().and_then(|s| s.parse().ok()).unwrap_or(0);
+        let max_mb: u64 = parts.next().and_then(|s| s.parse().ok()).unwrap_or(0);
+        let drive = path
+            .chars()
+            .next()
+            .map(|c| c.to_ascii_uppercase().to_string())
+            .unwrap_or_default();
+        if drive.is_empty() {
+            continue;
+        }
+        out.push(PagefileEntry {
+            system_managed: init_mb == 0 && max_mb == 0,
+            path,
+            drive,
+            init_mb,
+            max_mb,
+        });
+    }
+    (out, auto)
+}
+
+/// 一致性判定（纯函数，可测）：配置了却没启用 = 问题
+fn evaluate(configured: &[PagefileEntry], auto: bool, active: &[ActivePagefile]) -> Vec<String> {
+    let mut issues = Vec::new();
+    if active.is_empty() {
+        if auto || !configured.is_empty() {
+            issues.push(
+                "已配置页面文件，但本次开机系统没有启用任何一个——虚拟内存完全没在工作，大型程序可能报“内存不足”。"
+                    .to_string(),
+            );
+        } else {
+            issues.push(
+                "当前没有配置任何页面文件，物理内存一旦占满，程序会直接崩溃或被系统终止。"
+                    .to_string(),
+            );
+        }
+        return issues;
+    }
+    // 自动管理模式下有活动页面文件即视为正常
+    if auto {
+        return issues;
+    }
+    for c in configured {
+        if !active.iter().any(|a| a.drive == c.drive) {
+            issues.push(format!(
+                "已配置 {} 盘页面文件，但本次开机系统没有启用它（Windows 对非系统盘页面文件偶发此问题）。建议改为 C 盘或勾选“自动管理”。",
+                c.drive
+            ));
+        }
+    }
+    issues
+}
+
+fn read_config() -> (Vec<PagefileEntry>, bool) {
+    use winreg::enums::HKEY_LOCAL_MACHINE;
+    use winreg::RegKey;
+    let vals: Vec<String> = RegKey::predef(HKEY_LOCAL_MACHINE)
+        .open_subkey(r"SYSTEM\CurrentControlSet\Control\Session Manager\Memory Management")
+        .and_then(|k| k.get_value("PagingFiles"))
+        .unwrap_or_default();
+    parse_config(&vals)
+}
+
+/// Win32_PageFileUsage = 本次开机实际启用的页面文件（权威口径；文件存在≠已启用）
+fn read_active() -> Vec<ActivePagefile> {
+    use std::os::windows::process::CommandExt;
+    const CREATE_NO_WINDOW: u32 = 0x0800_0000;
+    let Ok(out) = std::process::Command::new("powershell")
+        .args([
+            "-NoProfile",
+            "-Command",
+            "Get-CimInstance Win32_PageFileUsage | ForEach-Object { $_.Name + '|' + $_.AllocatedBaseSize }",
+        ])
+        .creation_flags(CREATE_NO_WINDOW)
+        .output()
+    else {
+        return Vec::new();
+    };
+    String::from_utf8_lossy(&out.stdout)
+        .lines()
+        .filter_map(|l| {
+            let (p, s) = l.trim().split_once('|')?;
+            Some(ActivePagefile {
+                drive: p.chars().next()?.to_ascii_uppercase().to_string(),
+                path: p.to_string(),
+                allocated_mb: s.trim().parse().ok()?,
+            })
+        })
+        .collect()
+}
+
+pub fn pagefile_check() -> PagefileCheck {
+    let (configured, auto_managed) = read_config();
+    let active = read_active();
+    let issues = evaluate(&configured, auto_managed, &active);
+    PagefileCheck {
+        auto_managed,
+        configured,
+        active,
+        issues,
+    }
+}
+
 struct ProcInfo {
     needle: &'static str,
     friendly: &'static str,
@@ -160,5 +314,65 @@ mod tests {
         for w in r.groups.windows(2) {
             assert!(w[0].memory >= w[1].memory);
         }
+    }
+
+    // ---------- 页面文件核验 ----------
+
+    fn active(drive: &str, mb: u64) -> ActivePagefile {
+        ActivePagefile {
+            path: format!("{}:\\pagefile.sys", drive),
+            drive: drive.to_string(),
+            allocated_mb: mb,
+        }
+    }
+
+    #[test]
+    fn parse_config_custom_and_auto() {
+        let (list, auto) = parse_config(&[
+            r"c:\pagefile.sys 800 800".to_string(),
+            r"d:\pagefile.sys 0 0".to_string(),
+        ]);
+        assert!(!auto);
+        assert_eq!(list.len(), 2);
+        assert_eq!(list[0].drive, "C");
+        assert_eq!(list[0].init_mb, 800);
+        assert!(!list[0].system_managed);
+        assert!(list[1].system_managed);
+
+        let (list2, auto2) = parse_config(&[r"?:\pagefile.sys".to_string()]);
+        assert!(auto2);
+        assert!(list2.is_empty());
+    }
+
+    #[test]
+    fn evaluate_detects_configured_but_inactive_drive() {
+        // 真实事故场景：C 800MB 生效，D 盘配置了却没启用
+        let (cfg, auto) = parse_config(&[
+            r"c:\pagefile.sys 800 800".to_string(),
+            r"d:\pagefile.sys 8192 16384".to_string(),
+        ]);
+        let issues = evaluate(&cfg, auto, &[active("C", 800)]);
+        assert_eq!(issues.len(), 1);
+        assert!(issues[0].contains("D 盘"));
+    }
+
+    #[test]
+    fn evaluate_ok_when_all_active() {
+        let (cfg, auto) = parse_config(&[r"c:\pagefile.sys 800 800".to_string()]);
+        assert!(evaluate(&cfg, auto, &[active("C", 800)]).is_empty());
+        // 自动管理 + 有活动文件 = 正常
+        let (cfg2, auto2) = parse_config(&[r"?:\pagefile.sys".to_string()]);
+        assert!(evaluate(&cfg2, auto2, &[active("C", 14848)]).is_empty());
+    }
+
+    #[test]
+    fn evaluate_warns_when_nothing_active() {
+        let (cfg, auto) = parse_config(&[r"d:\pagefile.sys 8192 16384".to_string()]);
+        let issues = evaluate(&cfg, auto, &[]);
+        assert_eq!(issues.len(), 1);
+        assert!(issues[0].contains("没有启用"));
+        // 完全没配置也要提醒
+        let issues2 = evaluate(&[], false, &[]);
+        assert_eq!(issues2.len(), 1);
     }
 }
