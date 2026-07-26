@@ -64,6 +64,22 @@ export default function Startup() {
     setBusy(null);
   }
 
+  /** 分组批量启用/禁用（逐项执行，失败项单独显示错误） */
+  async function setGroupEnabled(advice: string, enabled: boolean) {
+    const targets = items.filter((i) => i.advice === advice && i.enabled !== enabled);
+    for (const item of targets) {
+      setBusy(item.id);
+      try {
+        await invoke("set_startup_enabled", { id: item.id, enabled });
+        setItems((prev) => prev.map((i) => (i.id === item.id ? { ...i, enabled } : i)));
+        setItemErrors((prev) => ({ ...prev, [item.id]: "" }));
+      } catch (e) {
+        setItemErrors((prev) => ({ ...prev, [item.id]: String(e) }));
+      }
+    }
+    setBusy(null);
+  }
+
   const enabledCount = items.filter((i) => i.enabled).length;
   const suggestible = items.filter((i) => i.advice === "disable" && i.enabled).length;
 
@@ -122,7 +138,7 @@ export default function Startup() {
             const meta = ADVICE_META[advice];
             return (
               <div key={advice} className="mb-6">
-                <div className="mb-2 flex items-baseline gap-2">
+                <div className="mb-2 flex items-center gap-2">
                   <span className="flex items-center gap-1.5 text-sm font-semibold">
                     {meta.icon}
                     {meta.title}
@@ -130,6 +146,21 @@ export default function Startup() {
                   <span className="text-xs text-[var(--color-text-secondary)]">
                     {meta.subtitle}
                   </span>
+                  {/* 分组批量开关 */}
+                  <div className="ml-auto flex gap-1.5">
+                    <button
+                      onClick={() => setGroupEnabled(advice, false)}
+                      className="rounded-lg border border-[var(--color-line)] px-2.5 py-1 text-[11px] text-[var(--color-text-secondary)] transition-colors hover:border-[var(--color-caution)] hover:text-[var(--color-caution)]"
+                    >
+                      全部禁用
+                    </button>
+                    <button
+                      onClick={() => setGroupEnabled(advice, true)}
+                      className="rounded-lg border border-[var(--color-line)] px-2.5 py-1 text-[11px] text-[var(--color-text-secondary)] transition-colors hover:border-[var(--color-primary)] hover:text-[var(--color-primary-dark)]"
+                    >
+                      全部启用
+                    </button>
+                  </div>
                 </div>
                 <div className="space-y-2.5">
                   {group.map((item) => (

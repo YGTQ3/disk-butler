@@ -25,9 +25,22 @@ pub struct CleanupItem {
     /// 将被清理的具体路径及各自大小（详情透明化）
     pub paths: Vec<PathDetail>,
     pub size: u64,
-    /// "safe" 默认勾选；"caution" 默认不勾选
+    /// "safe" | "caution"
     pub safety: String,
+    /// 清理策略分型："junk" 垃圾残留 | "cache" 性能缓存 | "data" 数据类
+    pub kind: String,
+    /// 占用相对磁盘剩余空间微不足道，不值得动
+    pub negligible: bool,
     pub default_checked: bool,
+}
+
+/// 清理页扫描结果：项目列表 + 磁盘空间水位（前端据此展示缓存策略提示）
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CleanupScan {
+    pub items: Vec<CleanupItem>,
+    pub free: u64,
+    pub space_tight: bool,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -228,6 +241,101 @@ fn candidates() -> Vec<Candidate> {
             safety: "caution",
             paths: vec![local.join("JetBrains")],
         });
+
+        // 图形着色器缓存：完全可再生
+        let mut gpu: Vec<PathBuf> = Vec::new();
+        for p in [
+            local.join("D3DSCache"),
+            local.join("NVIDIA").join("DXCache"),
+            local.join("NVIDIA").join("GLCache"),
+            local.join("AMD").join("DxCache"),
+            local.join("AMD").join("DxcCache"),
+            local.join("AMD").join("GLCache"),
+        ] {
+            if p.exists() {
+                gpu.push(p);
+            }
+        }
+        if !gpu.is_empty() {
+            out.push(Candidate {
+                id: "gpu-cache",
+                name: "显卡着色器缓存",
+                description: "DirectX/显卡驱动的着色器编译缓存。",
+                impact: "没有影响。游戏/应用首次启动时会自动重新生成，首次加载稍慢。",
+                safety: "safe",
+                paths: gpu,
+            });
+        }
+
+        out.push(Candidate {
+            id: "crash-reports",
+            name: "崩溃转储与错误报告",
+            description: "程序崩溃时的现场快照和 Windows 错误报告存档，只对排查问题有用。",
+            impact: "没有影响。除非你正在追查某个程序的崩溃原因。",
+            safety: "safe",
+            paths: vec![
+                local.join("CrashDumps"),
+                local.join("Microsoft").join("Windows").join("WER"),
+            ],
+        });
+
+        // 前端包管理器缓存（npm-cache 已单独列出）
+        let mut jscache: Vec<PathBuf> = Vec::new();
+        for p in [
+            local.join("Yarn").join("Cache"),
+            local.join("pnpm").join("store"),
+            local.join("pnpm-cache"),
+        ] {
+            if p.exists() {
+                jscache.push(p);
+            }
+        }
+        if !jscache.is_empty() {
+            out.push(Candidate {
+                id: "js-pkg-cache",
+                name: "Yarn/pnpm 缓存",
+                description: "Node.js 包管理器的下载缓存。",
+                impact: "基本没有影响。pnpm 项目重装依赖时需重新下载。",
+                safety: "safe",
+                paths: jscache,
+            });
+        }
+    }
+
+    // 用户主目录下的开发/AI 缓存（体积大、重下载成本高，均列为谨慎项）
+    if let Some(home) = env_path("USERPROFILE") {
+        out.push(Candidate {
+            id: "gradle-cache",
+            name: "Gradle 构建缓存",
+            description: "Android/Java 项目的构建与依赖缓存。",
+            impact: "没有影响。下次构建时重新下载依赖，首次构建变慢。",
+            safety: "safe",
+            paths: vec![home.join(".gradle").join("caches")],
+        });
+        out.push(Candidate {
+            id: "nuget-cache",
+            name: "NuGet 包缓存",
+            description: ".NET 项目的依赖包缓存。",
+            impact: "项目重新构建时需重新下载全部依赖，可能耗时较长。",
+            safety: "caution",
+            paths: vec![home.join(".nuget").join("packages")],
+        });
+        out.push(Candidate {
+            id: "maven-cache",
+            name: "Maven 依赖缓存",
+            description: "Java 项目的依赖包缓存 (.m2)。",
+            impact: "项目重新构建时需重新下载全部依赖，国内网络下可能很慢。",
+            safety: "caution",
+            paths: vec![home.join(".m2").join("repository")],
+        });
+        out.push(Candidate {
+            id: "hf-cache",
+            name: "HuggingFace AI 模型缓存",
+            description: "AI 模型文件缓存，单个模型动辄数 GB。",
+            impact: "⚠ 再次使用对应模型时需重新下载大文件，耗时取决于网速。",
+            safety: "caution",
+            paths: vec![home.join(".cache").join("huggingface")],
+        });
     }
 
     if let Some(roaming) = &roaming {
@@ -244,8 +352,40 @@ fn candidates() -> Vec<Candidate> {
     out
 }
 
+/// 清理策略分型：垃圾残留（删了纯赚）/ 性能缓存（空间充足可留）/ 数据类（默认不动）
+fn kind_of(id: &str) -> &'static str {
+    match id {
+        "temp" | "updaters" | "crash-reports" => "junk",
+        "idm-dwnldata" | "recycle-bin" => "data",
+        _ => "cache",
+    }
+}
+
+/// 智能默认勾选：
+/// - 微小项（占用 < max(100MB, 剩余空间的1%)）不勾——不值得动；
+/// - 垃圾残留：安全且不微小则勾；
+/// - 性能缓存：只有磁盘空间紧张时才勾（缓存是拿空间换体验的资产）；
+/// - 数据类：永不默认勾。
+fn compute_default(kind: &str, safety: &str, negligible: bool, space_tight: bool) -> bool {
+    if negligible || safety != "safe" {
+        return false;
+    }
+    match kind {
+        "junk" => true,
+        "cache" => space_tight,
+        _ => false,
+    }
+}
+
 /// 枚举所有存在且非空的清理项（含大小计算，可能耗几秒）。
-pub fn list_items() -> Vec<CleanupItem> {
+pub fn list_items() -> CleanupScan {
+    let free = c_drive_free();
+    let total = c_drive_total();
+    // 空间紧张：剩余 < 15% 或 < 20GB
+    let space_tight = free < total / 100 * 15 || free < 20 * 1024 * 1024 * 1024;
+    // 微小阈值：剩余空间的 1%，不低于 100MB
+    let negligible_threshold = std::cmp::max(100 * 1024 * 1024, free / 100);
+
     let mut items: Vec<CleanupItem> = candidates()
         .into_iter()
         .filter_map(|c| {
@@ -269,6 +409,8 @@ pub fn list_items() -> Vec<CleanupItem> {
             if size == 0 {
                 return None;
             }
+            let kind = kind_of(c.id);
+            let negligible = size < negligible_threshold;
             Some(CleanupItem {
                 id: c.id.to_string(),
                 name: c.name.to_string(),
@@ -277,7 +419,9 @@ pub fn list_items() -> Vec<CleanupItem> {
                 paths: details,
                 size,
                 safety: c.safety.to_string(),
-                default_checked: c.safety == "safe",
+                kind: kind.to_string(),
+                negligible,
+                default_checked: compute_default(kind, c.safety, negligible, space_tight),
             })
         })
         .collect();
@@ -297,12 +441,18 @@ pub fn list_items() -> Vec<CleanupItem> {
             }],
             size: rb,
             safety: "caution".to_string(),
+            kind: "data".to_string(),
+            negligible: rb < negligible_threshold,
             default_checked: false,
         });
     }
 
     items.sort_by(|a, b| b.size.cmp(&a.size));
-    items
+    CleanupScan {
+        items,
+        free,
+        space_tight,
+    }
 }
 
 fn c_drive_free() -> u64 {
@@ -314,6 +464,63 @@ fn c_drive_free() -> u64 {
         .find(|d| d.mount_point().to_string_lossy().to_uppercase().starts_with('C'.to_string().as_str()))
         .map(|d| d.available_space())
         .unwrap_or(0)
+}
+
+fn c_drive_total() -> u64 {
+    use sysinfo::Disks;
+    let disks = Disks::new_with_refreshed_list();
+    disks
+        .list()
+        .iter()
+        .find(|d| d.mount_point().to_string_lossy().to_uppercase().starts_with('C'.to_string().as_str()))
+        .map(|d| d.total_space())
+        .unwrap_or(0)
+}
+
+// ---------- 高级：系统深度清理（DISM 组件存储清理） ----------
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct DeepCleanReport {
+    pub freed: u64,
+    pub free_before: u64,
+    pub free_after: u64,
+}
+
+/// 执行 DISM /StartComponentCleanup：清理 Windows 更新的旧版本备份（WinSxS）。
+/// 会弹 UAC 提权窗口与 DISM 控制台进度窗口，耗时 5~20 分钟，同步等待完成。
+pub fn deep_clean() -> Result<DeepCleanReport, String> {
+    use std::os::windows::process::CommandExt;
+    const CREATE_NO_WINDOW: u32 = 0x0800_0000;
+
+    let free_before = c_drive_free();
+    // 用 PowerShell 提权启动 Dism 并等待退出码；拒绝 UAC 时 Start-Process 抛异常 -> exit 1
+    let status = std::process::Command::new("powershell")
+        .args([
+            "-NoProfile",
+            "-Command",
+            "$p = Start-Process -Verb RunAs -Wait -PassThru -FilePath Dism.exe -ArgumentList '/Online','/Cleanup-Image','/StartComponentCleanup','/NoRestart'; exit $p.ExitCode",
+        ])
+        .creation_flags(CREATE_NO_WINDOW)
+        .status()
+        .map_err(|e| format!("启动清理失败：{}", e))?;
+
+    let code = status.code().unwrap_or(-1);
+    // 0 = 成功；3010 = 成功但需重启
+    if code != 0 && code != 3010 {
+        return Err(if code == 1 {
+            "已取消授权，未执行清理。".to_string()
+        } else {
+            format!("系统清理未完成（退出码 {}），可稍后重试。", code)
+        });
+    }
+
+    let free_after = c_drive_free();
+    Ok(DeepCleanReport {
+        freed: free_after.saturating_sub(free_before),
+        free_before,
+        free_after,
+    })
 }
 
 /// 执行清理。只接受白名单 id，路径由本函数重新解析。
@@ -390,6 +597,30 @@ mod tests {
         ids.sort();
         ids.dedup();
         assert_eq!(ids.len(), n, "candidate id 重复");
+    }
+
+    #[test]
+    fn kind_mapping_is_sensible() {
+        assert_eq!(kind_of("temp"), "junk");
+        assert_eq!(kind_of("crash-reports"), "junk");
+        assert_eq!(kind_of("npm-cache"), "cache");
+        assert_eq!(kind_of("recycle-bin"), "data");
+        assert_eq!(kind_of("idm-dwnldata"), "data");
+    }
+
+    #[test]
+    fn default_check_logic() {
+        // 垃圾：安全且不微小 -> 勾
+        assert!(compute_default("junk", "safe", false, false));
+        // 微小项永不勾（用户：58MB 的崩溃日志不值得动）
+        assert!(!compute_default("junk", "safe", true, true));
+        // 缓存：空间充足不勾，紧张才勾
+        assert!(!compute_default("cache", "safe", false, false));
+        assert!(compute_default("cache", "safe", false, true));
+        // 数据类永不默认勾
+        assert!(!compute_default("data", "safe", false, true));
+        // 谨慎项永不默认勾
+        assert!(!compute_default("junk", "caution", false, true));
     }
 
     #[test]

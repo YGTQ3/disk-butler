@@ -2,7 +2,7 @@
 
 use crate::knowledge::{self, Category, Safety};
 use jwalk::WalkDir;
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicU64, Ordering};
@@ -15,8 +15,8 @@ const TOP_N_PER_LEVEL: usize = 30;
 /// 返回给前端的树的最大深度（从扫描根算起）。
 const MAX_DEPTH: usize = 4;
 
-/// 树节点，直接序列化给前端。
-#[derive(Debug, Clone, Serialize)]
+/// 树节点，直接序列化给前端（也用于扫描结果缓存的存取）。
+#[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct TreeNode {
     pub name: String,
@@ -29,7 +29,7 @@ pub struct TreeNode {
     pub friendly_name: String,
     pub description: String,
     pub safety: Safety,
-    #[serde(skip_serializing_if = "Vec::is_empty")]
+    #[serde(skip_serializing_if = "Vec::is_empty", default)]
     pub children: Vec<TreeNode>,
 }
 
@@ -62,6 +62,8 @@ struct SizeIndex {
     children: HashMap<PathBuf, Vec<PathBuf>>,
     /// 文件大小
     file_sizes: HashMap<PathBuf, u64>,
+    /// 每个目录的内容构成（按扩展名分组的累计字节数），用于未知目录的启发式推断
+    dir_profiles: HashMap<PathBuf, [u64; knowledge::EXT_GROUP_COUNT]>,
 }
 
 /// 枚举系统盘符。
@@ -134,12 +136,14 @@ fn build_index(root: &Path, app: Option<&AppHandle>) -> (SizeIndex, u64) {
         }
     }
 
-    // 由文件大小自底向上聚合出目录大小与父子关系
+    // 由文件大小自底向上聚合出目录大小、父子关系与内容构成
     let mut dir_sizes: HashMap<PathBuf, u64> = HashMap::new();
     let mut children: HashMap<PathBuf, Vec<PathBuf>> = HashMap::new();
+    let mut dir_profiles: HashMap<PathBuf, [u64; knowledge::EXT_GROUP_COUNT]> = HashMap::new();
     let root_buf = root.to_path_buf();
 
     for (file, size) in &file_sizes {
+        let group = knowledge::ext_group(file);
         let mut cur = file.parent().map(|p| p.to_path_buf());
         // 记录直接父子关系
         if let Some(parent) = file.parent() {
@@ -151,6 +155,7 @@ fn build_index(root: &Path, app: Option<&AppHandle>) -> (SizeIndex, u64) {
         // 向上累加到 root 为止
         while let Some(dir) = cur {
             *dir_sizes.entry(dir.clone()).or_insert(0) += size;
+            dir_profiles.entry(dir.clone()).or_insert([0; knowledge::EXT_GROUP_COUNT])[group] += size;
             if dir == root_buf {
                 break;
             }
@@ -173,6 +178,7 @@ fn build_index(root: &Path, app: Option<&AppHandle>) -> (SizeIndex, u64) {
             dir_sizes,
             children,
             file_sizes,
+            dir_profiles,
         },
         total,
     )
@@ -182,7 +188,15 @@ fn build_index(root: &Path, app: Option<&AppHandle>) -> (SizeIndex, u64) {
 fn build_tree(index: &SizeIndex, dir: &Path, depth: usize) -> TreeNode {
     let path_str = dir.to_string_lossy().to_string();
     let size = index.dir_sizes.get(dir).copied().unwrap_or(0);
-    let hit = knowledge::classify(&path_str);
+    let mut hit = knowledge::classify(&path_str);
+    // 名字认不出的目录，按内容构成推断（不只看目录名）
+    if hit.category == knowledge::Category::Other {
+        if let Some(profile) = index.dir_profiles.get(dir) {
+            if let Some(h) = knowledge::profile_classify(profile) {
+                hit = h;
+            }
+        }
+    }
     let name = dir
         .file_name()
         .map(|n| n.to_string_lossy().to_string())

@@ -10,26 +10,59 @@ import {
   XCircle,
   RotateCcw,
   ChevronDown,
+  Trash2,
+  Gauge,
+  Archive,
+  Wrench,
 } from "lucide-react";
-import { CleanupItem, CleanupReport, formatBytes } from "../types";
+import { CleanupItem, CleanupScan, CleanupReport, DeepCleanReport, formatBytes } from "../types";
 
 type Phase = "loading" | "ready" | "confirm" | "cleaning" | "done";
+type DeepPhase = "idle" | "confirm" | "running" | "done";
+
+const KIND_META = {
+  junk: {
+    title: "垃圾残留",
+    icon: <Trash2 size={15} />,
+    subtitle: (tight: boolean) => (tight ? "删了纯赚，不影响任何功能" : "删了纯赚，不影响任何功能"),
+  },
+  cache: {
+    title: "性能缓存",
+    icon: <Gauge size={15} />,
+    subtitle: (tight: boolean) =>
+      tight
+        ? "磁盘空间紧张，已为你勾选可清理的缓存"
+        : "缓存能加快软件运行。当前空间充足，建议留着（默认未勾选）",
+  },
+  data: {
+    title: "含个人数据",
+    icon: <Archive size={15} />,
+    subtitle: () => "删除有实际代价，看清说明再勾选",
+  },
+} as const;
 
 export default function Cleanup() {
   const [phase, setPhase] = useState<Phase>("loading");
-  const [items, setItems] = useState<CleanupItem[]>([]);
+  const [scan, setScan] = useState<CleanupScan | null>(null);
   const [checked, setChecked] = useState<Set<string>>(new Set());
   const [report, setReport] = useState<CleanupReport | null>(null);
   const [error, setError] = useState("");
+
+  // 高级：系统深度清理
+  const [deepPhase, setDeepPhase] = useState<DeepPhase>("idle");
+  const [deepReport, setDeepReport] = useState<DeepCleanReport | null>(null);
+  const [deepError, setDeepError] = useState("");
+
+  const items = scan?.items ?? [];
 
   async function load() {
     setPhase("loading");
     setError("");
     setReport(null);
     try {
-      const list = await invoke<CleanupItem[]>("list_cleanup_items");
-      setItems(list);
-      setChecked(new Set(list.filter((i) => i.defaultChecked).map((i) => i.id)));
+      const s = await invoke<CleanupScan>("list_cleanup_items");
+      setScan(s);
+      setChecked(new Set(s.items.filter((i) => i.defaultChecked).map((i) => i.id)));
       setPhase("ready");
     } catch (e) {
       setError(String(e));
@@ -57,12 +90,22 @@ export default function Cleanup() {
     });
   }
 
+  /** 分组全选/全不选 */
+  function setGroup(kind: string, on: boolean) {
+    setChecked((prev) => {
+      const next = new Set(prev);
+      for (const i of items.filter((x) => x.kind === kind)) {
+        if (on) next.add(i.id);
+        else next.delete(i.id);
+      }
+      return next;
+    });
+  }
+
   async function doClean() {
     setPhase("cleaning");
     try {
-      const r = await invoke<CleanupReport>("run_cleanup", {
-        ids: [...checked],
-      });
+      const r = await invoke<CleanupReport>("run_cleanup", { ids: [...checked] });
       setReport(r);
       setPhase("done");
     } catch (e) {
@@ -71,8 +114,18 @@ export default function Cleanup() {
     }
   }
 
-  const safeItems = items.filter((i) => i.safety === "safe");
-  const cautionItems = items.filter((i) => i.safety === "caution");
+  async function doDeepClean() {
+    setDeepPhase("running");
+    setDeepError("");
+    try {
+      const r = await invoke<DeepCleanReport>("run_deep_clean");
+      setDeepReport(r);
+      setDeepPhase("done");
+    } catch (e) {
+      setDeepError(String(e));
+      setDeepPhase("idle");
+    }
+  }
 
   return (
     <div className="flex h-full flex-col">
@@ -83,7 +136,6 @@ export default function Cleanup() {
             只清理经过验证安全的项目，每一项都告诉你“删了会怎样”
           </p>
         </div>
-        {/* 手动刷新：数据保留在页面上，想重新检查时才重新扫描 */}
         {(phase === "ready" || phase === "confirm") && (
           <button
             onClick={load}
@@ -96,7 +148,6 @@ export default function Cleanup() {
         )}
       </header>
 
-      {/* 加载中 */}
       {phase === "loading" && (
         <div className="flex flex-1 flex-col items-center justify-center gap-4">
           <Loader2 size={36} className="animate-spin text-[var(--color-primary)]" />
@@ -106,7 +157,6 @@ export default function Cleanup() {
         </div>
       )}
 
-      {/* 清理中 */}
       {phase === "cleaning" && (
         <div className="flex flex-1 flex-col items-center justify-center gap-4">
           <Loader2 size={36} className="animate-spin text-[var(--color-primary)]" />
@@ -116,7 +166,6 @@ export default function Cleanup() {
         </div>
       )}
 
-      {/* 清理完成：结果对比 */}
       {phase === "done" && report && (
         <div className="flex flex-1 flex-col items-center gap-6 overflow-y-auto p-8">
           <motion.div
@@ -127,17 +176,14 @@ export default function Cleanup() {
             <CheckCircle2 size={40} className="text-[var(--color-primary)]" />
           </motion.div>
           <div className="text-center">
-            <div className="text-2xl font-bold">
-              释放了 {formatBytes(report.totalFreed)}
-            </div>
+            <div className="text-2xl font-bold">释放了 {formatBytes(report.totalFreed)}</div>
             <div className="mt-1 text-sm text-[var(--color-text-secondary)]">
-              C 盘剩余空间：{formatBytes(report.freeBefore)} → {" "}
+              C 盘剩余空间：{formatBytes(report.freeBefore)} →{" "}
               <span className="font-semibold text-[var(--color-primary-dark)]">
                 {formatBytes(report.freeAfter)}
               </span>
             </div>
           </div>
-
           <div className="w-full max-w-xl rounded-2xl bg-[var(--color-surface)] p-5 shadow-[var(--shadow-card)]">
             {report.results.map((r) => (
               <div
@@ -155,13 +201,10 @@ export default function Cleanup() {
                     {r.skipped} 个使用中已跳过
                   </span>
                 )}
-                <span className="font-medium">
-                  {r.error ? r.error : `+${formatBytes(r.freed)}`}
-                </span>
+                <span className="font-medium">{r.error ? r.error : `+${formatBytes(r.freed)}`}</span>
               </div>
             ))}
           </div>
-
           <button
             onClick={load}
             className="flex items-center gap-2 rounded-xl border border-[var(--color-line)] bg-[var(--color-surface)] px-5 py-2.5 text-sm font-medium transition-colors hover:border-[var(--color-primary)]"
@@ -172,7 +215,6 @@ export default function Cleanup() {
         </div>
       )}
 
-      {/* 列表 */}
       {(phase === "ready" || phase === "confirm") && (
         <>
           <div className="flex-1 overflow-y-auto px-8 pb-4 pt-2">
@@ -182,29 +224,103 @@ export default function Cleanup() {
               </div>
             )}
             {items.length === 0 && !error && (
-              <div className="flex h-full flex-col items-center justify-center gap-3">
+              <div className="flex flex-col items-center justify-center gap-3 py-16">
                 <ShieldCheck size={36} className="text-[var(--color-primary)]" />
                 <div className="text-base font-medium">很干净，没有需要清理的项目</div>
               </div>
             )}
 
-            {safeItems.length > 0 && (
-              <Section title="放心清理" subtitle="删除后没有任何影响，缓存会按需重新生成">
-                {safeItems.map((i) => (
-                  <ItemCard key={i.id} item={i} checked={checked.has(i.id)} onToggle={toggle} />
-                ))}
-              </Section>
-            )}
-            {cautionItems.length > 0 && (
-              <Section
-                title="谨慎选择"
-                subtitle="有一定代价，看清说明后再勾选（默认不勾选）"
-              >
-                {cautionItems.map((i) => (
-                  <ItemCard key={i.id} item={i} checked={checked.has(i.id)} onToggle={toggle} />
-                ))}
-              </Section>
-            )}
+            {(["junk", "cache", "data"] as const).map((kind) => {
+              const group = items.filter((i) => i.kind === kind);
+              if (group.length === 0) return null;
+              const meta = KIND_META[kind];
+              const allOn = group.every((i) => checked.has(i.id));
+              return (
+                <div key={kind} className="mb-6">
+                  <div className="mb-2 flex items-center gap-2">
+                    <span className="flex items-center gap-1.5 text-sm font-semibold">
+                      {meta.icon}
+                      {meta.title}
+                    </span>
+                    <span className="text-xs text-[var(--color-text-secondary)]">
+                      {meta.subtitle(scan?.spaceTight ?? false)}
+                    </span>
+                    {/* 分组快捷全选/全不选 */}
+                    <button
+                      onClick={() => setGroup(kind, !allOn)}
+                      className="ml-auto rounded-lg border border-[var(--color-line)] px-2.5 py-1 text-[11px] text-[var(--color-text-secondary)] transition-colors hover:border-[var(--color-primary)] hover:text-[var(--color-primary-dark)]"
+                    >
+                      {allOn ? "全部取消" : "全部选中"}
+                    </button>
+                  </div>
+                  <div className="space-y-2.5">
+                    {group.map((i) => (
+                      <ItemCard key={i.id} item={i} checked={checked.has(i.id)} onToggle={toggle} />
+                    ))}
+                  </div>
+                </div>
+              );
+            })}
+
+            {/* 高级 · 系统深度清理 */}
+            <div className="mb-6">
+              <div className="mb-2 flex items-center gap-2">
+                <span className="flex items-center gap-1.5 text-sm font-semibold">
+                  <Wrench size={15} />
+                  高级 · 系统深度清理
+                </span>
+                <span className="text-xs text-[var(--color-text-secondary)]">
+                  收益大但有代价，看懂说明再用
+                </span>
+              </div>
+              <div className="rounded-2xl bg-[var(--color-surface)] p-4 shadow-[var(--shadow-card)]">
+                <div className="flex items-center gap-2">
+                  <span className="text-sm font-semibold">清理 Windows 更新旧版本备份 (WinSxS)</span>
+                  <span className="rounded-full bg-[#FEE2E2] px-2 py-0.5 text-[10px] font-medium text-[#991B1B]">
+                    需要管理员
+                  </span>
+                  <span className="rounded-full bg-[var(--color-bg)] px-2 py-0.5 text-[10px] text-[var(--color-text-secondary)]">
+                    约 5~20 分钟
+                  </span>
+                </div>
+                <div className="mt-1 text-xs leading-relaxed text-[var(--color-text-secondary)]">
+                  系统每次更新都会保留旧组件用于回滚，日积月累可达数 GB～十几 GB。本操作调用微软官方
+                  DISM 工具清理这些备份，与系统自带磁盘清理同源，不会损坏系统。
+                </div>
+                <div className="mt-0.5 text-xs leading-relaxed">
+                  <span className="text-[var(--color-text-secondary)]">删了会怎样：</span>
+                  ⚠ 清理后将无法卸载/回滚现有的 Windows 更新（系统运行正常则基本无影响）。
+                </div>
+
+                {deepPhase === "running" && (
+                  <div className="mt-3 flex items-center gap-2 rounded-xl bg-[var(--color-bg)] px-3.5 py-2.5 text-xs text-[var(--color-text-secondary)]">
+                    <Loader2 size={14} className="animate-spin text-[var(--color-primary)]" />
+                    正在清理系统组件……会弹出授权和进度窗口，请勿关机。完成后这里会显示结果。
+                  </div>
+                )}
+                {deepPhase === "done" && deepReport && (
+                  <div className="mt-3 rounded-xl bg-[var(--color-primary-soft)] px-3.5 py-2.5 text-xs">
+                    ✅ 深度清理完成，释放{" "}
+                    <b>{formatBytes(deepReport.freed)}</b>（C 盘剩余{" "}
+                    {formatBytes(deepReport.freeBefore)} → {formatBytes(deepReport.freeAfter)}）
+                  </div>
+                )}
+                {deepError && (
+                  <div className="mt-3 rounded-xl bg-[#FEF3C7] px-3.5 py-2.5 text-xs text-[#92400E]">
+                    {deepError}
+                  </div>
+                )}
+
+                {deepPhase !== "running" && deepPhase !== "done" && (
+                  <button
+                    onClick={() => setDeepPhase("confirm")}
+                    className="mt-3 rounded-xl border border-[var(--color-line)] px-4 py-2 text-xs font-medium transition-colors hover:border-[var(--color-caution)] hover:text-[var(--color-caution)]"
+                  >
+                    开始深度清理…
+                  </button>
+                )}
+              </div>
+            </div>
           </div>
 
           {/* 底部操作条 */}
@@ -229,7 +345,7 @@ export default function Cleanup() {
             </div>
           )}
 
-          {/* 确认弹窗 */}
+          {/* 常规清理确认弹窗 */}
           <AnimatePresence>
             {phase === "confirm" && (
               <motion.div
@@ -246,11 +362,12 @@ export default function Cleanup() {
                   className="w-full max-w-md rounded-2xl bg-[var(--color-surface)] p-6 shadow-[var(--shadow-card-hover)]"
                   onClick={(e) => e.stopPropagation()}
                 >
-                  <div className="text-base font-semibold">确认清理这 {selectedItems.length} 项？</div>
+                  <div className="text-base font-semibold">
+                    确认清理这 {selectedItems.length} 项？
+                  </div>
                   <div className="mt-1 text-sm text-[var(--color-text-secondary)]">
                     共 {formatBytes(selectedSize)}。正在使用中的文件会自动跳过。
                   </div>
-
                   {cautionSelected.length > 0 && (
                     <div className="mt-4 rounded-xl bg-[#FEF3C7] p-3.5">
                       <div className="flex items-center gap-1.5 text-sm font-medium text-[#92400E]">
@@ -266,7 +383,6 @@ export default function Cleanup() {
                       </ul>
                     </div>
                   )}
-
                   <div className="mt-5 flex gap-3">
                     <button
                       onClick={() => setPhase("ready")}
@@ -285,28 +401,51 @@ export default function Cleanup() {
               </motion.div>
             )}
           </AnimatePresence>
+
+          {/* 深度清理确认弹窗 */}
+          <AnimatePresence>
+            {deepPhase === "confirm" && (
+              <motion.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                className="absolute inset-0 z-30 flex items-center justify-center bg-black/30 p-6"
+                onClick={() => setDeepPhase("idle")}
+              >
+                <motion.div
+                  initial={{ scale: 0.94, y: 10 }}
+                  animate={{ scale: 1, y: 0 }}
+                  exit={{ scale: 0.94, y: 10 }}
+                  className="w-full max-w-md rounded-2xl bg-[var(--color-surface)] p-6 shadow-[var(--shadow-card-hover)]"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <div className="text-base font-semibold">确认执行系统深度清理？</div>
+                  <div className="mt-3 rounded-xl bg-[#FEF3C7] p-3.5 text-xs leading-relaxed text-[#92400E]">
+                    <b>请确认你了解：</b>
+                    <br />① 会弹出系统授权窗口（UAC），需要点“是”；
+                    <br />② 过程约 5~20 分钟，会显示系统进度窗口，期间请勿关机；
+                    <br />③ 完成后将无法卸载/回滚现有的 Windows 更新——系统运行正常的话，这基本没有影响。
+                  </div>
+                  <div className="mt-5 flex gap-3">
+                    <button
+                      onClick={() => setDeepPhase("idle")}
+                      className="flex-1 rounded-xl border border-[var(--color-line)] py-2.5 text-sm font-medium transition-colors hover:bg-[var(--color-bg)]"
+                    >
+                      再想想
+                    </button>
+                    <button
+                      onClick={doDeepClean}
+                      className="flex-1 rounded-xl bg-[var(--color-caution)] py-2.5 text-sm font-medium text-white transition-colors hover:opacity-90"
+                    >
+                      我已了解，开始
+                    </button>
+                  </div>
+                </motion.div>
+              </motion.div>
+            )}
+          </AnimatePresence>
         </>
       )}
-    </div>
-  );
-}
-
-function Section({
-  title,
-  subtitle,
-  children,
-}: {
-  title: string;
-  subtitle: string;
-  children: React.ReactNode;
-}) {
-  return (
-    <div className="mb-6">
-      <div className="mb-2 flex items-baseline gap-2">
-        <span className="text-sm font-semibold">{title}</span>
-        <span className="text-xs text-[var(--color-text-secondary)]">{subtitle}</span>
-      </div>
-      <div className="space-y-2.5">{children}</div>
     </div>
   );
 }
@@ -344,6 +483,14 @@ function ItemCard({
                 谨慎
               </span>
             )}
+            {item.negligible && (
+              <span
+                className="rounded-full bg-[var(--color-bg)] px-2 py-0.5 text-[10px] text-[var(--color-text-secondary)]"
+                title="占用不到剩余空间的 1%，删了也感觉不到，可以不管它"
+              >
+                占用很小，可忽略
+              </span>
+            )}
             <span className="ml-auto text-sm font-bold text-[var(--color-primary-dark)]">
               {formatBytes(item.size)}
             </span>
@@ -358,7 +505,6 @@ function ItemCard({
         </div>
       </label>
 
-      {/* 详情展开：具体会清理哪些路径 */}
       <button
         onClick={(e) => {
           e.preventDefault();
