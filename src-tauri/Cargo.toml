@@ -1,0 +1,36 @@
+[package]
+name = "disk-butler"
+version = "0.2.0"
+description = "C盘管家 - 磁盘与内存维护助手"
+authors = ["you"]
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[lib]
+# The `_lib` suffix may seem redundant but it is necessary
+# to make the lib name unique and wouldn't conflict with the bin name.
+# This seems to be only an issue on Windows, see https://github.com/rust-lang/cargo/issues/8519
+name = "disk_butler_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri = { version = "2", features = [] }
+tauri-plugin-opener = "2"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+jwalk = "0.8"
+sysinfo = "0.32"
+windows-sys = { version = "0.59", features = ["Win32_Foundation", "Win32_UI_Shell"] }
+
+[profile.dev]
+# 加快扫描相关依赖的运行速度；关闭调试信息以降低编译内存峰值（16GB 内存机器必需）
+opt-level = 1
+debug = false
+
+[profile.dev.package."*"]
+debug = false
+
