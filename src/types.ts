@@ -68,6 +68,13 @@ export interface DeepCleanReport {
   freeAfter: number;
 }
 
+/** 累计清理统计（本地持久化） */
+export interface CleanupStats {
+  totalFreed: number;
+  totalRuns: number;
+  lastAt: number;
+}
+
 export interface DeepAnalyzeReport {
   lines: string[];
   recommended: boolean | null;
