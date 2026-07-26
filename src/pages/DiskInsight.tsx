@@ -3,7 +3,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { motion } from "framer-motion";
 import { HardDrive, Search, ChevronRight, Loader2, RotateCcw } from "lucide-react";
-import { DriveInfo, TreeNode, ScanProgress, formatBytes, formatCount } from "../types";
+import { DriveInfo, TreeNode, ScanProgress, ScanCache, formatBytes, formatCount, formatAgo } from "../types";
 import CapacityBar from "../components/CapacityBar";
 import TreeMap from "../components/TreeMap";
 import DetailPanel from "../components/DetailPanel";
@@ -23,6 +23,10 @@ export default function DiskInsight({ active = true }: Props) {
   const [root, setRoot] = useState<TreeNode | null>(null);
   /** 当前扫描结果属于哪个盘（挂载点）——标题/面包屑跟结果走，不跟下拉框走 */
   const [scannedDrive, setScannedDrive] = useState<string>("");
+  /** 结果的扫描时刻（Unix 秒），用于“扫描于 X 前”标注 */
+  const [scannedAt, setScannedAt] = useState<number | null>(null);
+  /** 当前结果是否来自本地缓存（而非本次会话的新扫描） */
+  const [fromCache, setFromCache] = useState(false);
   const [stack, setStack] = useState<TreeNode[]>([]); // 下钻路径栈
   const [selectedNode, setSelectedNode] = useState<TreeNode | null>(null);
   const [error, setError] = useState<string>("");
@@ -30,15 +34,37 @@ export default function DiskInsight({ active = true }: Props) {
   const mapAreaRef = useRef<HTMLDivElement>(null);
   const [mapSize, setMapSize] = useState({ w: 640, h: 420 });
 
-  // 加载盘符
+  /** 尝试加载某盘的本地缓存；命中则直接展示（不自动重扫，更新由用户手动触发） */
+  async function tryLoadCache(mount: string): Promise<boolean> {
+    try {
+      const cache = await invoke<ScanCache | null>("load_scan_cache", { root: mount });
+      if (!cache) return false;
+      setRoot(cache.tree);
+      setScannedDrive(cache.root);
+      setScannedAt(cache.scannedAt);
+      setFromCache(true);
+      setStack([]);
+      setSelectedNode(null);
+      setPhase("done");
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
+  // 加载盘符，并优先恢复默认盘的上次扫描结果
   useEffect(() => {
     invoke<DriveInfo[]>("get_drives")
       .then((ds) => {
         setDrives(ds);
         const c = ds.find((d) => d.letter.toUpperCase() === "C") ?? ds[0];
-        if (c) setSelected(c.mountPoint);
+        if (c) {
+          setSelected(c.mountPoint);
+          tryLoadCache(c.mountPoint);
+        }
       })
       .catch((e) => setError(String(e)));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // 监听扫描进度
@@ -82,10 +108,20 @@ export default function DiskInsight({ active = true }: Props) {
       const tree = await invoke<TreeNode>("scan_drive", { root: target });
       setRoot(tree);
       setScannedDrive(target);
+      setScannedAt(Math.floor(Date.now() / 1000));
+      setFromCache(false);
       setPhase("done");
     } catch (e) {
       setError(String(e));
       setPhase("idle");
+    }
+  }
+
+  /** 切换盘符：优先找该盘的缓存，找不到则保持现状（由不匹配提示条引导扫描） */
+  function onSelectDrive(mount: string) {
+    setSelected(mount);
+    if (phase !== "scanning" && mount !== scannedDrive) {
+      tryLoadCache(mount);
     }
   }
 
@@ -127,7 +163,7 @@ export default function DiskInsight({ active = true }: Props) {
           <div className="relative">
             <select
               value={selected}
-              onChange={(e) => setSelected(e.target.value)}
+              onChange={(e) => onSelectDrive(e.target.value)}
               disabled={phase === "scanning"}
               className="appearance-none rounded-xl border border-[var(--color-line)] bg-[var(--color-bg)] py-2.5 pl-10 pr-8 text-sm font-medium outline-none focus:border-[var(--color-primary)] disabled:opacity-50"
             >
@@ -238,7 +274,7 @@ export default function DiskInsight({ active = true }: Props) {
                   <b>{currentDrive?.letter ?? ""} 盘</b>，请点右上方「扫描 {currentDrive?.letter ?? ""} 盘」。
                 </div>
               )}
-              {/* 面包屑（盘符标签跟扫描结果走，不跟下拉框走） */}
+              {/* 面包屑（盘符标签跟扫描结果走，不跟下拉框走）+ 扫描时间标注 */}
               <div className="mb-4 flex flex-wrap items-center gap-1 text-sm">
                 {crumbs.map((c, i) => (
                   <div key={c.path} className="flex items-center gap-1">
@@ -256,6 +292,15 @@ export default function DiskInsight({ active = true }: Props) {
                     </button>
                   </div>
                 ))}
+                {scannedAt !== null && (
+                  <span
+                    className="ml-auto rounded-full bg-[var(--color-bg)] px-2.5 py-1 text-[11px] text-[var(--color-text-secondary)]"
+                    title={fromCache ? "这是上次扫描保存的结果，点“重新扫描”获取最新数据" : "本次扫描的结果"}
+                  >
+                    扫描于 {formatAgo(scannedAt)}
+                    {fromCache && " · 上次结果"}
+                  </span>
+                )}
               </div>
 
               {/* TreeMap 画布 */}

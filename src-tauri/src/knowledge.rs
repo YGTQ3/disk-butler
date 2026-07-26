@@ -2,10 +2,10 @@
 //! 每条规则将「路径片段」映射到「分类 + 人话名称 + 说明 + 安全等级」，
 //! 供前端在 TreeMap 悬停/详情卡中向普通用户解释「这是什么、能不能动」。
 
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 
 /// 磁盘占用分类。决定 TreeMap 的色彩语义。
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub enum Category {
     /// 操作系统本体（蓝）
@@ -23,7 +23,7 @@ pub enum Category {
 }
 
 /// 安全等级：能否清理。
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub enum Safety {
     /// 可安全清理（缓存、临时文件）
@@ -235,12 +235,41 @@ const RULES: &[Rule] = &[
         description: "微信聊天记录、图片、小程序缓存，占用往往很大。含重要数据，请在微信内清理。",
         safety: Safety::Caution,
     },
+    // ---------- 下载/接收类目录：名字像缓存，实为个人数据，必须排在对应的程序缓存规则之前 ----------
+    Rule {
+        needle: "baidunetdiskdownload",
+        category: Category::Personal,
+        friendly_name: "百度网盘下载的文件",
+        description: "你从百度网盘下载下来的文件，是个人数据而不是缓存，请自行整理，不要当垃圾清理。",
+        safety: Safety::Keep,
+    },
+    Rule {
+        needle: "wechat files",
+        category: Category::Personal,
+        friendly_name: "微信接收的文件",
+        description: "聊天中接收的文件/图片/视频。删除后若聊天记录已过期将无法重新下载，谨慎清理。",
+        safety: Safety::Caution,
+    },
+    Rule {
+        needle: "xwechat_files",
+        category: Category::Personal,
+        friendly_name: "微信接收的文件",
+        description: "聊天中接收的文件/图片/视频。删除后若聊天记录已过期将无法重新下载，谨慎清理。",
+        safety: Safety::Caution,
+    },
+    Rule {
+        needle: "thunderdownload",
+        category: Category::Personal,
+        friendly_name: "迅雷下载的文件",
+        description: "你用迅雷下载的文件，属于个人数据，请自行整理。",
+        safety: Safety::Keep,
+    },
     Rule {
         needle: "baidunetdisk",
         category: Category::Cache,
-        friendly_name: "百度网盘缓存",
-        description: "百度网盘的下载与传输缓存，可在客户端设置中清理。",
-        safety: Safety::Safe,
+        friendly_name: "百度网盘程序数据",
+        description: "百度网盘客户端的程序数据与传输缓存（注意：你下载的文件不在这里），可在客户端设置中清理。",
+        safety: Safety::Caution,
     },
     Rule {
         needle: "-updater",
@@ -263,6 +292,155 @@ const RULES: &[Rule] = &[
         description: "软件的配置与账户数据，删除会丢失设置，请谨慎。",
         safety: Safety::Caution,
     },
+    // ---------- 游戏/开发/AI 生态 ----------
+    Rule {
+        needle: "steamapps",
+        category: Category::Software,
+        friendly_name: "Steam 游戏本体",
+        description: "已安装的 Steam 游戏文件。想释放空间请在 Steam 内卸载游戏，不要手动删除。",
+        safety: Safety::Keep,
+    },
+    Rule {
+        needle: "epic games",
+        category: Category::Software,
+        friendly_name: "Epic 游戏本体",
+        description: "Epic 平台的游戏文件，请通过 Epic 启动器管理。",
+        safety: Safety::Keep,
+    },
+    Rule {
+        needle: "node_modules",
+        category: Category::Software,
+        friendly_name: "前端项目依赖",
+        description: "代码项目的依赖包。删除后需 npm install 重装；不再维护的旧项目可连项目一起处理。",
+        safety: Safety::Caution,
+    },
+    Rule {
+        needle: ".nuget/packages",
+        category: Category::Cache,
+        friendly_name: "NuGet 包缓存",
+        description: ".NET 依赖包缓存，删除后构建时重新下载。",
+        safety: Safety::Caution,
+    },
+    Rule {
+        needle: ".m2/repository",
+        category: Category::Cache,
+        friendly_name: "Maven 依赖缓存",
+        description: "Java 项目依赖缓存，删除后构建时重新下载（可能很慢）。",
+        safety: Safety::Caution,
+    },
+    Rule {
+        needle: ".gradle/caches",
+        category: Category::Cache,
+        friendly_name: "Gradle 构建缓存",
+        description: "Android/Java 构建缓存，可安全删除，下次构建时重新生成。",
+        safety: Safety::Safe,
+    },
+    Rule {
+        needle: "go/pkg/mod",
+        category: Category::Cache,
+        friendly_name: "Go 模块缓存",
+        description: "Go 依赖缓存（文件带只读属性），建议用 go clean -modcache 清理。",
+        safety: Safety::Caution,
+    },
+    Rule {
+        needle: "yarn/cache",
+        category: Category::Cache,
+        friendly_name: "Yarn 缓存",
+        description: "Node.js 依赖缓存，可安全清理。",
+        safety: Safety::Safe,
+    },
+    Rule {
+        needle: "pnpm",
+        category: Category::Cache,
+        friendly_name: "pnpm 存储",
+        description: "pnpm 的全局依赖存储，删除后项目需重新安装依赖。",
+        safety: Safety::Caution,
+    },
+    Rule {
+        needle: "huggingface",
+        category: Category::Cache,
+        friendly_name: "HuggingFace AI 模型缓存",
+        description: "AI 模型文件，动辄数 GB。删除后再用时需重新下载大文件。",
+        safety: Safety::Caution,
+    },
+    Rule {
+        needle: ".ollama",
+        category: Category::Software,
+        friendly_name: "Ollama 本地大模型",
+        description: "本地大语言模型文件，建议用 ollama rm 命令删除不用的模型。",
+        safety: Safety::Caution,
+    },
+    Rule {
+        needle: "conda/pkgs",
+        category: Category::Cache,
+        friendly_name: "conda 包缓存",
+        description: "与已建环境存在硬链接共享，手动删除可能破坏环境！请用 conda clean -p 清理。",
+        safety: Safety::Caution,
+    },
+    Rule {
+        needle: "miniconda3/pkgs",
+        category: Category::Cache,
+        friendly_name: "conda 包缓存",
+        description: "与已建环境存在硬链接共享，手动删除可能破坏环境！请用 conda clean -p 清理。",
+        safety: Safety::Caution,
+    },
+    Rule {
+        needle: "docker/wsl",
+        category: Category::SystemFile,
+        friendly_name: "Docker 虚拟磁盘",
+        description: "Docker 的镜像与容器数据盘，体积大。请通过 Docker Desktop 清理镜像来瘦身。",
+        safety: Safety::Caution,
+    },
+    Rule {
+        needle: "d3dscache",
+        category: Category::Cache,
+        friendly_name: "DirectX 着色器缓存",
+        description: "图形着色器缓存，可安全清理，游戏/应用首次启动时重新生成。",
+        safety: Safety::Safe,
+    },
+    Rule {
+        needle: "crashdumps",
+        category: Category::Cache,
+        friendly_name: "程序崩溃转储",
+        description: "程序崩溃时的现场快照，排查问题用，可安全清理。",
+        safety: Safety::Safe,
+    },
+    Rule {
+        needle: "windows/wer",
+        category: Category::Cache,
+        friendly_name: "Windows 错误报告",
+        description: "程序出错时的报告存档，可安全清理。",
+        safety: Safety::Safe,
+    },
+    Rule {
+        needle: "nvidia/dxcache",
+        category: Category::Cache,
+        friendly_name: "显卡着色器缓存",
+        description: "NVIDIA 着色器缓存，可安全清理，会自动重建。",
+        safety: Safety::Safe,
+    },
+    Rule {
+        needle: "nvidia/glcache",
+        category: Category::Cache,
+        friendly_name: "显卡着色器缓存",
+        description: "NVIDIA 着色器缓存，可安全清理，会自动重建。",
+        safety: Safety::Safe,
+    },
+    Rule {
+        needle: "$windows.~bt",
+        category: Category::Cache,
+        friendly_name: "系统升级临时文件",
+        description: "Windows 大版本升级的临时文件，升级完成后可用磁盘清理工具安全删除。",
+        safety: Safety::Caution,
+    },
+    Rule {
+        needle: "onedrivetemp",
+        category: Category::Cache,
+        friendly_name: "OneDrive 临时文件",
+        description: "OneDrive 同步产生的临时文件，可安全清理。",
+        safety: Safety::Safe,
+    },
+
     // ---------- 开发环境 ----------
     Rule {
         needle: "miniconda3",
@@ -394,6 +572,108 @@ pub fn classify(path: &str) -> KnowledgeHit {
     }
 }
 
+// ---------- 内容启发式推断：不只看目录名，还看里面装的是什么 ----------
+
+pub const EXT_GROUP_COUNT: usize = 7;
+const G_MEDIA: usize = 0; // 视频/图片/音频
+const G_DOCS: usize = 1; // 文档/电子书
+const G_ARCHIVE: usize = 2; // 压缩包/镜像
+const G_PROGRAM: usize = 3; // 可执行/程序库
+const G_CODE: usize = 4; // 代码/工程文件
+const G_CACHE: usize = 5; // 临时/日志/缓存类
+const G_OTHER: usize = 6;
+
+/// 根据文件扩展名归入内容组
+pub fn ext_group(path: &std::path::Path) -> usize {
+    let Some(ext) = path.extension().map(|e| e.to_string_lossy().to_lowercase()) else {
+        return G_OTHER;
+    };
+    match ext.as_str() {
+        "mp4" | "mkv" | "avi" | "mov" | "flv" | "wmv" | "ts" | "webm" | "mp3" | "wav" | "flac"
+        | "aac" | "m4a" | "jpg" | "jpeg" | "png" | "gif" | "webp" | "heic" | "bmp" | "raw"
+        | "psd" => G_MEDIA,
+        "pdf" | "doc" | "docx" | "xls" | "xlsx" | "ppt" | "pptx" | "txt" | "md" | "epub"
+        | "mobi" | "csv" => G_DOCS,
+        "zip" | "rar" | "7z" | "tar" | "gz" | "xz" | "iso" | "img" => G_ARCHIVE,
+        "exe" | "dll" | "msi" | "sys" | "ocx" | "so" | "node" | "pyd" | "winmd" | "mui" => G_PROGRAM,
+        "js" | "ts" | "tsx" | "jsx" | "py" | "rs" | "java" | "c" | "cpp" | "h" | "hpp" | "go"
+        | "cs" | "json" | "toml" | "yaml" | "yml" | "css" | "html" | "vue" | "lock" => G_CODE,
+        "tmp" | "temp" | "log" | "cache" | "db" | "ldb" | "dat" | "etl" | "dmp" | "old" | "bak"
+        | "idx" => G_CACHE,
+        _ => G_OTHER,
+    }
+}
+
+/// 对「未识别」目录按内容构成推断分类。
+/// 只在体量足够大时才猜；推断结果仅用于展示，永不进入清理白名单。
+pub fn profile_classify(profile: &[u64; EXT_GROUP_COUNT]) -> Option<KnowledgeHit> {
+    let total: u64 = profile.iter().sum();
+    if total < 50 * 1024 * 1024 {
+        return None; // 太小的目录不值得猜，也猜不准
+    }
+    let share = |i: usize| profile[i] as f64 / total as f64;
+    let pct = |i: usize| (share(i) * 100.0).round() as u32;
+
+    if share(G_MEDIA) >= 0.6 {
+        return Some(KnowledgeHit {
+            category: Category::Personal,
+            friendly_name: "个人媒体文件（根据内容推断）".to_string(),
+            description: format!(
+                "里面约 {}% 是视频/图片/音频，更像你的个人文件而不是缓存，请勿当垃圾清理。",
+                pct(G_MEDIA)
+            ),
+            safety: Safety::Keep,
+        });
+    }
+    if share(G_MEDIA) + share(G_DOCS) + share(G_ARCHIVE) >= 0.7 {
+        return Some(KnowledgeHit {
+            category: Category::Personal,
+            friendly_name: "个人文件为主（根据内容推断）".to_string(),
+            description: format!(
+                "里面主要是媒体({}%)、文档({}%)和压缩包({}%)，更像个人数据，请自行整理而非直接清理。",
+                pct(G_MEDIA),
+                pct(G_DOCS),
+                pct(G_ARCHIVE)
+            ),
+            safety: Safety::Keep,
+        });
+    }
+    if share(G_PROGRAM) >= 0.6 {
+        return Some(KnowledgeHit {
+            category: Category::Software,
+            friendly_name: "程序目录（根据内容推断）".to_string(),
+            description: format!(
+                "里面约 {}% 是程序文件，可能是某个软件的安装目录，请通过卸载程序移除而非手动删除。",
+                pct(G_PROGRAM)
+            ),
+            safety: Safety::Keep,
+        });
+    }
+    if share(G_CODE) >= 0.5 {
+        return Some(KnowledgeHit {
+            category: Category::Software,
+            friendly_name: "代码工程（根据内容推断）".to_string(),
+            description: format!(
+                "里面约 {}% 是代码/工程文件，像是开发项目，请确认不再需要后再处理。",
+                pct(G_CODE)
+            ),
+            safety: Safety::Keep,
+        });
+    }
+    if share(G_CACHE) >= 0.7 {
+        return Some(KnowledgeHit {
+            category: Category::Cache,
+            friendly_name: "疑似缓存（根据内容推断）".to_string(),
+            description: format!(
+                "里面约 {}% 是临时/日志类文件。这只是推测，清理前请先确认它属于哪个软件。",
+                pct(G_CACHE)
+            ),
+            safety: Safety::Caution,
+        });
+    }
+    None
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -485,5 +765,94 @@ mod tests {
         // windows/winsxs 应先于泛化的 windows 命中
         let hit = classify(r"C:\Windows\WinSxS\amd64_something");
         assert_eq!(hit.friendly_name, "Windows 组件仓库 (WinSxS)");
+    }
+
+    // ---------- 新增规则：下载目录不是缓存 ----------
+
+    #[test]
+    fn baidu_download_dir_is_personal_not_cache() {
+        let hit = classify(r"C:\Users\x\BaiduNetdiskDownload");
+        assert_eq!(hit.category, Category::Personal);
+        assert_eq!(hit.safety, Safety::Keep);
+    }
+
+    #[test]
+    fn baidu_app_data_is_caution_cache() {
+        let hit = classify(r"C:\Users\x\AppData\Roaming\BaiduNetdisk");
+        assert_eq!(hit.category, Category::Cache);
+        assert_eq!(hit.safety, Safety::Caution);
+    }
+
+    #[test]
+    fn wechat_files_is_personal() {
+        assert_eq!(classify(r"D:\WeChat Files\wxid_123\FileStorage").category, Category::Personal);
+        assert_eq!(classify(r"D:\Documents\xwechat_files").category, Category::Personal);
+    }
+
+    #[test]
+    fn steamapps_is_software_keep() {
+        let hit = classify(r"D:\Steam\steamapps\common\Game");
+        assert_eq!(hit.category, Category::Software);
+        assert_eq!(hit.safety, Safety::Keep);
+    }
+
+    #[test]
+    fn conda_pkgs_is_caution() {
+        assert_eq!(classify(r"C:\Users\x\miniconda3\pkgs").safety, Safety::Caution);
+    }
+
+    // ---------- 内容启发式 ----------
+
+    fn mb(n: u64) -> u64 {
+        n * 1024 * 1024
+    }
+
+    #[test]
+    fn profile_media_dominant_is_personal() {
+        let mut p = [0u64; EXT_GROUP_COUNT];
+        p[0] = mb(700); // media
+        p[6] = mb(100);
+        let hit = profile_classify(&p).unwrap();
+        assert_eq!(hit.category, Category::Personal);
+        assert_eq!(hit.safety, Safety::Keep);
+    }
+
+    #[test]
+    fn profile_cacheish_is_caution_not_safe() {
+        let mut p = [0u64; EXT_GROUP_COUNT];
+        p[5] = mb(800); // cache-ish
+        p[6] = mb(100);
+        let hit = profile_classify(&p).unwrap();
+        assert_eq!(hit.category, Category::Cache);
+        // 推断出的缓存只能是 Caution，绝不能是 Safe
+        assert_eq!(hit.safety, Safety::Caution);
+    }
+
+    #[test]
+    fn profile_small_dir_returns_none() {
+        let mut p = [0u64; EXT_GROUP_COUNT];
+        p[0] = mb(10); // 不足 50MB 不猜
+        assert!(profile_classify(&p).is_none());
+    }
+
+    #[test]
+    fn profile_mixed_returns_none() {
+        let mut p = [0u64; EXT_GROUP_COUNT];
+        for i in 0..EXT_GROUP_COUNT {
+            p[i] = mb(100); // 均匀混合，无法判断
+        }
+        assert!(profile_classify(&p).is_none());
+    }
+
+    #[test]
+    fn ext_group_basic() {
+        use std::path::Path;
+        assert_eq!(ext_group(Path::new("a.mp4")), 0);
+        assert_eq!(ext_group(Path::new("b.pdf")), 1);
+        assert_eq!(ext_group(Path::new("c.zip")), 2);
+        assert_eq!(ext_group(Path::new("d.exe")), 3);
+        assert_eq!(ext_group(Path::new("e.rs")), 4);
+        assert_eq!(ext_group(Path::new("f.tmp")), 5);
+        assert_eq!(ext_group(Path::new("noext")), 6);
     }
 }

@@ -51,7 +51,21 @@ export interface CleanupItem {
   paths: PathDetail[];
   size: number;
   safety: "safe" | "caution";
+  kind: "junk" | "cache" | "data";
+  negligible: boolean;
   defaultChecked: boolean;
+}
+
+export interface CleanupScan {
+  items: CleanupItem[];
+  free: number;
+  spaceTight: boolean;
+}
+
+export interface DeepCleanReport {
+  freed: number;
+  freeBefore: number;
+  freeAfter: number;
 }
 
 export interface ItemResult {
@@ -103,6 +117,12 @@ export interface MemoryReport {
   groups: ProcessGroup[];
 }
 
+export interface ScanCache {
+  scannedAt: number;
+  root: string;
+  tree: TreeNode;
+}
+
 /** 分类 -> 设计令牌色（与 tokens.css / DESIGN.md 一致） */
 export const CATEGORY_COLOR: Record<Category, string> = {
   system: "var(--color-cat-system)",
@@ -141,4 +161,13 @@ export function formatBytes(bytes: number): string {
 export function formatCount(n: number): string {
   if (n >= 10000) return `${(n / 10000).toFixed(1)} 万`;
   return n.toLocaleString();
+}
+
+/** 相对时间：Unix 秒 -> "刚刚 / 5 分钟前 / 3 小时前 / 2 天前" */
+export function formatAgo(unixSecs: number): string {
+  const diff = Math.max(0, Date.now() / 1000 - unixSecs);
+  if (diff < 60) return "刚刚";
+  if (diff < 3600) return `${Math.floor(diff / 60)} 分钟前`;
+  if (diff < 86400) return `${Math.floor(diff / 3600)} 小时前`;
+  return `${Math.floor(diff / 86400)} 天前`;
 }

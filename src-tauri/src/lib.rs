@@ -1,10 +1,12 @@
+mod cache;
 mod cleanup;
 mod knowledge;
 mod memory;
 mod scan;
 mod startup;
 
-use cleanup::{CleanupItem, CleanupReport};
+use cache::ScanCache;
+use cleanup::{CleanupReport, CleanupScan, DeepCleanReport};
 use memory::MemoryReport;
 use scan::{DriveInfo, TreeNode};
 use startup::StartupItem;
@@ -15,12 +17,25 @@ fn get_drives() -> Vec<DriveInfo> {
     scan::list_drives()
 }
 
-/// 扫描指定根目录（如 "C:\\"），后台线程执行并推送进度事件，返回剪枝后的目录树。
+/// 扫描指定根目录（如 "C:\\"），后台线程执行并推送进度事件，完成后自动写入本地缓存。
 #[tauri::command]
 async fn scan_drive(app: tauri::AppHandle, root: String) -> Result<TreeNode, String> {
-    tauri::async_runtime::spawn_blocking(move || scan::scan(&root, Some(&app)))
+    tauri::async_runtime::spawn_blocking(move || {
+        let tree = scan::scan(&root, Some(&app))?;
+        cache::save(&app, &root, &tree);
+        Ok(tree)
+    })
+    .await
+    .map_err(|e| format!("扫描任务失败：{}", e))?
+}
+
+/// 读取某盘上次扫描的本地缓存（无则返回 null）。
+#[tauri::command]
+async fn load_scan_cache(app: tauri::AppHandle, root: String) -> Option<ScanCache> {
+    tauri::async_runtime::spawn_blocking(move || cache::load(&app, &root))
         .await
-        .map_err(|e| format!("扫描任务失败：{}", e))?
+        .ok()
+        .flatten()
 }
 
 /// 按需下钻：扫描更深层目录（不推送进度，用于 TreeMap 展开下级）。
@@ -31,12 +46,20 @@ async fn scan_dir(path: String) -> Result<TreeNode, String> {
         .map_err(|e| format!("扫描任务失败：{}", e))?
 }
 
-/// 枚举白名单清理项及当前大小（含磁盘扫描，后台线程执行）。
+/// 枚举白名单清理项及当前大小 + 磁盘空间水位（含磁盘扫描，后台线程执行）。
 #[tauri::command]
-async fn list_cleanup_items() -> Result<Vec<CleanupItem>, String> {
+async fn list_cleanup_items() -> Result<CleanupScan, String> {
     tauri::async_runtime::spawn_blocking(cleanup::list_items)
         .await
         .map_err(|e| format!("扫描清理项失败：{}", e))
+}
+
+/// 高级：系统深度清理（DISM 组件存储，需 UAC 授权，耗时 5~20 分钟）。
+#[tauri::command]
+async fn run_deep_clean() -> Result<DeepCleanReport, String> {
+    tauri::async_runtime::spawn_blocking(cleanup::deep_clean)
+        .await
+        .map_err(|e| format!("深度清理任务失败：{}", e))?
 }
 
 /// 执行清理（只接受白名单 id，路径由后端重新解析）。
@@ -79,8 +102,10 @@ pub fn run() {
             get_drives,
             scan_drive,
             scan_dir,
+            load_scan_cache,
             list_cleanup_items,
             run_cleanup,
+            run_deep_clean,
             list_startup_items,
             set_startup_enabled,
             memory_report
