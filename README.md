@@ -78,7 +78,10 @@ Windows 更新旧版本备份（WinSxS）动辄十几 GB。高级区调用**微�
 
 ## 📥 下载安装
 
-前往 [Releases](https://github.com/YGTQ3/disk-butler/releases) 下载最新的 `DiskButler_x.x.x_x64-setup.exe`，双击安装，2.4 MB 转瞬装完。
+- 国内用户（推荐）：[⚡ 加速下载最新版](https://github.akams.cn/?url=https://github.com/YGTQ3/disk-butler/releases/latest/download/DiskButler-Setup.exe)，打开后点“开始下载”即可；
+- 直连 GitHub：前往 [Releases](https://github.com/YGTQ3/disk-butler/releases) 下载 `DiskButler-Setup.exe`。
+
+双击安装，2.4 MB 转瞬装完。
 
 - 系统要求：Windows 10/11 x64（WebView2 系统自带，无需额外运行库）
 - 首次运行如遇 SmartScreen 提示"未知发布者"：点击"更多信息 → 仍要运行"（个人开源项目暂无代码签名证书，源码就在这里，可自行审计或构建）
