@@ -12,24 +12,21 @@ C盘管家的清理白名单和磁盘透视知识库都靠"规则"驱动——�
 
 **它不清理、不删除、不修改任何东西，也不联网**——只在你桌面上写两个报告文件。
 
-## 怎么用（三步）
+## 怎么用（三步，双击即可）
 
-1. **下载脚本**：打开
-   [collect-rules.ps1](https://github.com/YGTQ3/disk-butler/blob/main/tools/collect-rules.ps1)
-   → 点 `Raw` → `Ctrl+S` 保存到任意文件夹；
+1. **下载两个文件**到同一个文件夹（打开链接 → 点 `Raw` → `Ctrl+S` 保存）：
+   - [collect-rules.ps1](https://github.com/YGTQ3/disk-butler/blob/main/tools/collect-rules.ps1)（采集脚本本体）
+   - [run-collector.bat](https://github.com/YGTQ3/disk-butler/blob/main/tools/run-collector.bat)（双击启动器）
 
-2. **运行**：在脚本所在文件夹按住 `Shift` + 右键 → "在此处打开 PowerShell 窗口"，粘贴：
-
-   ```powershell
-   powershell -NoProfile -ExecutionPolicy Bypass -File .\collect-rules.ps1
-   ```
-
-   约 1 分钟跑完，**不需要管理员权限**；
+2. **双击 `run-collector.bat`**，约 1 分钟跑完，**不需要管理员权限**；
+   （为什么不直接双击 .ps1？Windows 默认双击 .ps1 是用记事本打开，不会运行）
 
 3. **审查后发送**：桌面上会生成 `diskbutler-rule-report-时间戳.md`，
    用记事本打开**自己先看一遍**，确认没有你不想分享的内容，再发给收集人。
 
 ## 可选：全盘线索模式
+
+命令行运行并加 `-IncludeDrives` 参数（或把参数传给 bat：`run-collector.bat -IncludeDrives`）：
 
 ```powershell
 powershell -NoProfile -ExecutionPolicy Bypass -File .\collect-rules.ps1 -IncludeDrives
