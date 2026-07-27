@@ -4,6 +4,8 @@ version = "0.5.1"
 description = "C盘管家 - 磁盘与内存维护助手"
 authors = ["you"]
 edition = "2021"
+# 包内有主程序与扫描服务两个 bin，明确主二进制（tauri CLI 依此识别应用本体）
+default-run = "disk-butler"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
@@ -24,9 +26,21 @@ serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 jwalk = "0.8"
 sysinfo = "0.32"
-windows-sys = { version = "0.59", features = ["Win32_Foundation", "Win32_UI_Shell"] }
+windows-sys = { version = "0.59", features = [
+    "Win32_Foundation",
+    "Win32_UI_Shell",
+    "Win32_System_Pipes",
+    "Win32_System_IO",
+    "Win32_Security",
+    "Win32_Security_Authorization",
+    "Win32_Storage_FileSystem",
+] }
 winreg = "0.52"
 encoding_rs = "0.8"
+# MFT 直读扫描（WizTree 同款原理）与后台服务
+ntfs-reader = "0.4"
+windows-service = "0.8"
+rayon = "1"
 
 [profile.dev]
 # 加快扫描相关依赖的运行速度；关闭调试信息以降低编译内存峰值（16GB 内存机器必需）
