@@ -236,6 +236,41 @@ const RULES: &[Rule] = &[
         safety: Safety::Caution,
     },
     Rule {
+        needle: "appdata/local/wsl",
+        category: Category::SystemFile,
+        friendly_name: "WSL Linux 子系统磁盘",
+        description: "Linux 子系统的虚拟磁盘，内含你的 Linux 环境和文件。请用 wsl 命令管理，不要直接删文件。",
+        safety: Safety::Caution,
+    },
+    Rule {
+        needle: "appdata/local/uv",
+        category: Category::Cache,
+        friendly_name: "uv 包缓存",
+        description: "Python 包管理器 uv 的下载缓存，可用 uv cache clean 安全清理。",
+        safety: Safety::Safe,
+    },
+    Rule {
+        needle: "appdata/roaming/code",
+        category: Category::Software,
+        friendly_name: "VS Code 数据",
+        description: "VS Code 的设置与缓存，其中 Cache 类子目录可由一键清理安全清理，设置不受影响。",
+        safety: Safety::Caution,
+    },
+    Rule {
+        needle: "adobe/common/media cache",
+        category: Category::Cache,
+        friendly_name: "Adobe 媒体缓存",
+        description: "Premiere/AE 的预览渲染缓存，可安全清理，打开旧项目时会重新生成。",
+        safety: Safety::Safe,
+    },
+    Rule {
+        needle: "kingsoft/office6/cache",
+        category: Category::Cache,
+        friendly_name: "WPS 缓存",
+        description: "WPS Office 的运行缓存，可安全清理，文档不受影响。",
+        safety: Safety::Safe,
+    },
+    Rule {
         needle: "weixin",
         category: Category::Cache,
         friendly_name: "微信数据/缓存",
@@ -725,6 +760,21 @@ mod tests {
     fn classify_dingtalk_local_versioned_dir() {
         // 目录名带版本号（DingTalk_133）也必须命中 appdata/local/dingtalk 规则
         assert_cat(r"C:\Users\x\AppData\Local\DingTalk_133", Category::Cache);
+    }
+
+    #[test]
+    fn classify_wsl_is_systemfile_caution() {
+        // WSL 虚拟磁盘含用户 Linux 环境，必须 Caution，不可被泛 appdata/local 规则归为可清
+        let hit = classify(r"C:\Users\x\AppData\Local\wsl");
+        assert_eq!(hit.category, Category::SystemFile);
+        assert_eq!(hit.safety, Safety::Caution);
+    }
+
+    #[test]
+    fn classify_adobe_media_cache_safe() {
+        let hit = classify(r"C:\Users\x\AppData\Roaming\Adobe\Common\Media Cache Files");
+        assert_eq!(hit.category, Category::Cache);
+        assert_eq!(hit.safety, Safety::Safe);
     }
 
     #[test]
