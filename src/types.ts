@@ -77,6 +77,16 @@ export interface CleanupStats {
   lastAt: number;
 }
 
+/** 规则采集报告生成结果（「帮它认识更多软件」） */
+export interface CollectResult {
+  mdPath: string;
+  jsonPath: string;
+  softwareCount: number;
+  dirRows: number;
+  driveRows: number;
+  elapsedSecs: number;
+}
+
 /** 页面文件一致性核验 */
 export interface PagefileEntry {
   path: string;

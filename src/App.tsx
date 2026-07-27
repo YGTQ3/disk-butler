@@ -1,9 +1,10 @@
 import { useState } from "react";
-import { HardDrive, Sparkles, Rocket, Cpu, ShieldCheck } from "lucide-react";
+import { HardDrive, Sparkles, Rocket, Cpu, ShieldCheck, HeartHandshake } from "lucide-react";
 import DiskInsight from "./pages/DiskInsight";
 import Cleanup from "./pages/Cleanup";
 import Startup from "./pages/Startup";
 import MemoryCheck from "./pages/MemoryCheck";
+import ContributeModal from "./components/ContributeModal";
 
 type PageId = "insight" | "clean" | "startup" | "memory";
 
@@ -25,6 +26,7 @@ function App() {
   const [page, setPage] = useState<PageId>("insight");
   // 访问过的页面保持挂载（只隐藏不销毁），切页不丢扫描结果
   const [visited, setVisited] = useState<Set<PageId>>(new Set(["insight"]));
+  const [showContribute, setShowContribute] = useState(false);
 
   function go(id: PageId) {
     setVisited((prev) => {
@@ -81,7 +83,18 @@ function App() {
           })}
         </nav>
 
-        <div className="mt-auto px-5 py-4 text-[11px] leading-relaxed text-[var(--color-text-secondary)]">
+        <div className="mt-auto px-3 pb-2">
+          {/* 社区贡献入口：本地生成报告，发不发由用户决定 */}
+          <button
+            onClick={() => setShowContribute(true)}
+            className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-sm text-[var(--color-text-secondary)] transition-colors hover:bg-[var(--color-bg)] hover:text-[var(--color-text-main)]"
+          >
+            <HeartHandshake size={20} />
+            <span className="flex-1">帮它认识更多软件</span>
+          </button>
+        </div>
+
+        <div className="px-5 pb-4 text-[11px] leading-relaxed text-[var(--color-text-secondary)]">
           v{__APP_VERSION__.split(".").slice(0, 2).join(".")} · 透视 / 清理 / 启动 / 内存
           <br />
           所有操作都会先告诉你“这是什么”
@@ -109,6 +122,8 @@ function App() {
           </div>
         )}
       </main>
+
+      {showContribute && <ContributeModal onClose={() => setShowContribute(false)} />}
     </div>
   );
 }

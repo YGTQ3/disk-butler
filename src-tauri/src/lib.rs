@@ -1,5 +1,6 @@
 mod cache;
 mod cleanup;
+mod collector;
 mod knowledge;
 mod memory;
 mod scan;
@@ -126,6 +127,14 @@ async fn pagefile_check() -> Result<memory::PagefileCheck, String> {
         .map_err(|e| format!("页面文件核验失败：{}", e))
 }
 
+/// 生成规则采集报告（写到桌面，由用户自主决定是否分享）。
+#[tauri::command]
+async fn collect_rules(include_drives: bool) -> Result<collector::CollectResult, String> {
+    tauri::async_runtime::spawn_blocking(move || collector::collect(include_drives))
+        .await
+        .map_err(|e| format!("采集失败：{}", e))?
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
@@ -143,7 +152,8 @@ pub fn run() {
             list_startup_items,
             set_startup_enabled,
             memory_report,
-            pagefile_check
+            pagefile_check,
+            collect_rules
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
