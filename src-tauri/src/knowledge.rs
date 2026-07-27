@@ -229,6 +229,13 @@ const RULES: &[Rule] = &[
         safety: Safety::Caution,
     },
     Rule {
+        needle: "appdata/local/dingtalk",
+        category: Category::Cache,
+        friendly_name: "钉钉内置浏览器数据",
+        description: "钉钉内置浏览器的缓存与页面数据，其中 Cache 部分可由一键清理安全清理。",
+        safety: Safety::Caution,
+    },
+    Rule {
         needle: "weixin",
         category: Category::Cache,
         friendly_name: "微信数据/缓存",
@@ -712,6 +719,12 @@ mod tests {
     #[test]
     fn jianying_is_cache() {
         assert_cat(r"C:\Users\l3268\AppData\Local\JianyingPro", Category::Cache);
+    }
+
+    #[test]
+    fn classify_dingtalk_local_versioned_dir() {
+        // 目录名带版本号（DingTalk_133）也必须命中 appdata/local/dingtalk 规则
+        assert_cat(r"C:\Users\x\AppData\Local\DingTalk_133", Category::Cache);
     }
 
     #[test]

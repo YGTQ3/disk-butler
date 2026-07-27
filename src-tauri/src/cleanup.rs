@@ -242,6 +242,64 @@ fn candidates() -> Vec<Candidate> {
             paths: vec![local.join("JetBrains")],
         });
 
+        // 剪映缓存：素材/渲染缓存，草稿和工程文件不在此目录
+        let jy = local.join("JianyingPro").join("User Data").join("Cache");
+        if jy.exists() {
+            out.push(Candidate {
+                id: "jianying-cache",
+                name: "剪映缓存",
+                description: "剪映视频编辑器的素材与渲染缓存（草稿和工程文件不在这里）。",
+                impact: "⚠ 已下载的云端素材需要重新下载，打开旧项目首次加载会变慢。正在剪片子时不建议清。",
+                safety: "caution",
+                paths: vec![jy],
+            });
+        }
+
+        // Playwright 自动化浏览器内核：缺失时工具会提示/自动重新下载
+        let mut pw: Vec<PathBuf> = Vec::new();
+        for name in ["ms-playwright", "ms-playwright-go", "ms-playwright-mcp"] {
+            let p = local.join(name);
+            if p.exists() {
+                pw.push(p);
+            }
+        }
+        if !pw.is_empty() {
+            out.push(Candidate {
+                id: "playwright-browsers",
+                name: "Playwright 测试浏览器内核",
+                description: "自动化工具 Playwright 下载的独立浏览器（不写代码的电脑上一般没有这项）。",
+                impact: "⚠ 下次运行自动化任务时需重新下载数百 MB 浏览器内核。不用自动化/AI 工具的可放心清。",
+                safety: "caution",
+                paths: pw,
+            });
+        }
+
+        // 钉钉网页缓存：仅 Chromium 缓存目录（目录名带版本号如 DingTalk_133），不碰消息与文件
+        let mut dd: Vec<PathBuf> = Vec::new();
+        if let Ok(read) = std::fs::read_dir(local) {
+            for e in read.flatten() {
+                let n = e.file_name().to_string_lossy().to_lowercase();
+                if n.starts_with("dingtalk") && e.path().is_dir() {
+                    for sub in ["Cache", "Code Cache", "GPUCache"] {
+                        let p = e.path().join("Default").join(sub);
+                        if p.exists() {
+                            dd.push(p);
+                        }
+                    }
+                }
+            }
+        }
+        if !dd.is_empty() {
+            out.push(Candidate {
+                id: "dingtalk-cache",
+                name: "钉钉网页缓存",
+                description: "钉钉内置浏览器的图片与脚本缓存（聊天记录和文件不在这里）。",
+                impact: "几乎没有影响。钉钉里的页面首次打开会稍慢一点。",
+                safety: "safe",
+                paths: dd,
+            });
+        }
+
         // 图形着色器缓存：完全可再生
         let mut gpu: Vec<PathBuf> = Vec::new();
         for p in [
