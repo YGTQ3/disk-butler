@@ -319,6 +319,7 @@ fn candidates() -> Vec<Candidate> {
             local.join("AMD").join("DxCache"),
             local.join("AMD").join("DxcCache"),
             local.join("AMD").join("GLCache"),
+            local.join("AMD").join("Radeonsoftware").join("cache"),
         ] {
             if p.exists() {
                 gpu.push(p);
@@ -332,6 +333,54 @@ fn candidates() -> Vec<Candidate> {
                 impact: "没有影响。游戏/应用首次启动时会自动重新生成，首次加载稍慢。",
                 safety: "safe",
                 paths: gpu,
+            });
+        }
+
+        // Android Studio 日志/临时文件：目录名带版本号（AndroidStudio2024.3），代码枚举
+        let mut asl: Vec<PathBuf> = Vec::new();
+        if let Ok(read) = std::fs::read_dir(local.join("Google")) {
+            for e in read.flatten() {
+                let n = e.file_name().to_string_lossy().to_lowercase();
+                if n.starts_with("androidstudio") && e.path().is_dir() {
+                    for sub in ["log", "tmp"] {
+                        let p = e.path().join(sub);
+                        if p.exists() {
+                            asl.push(p);
+                        }
+                    }
+                }
+            }
+        }
+        if !asl.is_empty() {
+            out.push(Candidate {
+                id: "androidstudio-logs",
+                name: "Android Studio 日志与临时文件",
+                description: "Android Studio 运行产生的日志和临时文件（项目和 SDK 不在这里）。",
+                impact: "没有影响。需要时会自动重建。",
+                safety: "safe",
+                paths: asl,
+            });
+        }
+
+        // 群晖 Synology Drive 客户端日志/临时文件（同步的文件不在此）
+        let mut syn: Vec<PathBuf> = Vec::new();
+        for p in [
+            local.join("SynologyDrive").join("log"),
+            local.join("SynologyDrive").join("temp"),
+            local.join("SynologyDrive").join("data").join("tmp"),
+        ] {
+            if p.exists() {
+                syn.push(p);
+            }
+        }
+        if !syn.is_empty() {
+            out.push(Candidate {
+                id: "synology-logs",
+                name: "Synology Drive 日志与临时文件",
+                description: "群晖同步客户端的运行日志和临时文件（你同步的文件不在这里）。",
+                impact: "没有影响。客户端会自动重建。",
+                safety: "safe",
+                paths: syn,
             });
         }
 
@@ -471,7 +520,7 @@ fn candidates() -> Vec<Candidate> {
 /// 清理策略分型：垃圾残留（删了纯赚）/ 性能缓存（空间充足可留）/ 数据类（默认不动）
 fn kind_of(id: &str) -> &'static str {
     match id {
-        "temp" | "updaters" | "crash-reports" => "junk",
+        "temp" | "updaters" | "crash-reports" | "androidstudio-logs" | "synology-logs" => "junk",
         "idm-dwnldata" | "recycle-bin" => "data",
         _ => "cache",
     }
