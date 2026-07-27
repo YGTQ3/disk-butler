@@ -14,6 +14,7 @@ import {
   Gauge,
   Archive,
   Wrench,
+  FolderOpen,
 } from "lucide-react";
 import {
   CleanupItem,
@@ -23,6 +24,7 @@ import {
   DeepCleanReport,
   DeepAnalyzeReport,
   formatBytes,
+  openInExplorer,
 } from "../types";
 
 type Phase = "loading" | "ready" | "confirm" | "cleaning" | "done";
@@ -845,10 +847,17 @@ function ItemCard({
                 {item.paths.map((p) => (
                   <div
                     key={p.path}
-                    className="flex items-baseline justify-between gap-3 text-[11px] leading-relaxed"
+                    className="group flex items-baseline justify-between gap-3 text-[11px] leading-relaxed"
                   >
                     <span className="break-all text-[var(--color-text-secondary)]">{p.path}</span>
-                    <span className="shrink-0 font-medium">{formatBytes(p.size)}</span>
+                    <span className="ml-auto shrink-0 font-medium">{formatBytes(p.size)}</span>
+                    <button
+                      onClick={() => void openInExplorer(p.path, true)}
+                      title="在文件夹中打开，亲眼看看里面是什么"
+                      className="shrink-0 self-center rounded-md p-1 text-[var(--color-text-secondary)] opacity-60 transition-all hover:bg-[var(--color-surface)] hover:text-[var(--color-primary-dark)] hover:opacity-100"
+                    >
+                      <FolderOpen size={13} />
+                    </button>
                   </div>
                 ))}
               </div>

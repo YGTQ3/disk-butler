@@ -1,5 +1,7 @@
 /** 与 Rust 端 serde 序列化结构一一对应的类型定义 */
 
+import { openPath, revealItemInDir } from "@tauri-apps/plugin-opener";
+
 export type Category =
   | "system"
   | "software"
@@ -191,6 +193,19 @@ export function formatBytes(bytes: number): string {
   const i = Math.min(Math.floor(Math.log2(bytes) / 10), units.length - 1);
   const value = bytes / 2 ** (10 * i);
   return `${value >= 100 ? value.toFixed(0) : value.toFixed(1)} ${units[i]}`;
+}
+
+/** 在资源管理器中打开：目录进入内部，文件定位选中。失败时明确告知原因，绝不静默。 */
+export async function openInExplorer(path: string, isDir: boolean): Promise<void> {
+  try {
+    if (isDir) {
+      await openPath(path);
+    } else {
+      await revealItemInDir(path);
+    }
+  } catch (e) {
+    alert(`没能打开这个位置：\n${path}\n\n原因：${String(e)}`);
+  }
 }
 
 /** 人性化数字：12345678 -> "1234.6 万" */

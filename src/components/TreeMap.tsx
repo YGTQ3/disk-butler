@@ -1,7 +1,7 @@
 import { useMemo, useRef, useState } from "react";
 import { hierarchy, treemap, treemapSquarify } from "d3-hierarchy";
 import { motion, AnimatePresence } from "framer-motion";
-import { TreeNode, CATEGORY_COLOR, formatBytes } from "../types";
+import { openInExplorer, TreeNode, CATEGORY_COLOR, formatBytes } from "../types";
 
 interface Props {
   node: TreeNode;
@@ -101,6 +101,14 @@ export default function TreeMap({ node, onDrill, onSelect, width, height }: Prop
               onClick={() => {
                 onSelect(d);
                 if (clickable) onDrill(d);
+              }}
+              onContextMenu={(e) => {
+                // 右键方块：直接在资源管理器中打开该目录（合并小项无真实路径，跳过）
+                e.preventDefault();
+                onSelect(d);
+                if (!d.path.endsWith("::__others__")) {
+                  void openInExplorer(d.path, d.isDir);
+                }
               }}
             >
               {showLabel && (
