@@ -66,3 +66,13 @@ body,
 ::-webkit-scrollbar-track {
   background: transparent;
 }
+
+/* 进度条不确定态：准备阶段（尚无真实进度）的左右滑动动画 */
+@keyframes progress-indeterminate {
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(400%);
+  }
+}

@@ -94,6 +94,15 @@ export default function DiskInsight({ active = true }: Props) {
   const scannedDriveInfo = drives.find((d) => d.mountPoint === scannedDrive);
   /** 选中盘 ≠ 已扫描盘：结果与选择不一致，需提示用户扫描新盘 */
   const driveMismatch = phase === "done" && !!scannedDrive && selected !== scannedDrive;
+  /** 后端给了精确百分比（MFT 极速引擎）就直接用；否则按已统计字节 / 磁盘已用空间估算（封顶 100） */
+  const exactPct = progress?.percent != null;
+  const scanPct = exactPct
+    ? Math.min(100, Math.round(progress!.percent!))
+    : progress && currentDrive && currentDrive.used > 0
+      ? Math.min(100, Math.round((progress.bytesScanned / currentDrive.used) * 100))
+      : 0;
+  /** 准备阶段（还没有任何真实进度）：进度条改滑动动画，避免看起来卡死 */
+  const indeterminate = phase === "scanning" && scanPct === 0;
 
   async function startScan() {
     if (!selected) return;
@@ -249,16 +258,32 @@ export default function DiskInsight({ active = true }: Props) {
             <Loader2 size={40} className="animate-spin text-[var(--color-primary)]" />
             <div className="text-center">
               <div className="text-base font-medium">
-                正在扫描 {progress ? `已发现 ${formatCount(progress.filesScanned)} 个文件` : "…"}
+                {progress?.phase || "正在扫描"}
+                {progress ? ` · 已发现 ${formatCount(progress.filesScanned)} 个文件` : " …"}
               </div>
               <div className="mt-1 max-w-lg truncate text-xs text-[var(--color-text-secondary)]">
-                {progress?.currentPath || "正在准备…"}
+                {progress?.currentPath || (exactPct ? "极速模式：直读 NTFS 文件表，无需逐个目录遍历" : "正在准备…")}
               </div>
-              {progress && (
-                <div className="mt-2 text-sm text-[var(--color-primary-dark)]">
-                  已统计 {formatBytes(progress.bytesScanned)}
-                </div>
-              )}
+            </div>
+            {/* 进度条：有真实进度时按百分比填充，准备阶段显示滑动加载动画 */}
+            <div className="w-full max-w-md">
+              <div className="h-2 w-full overflow-hidden rounded-full bg-[var(--color-primary-soft)]">
+                {indeterminate ? (
+                  <div
+                    className="h-full w-1/4 rounded-full bg-[var(--color-primary)]"
+                    style={{ animation: "progress-indeterminate 1.2s ease-in-out infinite" }}
+                  />
+                ) : (
+                  <div
+                    className="h-full rounded-full bg-[var(--color-primary)] transition-[width] duration-300 ease-out"
+                    style={{ width: `${scanPct}%` }}
+                  />
+                )}
+              </div>
+              <div className="mt-2 flex justify-between text-xs text-[var(--color-text-secondary)]">
+                <span>{progress ? `已统计 ${formatBytes(progress.bytesScanned)}` : "正在准备…"}</span>
+                <span>{indeterminate ? "准备中…" : exactPct ? `${scanPct}%` : `约 ${scanPct}%`}</span>
+              </div>
             </div>
           </div>
         )}
