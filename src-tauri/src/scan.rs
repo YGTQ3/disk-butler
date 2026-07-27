@@ -11,9 +11,9 @@ use std::time::{Duration, Instant};
 use tauri::{AppHandle, Emitter};
 
 /// 每层保留的子项数量上限，其余聚合为「其他」。
-pub const TOP_N_PER_LEVEL: usize = 30;
+const TOP_N_PER_LEVEL: usize = 30;
 /// 返回给前端的树的最大深度（从扫描根算起）。
-pub const MAX_DEPTH: usize = 4;
+const MAX_DEPTH: usize = 4;
 
 /// 树节点，直接序列化给前端（也用于扫描结果缓存的存取）。
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -41,11 +41,6 @@ pub struct ScanProgress {
     pub bytes_scanned: u64,
     pub current_path: String,
     pub done: bool,
-    /// 精确百分比（MFT 引擎提供；慢速引擎为 None，由前端按字节估算）
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub percent: Option<f32>,
-    /// 阶段文案，如「正在读取文件表（极速）」
-    pub phase: String,
 }
 
 /// 盘符信息。
@@ -134,8 +129,6 @@ fn build_index(root: &Path, app: Option<&AppHandle>) -> (SizeIndex, u64) {
                         bytes_scanned: byte_counter.load(Ordering::Relaxed),
                         current_path: last_path.clone(),
                         done: false,
-                        percent: None,
-                        phase: "正在遍历目录".to_string(),
                     },
                 );
                 last_emit = Instant::now();
@@ -293,87 +286,12 @@ fn build_tree(index: &SizeIndex, dir: &Path, depth: usize) -> TreeNode {
     }
 }
 
-/// 盘符根目录（如 "C:\\"）且文件系统为 NTFS 时，才能走 MFT 直读。
-fn is_ntfs_drive_root(root: &str) -> bool {
-    let bytes = root.as_bytes();
-    let is_root = matches!(bytes.len(), 2 | 3)
-        && bytes[0].is_ascii_alphabetic()
-        && bytes[1] == b':'
-        && (bytes.len() == 2 || bytes[2] == b'\\');
-    if !is_root {
-        return false;
-    }
-    use sysinfo::Disks;
-    let disks = Disks::new_with_refreshed_list();
-    disks.list().iter().any(|d| {
-        d.mount_point()
-            .to_string_lossy()
-            .to_uppercase()
-            .starts_with(&root[..2].to_uppercase())
-            && d.file_system().to_string_lossy().eq_ignore_ascii_case("NTFS")
-    })
-}
-
-/// MFT 引擎的进度转发：直接携带后端算出的精确百分比与阶段文案。
-fn emit_mft_progress(app: Option<&AppHandle>, files: u64, bytes: u64, percent: f32, phase: &str) {
-    if let Some(app) = app {
-        let _ = app.emit(
-            "scan-progress",
-            ScanProgress {
-                files_scanned: files,
-                bytes_scanned: bytes,
-                current_path: String::new(),
-                done: false,
-                percent: Some(percent),
-                phase: format!("{}（极速）", phase),
-            },
-        );
-    }
-}
-
 /// 扫描一个根目录，返回剪枝后的树。发送进度事件（需要 AppHandle）。
-///
-/// 三级引擎调度：后台服务 MFT（秒级）→ 本进程 MFT（已提权时）→ jwalk 遍历（永不失败的兜底）。
 pub fn scan(root: &str, app: Option<&AppHandle>) -> Result<TreeNode, String> {
     let root_path = PathBuf::from(root);
     if !root_path.exists() {
         return Err(format!("路径不存在：{}", root));
     }
-
-    if is_ntfs_drive_root(root) {
-        // 优先让后台服务扫（主程序无需管理员权限）
-        let by_service = crate::svc_client::scan_via_service(root, |f, b, p, ph| {
-            emit_mft_progress(app, f, b, p, ph)
-        });
-        let tree = match by_service {
-            Ok(tree) => Some(tree),
-            // 服务不在：若本进程已提权（开发模式/用户以管理员运行）则直读 MFT
-            Err(_) => {
-                crate::mft_scan::scan_mft(root, |f, b, p, ph| emit_mft_progress(app, f, b, p, ph))
-                    .ok()
-            }
-        };
-        // 空树视为引擎异常（如 MFT 解析边界情况）：宁可落回慢速遍历，也不把空结果当成果
-        let tree = tree.filter(|t| t.size > 0 && !t.children.is_empty());
-        if let Some(tree) = tree {
-            if let Some(app) = app {
-                let _ = app.emit(
-                    "scan-progress",
-                    ScanProgress {
-                        files_scanned: 0,
-                        bytes_scanned: tree.size,
-                        current_path: String::new(),
-                        done: true,
-                        percent: Some(100.0),
-                        phase: String::new(),
-                    },
-                );
-            }
-            return Ok(tree);
-        }
-        // 两条快路径都不可用，落回 jwalk 慢速遍历
-    }
-
     let (index, _total) = build_index(&root_path, app);
     let tree = build_tree(&index, &root_path, 0);
 
@@ -385,8 +303,6 @@ pub fn scan(root: &str, app: Option<&AppHandle>) -> Result<TreeNode, String> {
                 bytes_scanned: tree.size,
                 current_path: String::new(),
                 done: true,
-                percent: None,
-                phase: String::new(),
             },
         );
     }

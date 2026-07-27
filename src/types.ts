@@ -30,10 +30,6 @@ export interface ScanProgress {
   bytesScanned: number;
   currentPath: string;
   done: boolean;
-  /** 精确百分比（MFT 极速引擎提供；慢速引擎缺省，前端按字节估算） */
-  percent?: number;
-  /** 阶段文案，如「正在读取文件表（极速）」 */
-  phase?: string;
 }
 
 export interface DriveInfo {

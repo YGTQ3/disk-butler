@@ -56,28 +56,25 @@ export default function CapacityBar({ root, total, free }: Props) {
         </span>
       </div>
 
-      {/* 分段水位条：已用按分类着色，剩余空间用空状态样式（镜面底色 + 描边）表示“还空着” */}
-      <div className="flex h-3 w-full overflow-hidden rounded-full border border-[var(--color-line)] bg-[var(--color-bg)]">
-        {root ? (
-          sorted.map((s) => (
-            <div
-              key={s.cat}
-              style={{
-                width: `${(s.size / total) * 100}%`,
-                background: CATEGORY_COLOR[s.cat],
-              }}
-              title={`${CATEGORY_LABEL[s.cat]}：${formatBytes(s.size)}`}
-            />
-          ))
-        ) : (
-          <div
-            style={{ width: `${(used / total) * 100}%` }}
-            className="bg-[var(--color-cat-other)]"
-            title={`已用：${formatBytes(used)}`}
-          />
-        )}
-        {/* 剩余段：保持空状态底色不填充，悬停可看具体剩余量；flex-1 吸收百分比舍入尾差 */}
-        <div className="min-w-0 flex-1" title={`剩余空间：${formatBytes(free)}`} />
+      {/* 分段水位条 */}
+      <div className="flex h-3 w-full overflow-hidden rounded-full bg-[var(--color-line)]">
+        {root
+          ? sorted.map((s) => (
+              <div
+                key={s.cat}
+                style={{
+                  width: `${(s.size / total) * 100}%`,
+                  background: CATEGORY_COLOR[s.cat],
+                }}
+                title={`${CATEGORY_LABEL[s.cat]}：${formatBytes(s.size)}`}
+              />
+            ))
+          : (
+              <div
+                style={{ width: `${(used / total) * 100}%` }}
+                className="bg-[var(--color-cat-other)]"
+              />
+            )}
       </div>
 
       {/* 图例 */}
