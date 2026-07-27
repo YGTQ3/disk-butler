@@ -250,6 +250,27 @@ const RULES: &[Rule] = &[
         safety: Safety::Safe,
     },
     Rule {
+        needle: "appdata/local/synologydrive",
+        category: Category::Software,
+        friendly_name: "Synology Drive 客户端数据",
+        description: "群晖同步客户端的程序数据（你同步的文件不在这里），其中 log/temp 可由一键清理安全清理。",
+        safety: Safety::Caution,
+    },
+    Rule {
+        needle: "appdata/local/google/androidstudio",
+        category: Category::Software,
+        friendly_name: "Android Studio 数据",
+        description: "Android Studio 的缓存与日志（项目不在这里），其中 log/tmp 可由一键清理安全清理。",
+        safety: Safety::Caution,
+    },
+    Rule {
+        needle: "radeonsoftware/cache",
+        category: Category::Cache,
+        friendly_name: "AMD Radeon 软件缓存",
+        description: "AMD 显卡管理软件的缓存，可安全清理，会自动重建。",
+        safety: Safety::Safe,
+    },
+    Rule {
         needle: "appdata/roaming/code",
         category: Category::Software,
         friendly_name: "VS Code 数据",
@@ -298,6 +319,93 @@ const RULES: &[Rule] = &[
         friendly_name: "微信接收的文件",
         description: "聊天中接收的文件/图片/视频。删除后若聊天记录已过期将无法重新下载，谨慎清理。",
         safety: Safety::Caution,
+    },
+    // 中文目录名与泛化名：用户自行迁移微信数据到 D:\微信 等目录时也要认得出（泛规则必须排在上方具体规则之后）
+    Rule {
+        needle: "微信",
+        category: Category::Personal,
+        friendly_name: "微信数据",
+        description: "微信相关数据（聊天记录、接收的文件或迁移过来的存储目录），属于个人数据，请在微信内管理，不要直接删除。",
+        safety: Safety::Keep,
+    },
+    Rule {
+        needle: "wechat",
+        category: Category::Personal,
+        friendly_name: "微信数据",
+        description: "微信相关数据（聊天记录、接收的文件或程序数据），含个人数据，请在微信内管理，不要直接删除。",
+        safety: Safety::Keep,
+    },
+    Rule {
+        needle: "聊天记录",
+        category: Category::Personal,
+        friendly_name: "聊天记录备份",
+        description: "聊天记录类数据，属于个人数据，请勿删除。",
+        safety: Safety::Keep,
+    },
+    // 创作类个人数据：删了无法找回，一律 Keep
+    Rule {
+        needle: "jianyingpro drafts",
+        category: Category::Personal,
+        friendly_name: "剪映草稿",
+        description: "剪映的视频工程草稿，是你的创作成果，删了无法找回，请勿删除。",
+        safety: Safety::Keep,
+    },
+    Rule {
+        needle: "mailmasterdata",
+        category: Category::Personal,
+        friendly_name: "网易邮箱大师邮件数据",
+        description: "本地邮件与附件数据，属于个人数据，请在邮箱大师内管理，不要直接删除。",
+        safety: Safety::Keep,
+    },
+    // 常见中文个人目录名：用户自建目录大量用中文命名，宁可过度保护不可漏保护
+    Rule {
+        needle: "照片",
+        category: Category::Personal,
+        friendly_name: "照片",
+        description: "照片类个人文件，请自行整理，不要直接删除。",
+        safety: Safety::Keep,
+    },
+    Rule {
+        needle: "图片",
+        category: Category::Personal,
+        friendly_name: "图片",
+        description: "图片类个人文件，请自行整理，不要直接删除。",
+        safety: Safety::Keep,
+    },
+    Rule {
+        needle: "视频",
+        category: Category::Personal,
+        friendly_name: "视频文件",
+        description: "视频类个人文件，请自行整理，不要直接删除。",
+        safety: Safety::Keep,
+    },
+    Rule {
+        needle: "音乐",
+        category: Category::Personal,
+        friendly_name: "音乐文件",
+        description: "音乐类个人文件，请自行整理，不要直接删除。",
+        safety: Safety::Keep,
+    },
+    Rule {
+        needle: "备份",
+        category: Category::Personal,
+        friendly_name: "备份数据",
+        description: "备份类数据，删了可能无法找回，请勿删除。",
+        safety: Safety::Keep,
+    },
+    Rule {
+        needle: "下载",
+        category: Category::Personal,
+        friendly_name: "下载的文件",
+        description: "下载目录里是你主动获得的文件，属于个人数据，请自行整理。",
+        safety: Safety::Keep,
+    },
+    Rule {
+        needle: "文档",
+        category: Category::Personal,
+        friendly_name: "文档",
+        description: "文档类个人文件，请自行整理，不要直接删除。",
+        safety: Safety::Keep,
     },
     Rule {
         needle: "thunderdownload",
@@ -775,6 +883,33 @@ mod tests {
         let hit = classify(r"C:\Users\x\AppData\Roaming\Adobe\Common\Media Cache Files");
         assert_eq!(hit.category, Category::Cache);
         assert_eq!(hit.safety, Safety::Safe);
+    }
+
+    #[test]
+    fn classify_chinese_wechat_dir_on_data_drive() {
+        // 用户自行迁移到 D 盘的中文命名微信目录必须识别为个人数据/请勿删除
+        let hit = classify(r"D:\微信");
+        assert_eq!(hit.category, Category::Personal);
+        assert_eq!(hit.safety, Safety::Keep);
+        let hit2 = classify(r"D:\WeChat");
+        assert_eq!(hit2.category, Category::Personal);
+        assert_eq!(hit2.safety, Safety::Keep);
+    }
+
+    #[test]
+    fn classify_creation_and_chinese_personal_dirs() {
+        // 创作类与中文个人目录：全部 Personal/Keep
+        for p in [
+            r"D:\JianyingPro Drafts",
+            r"D:\MailMasterData",
+            r"D:\备份",
+            r"D:\旅行照片",
+            r"E:\我的文档",
+        ] {
+            let hit = classify(p);
+            assert_eq!(hit.category, Category::Personal, "path: {p}");
+            assert_eq!(hit.safety, Safety::Keep, "path: {p}");
+        }
     }
 
     #[test]
