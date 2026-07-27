@@ -22,3 +22,7 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Rule collection samples: contributor machine data, NEVER commit (privacy)
+samples/*
+!samples/README.md
