@@ -1,0 +1,30 @@
+[package]
+name = "diskbutler-collector"
+version = "0.1.0"
+edition = "2021"
+description = "C盘管家规则采集器（绿色单文件版）"
+
+[[bin]]
+name = "DiskButlerCollector"
+path = "src/main.rs"
+
+[dependencies]
+jwalk = "0.8"
+serde_json = "1"
+winreg = "0.52"
+windows-sys = { version = "0.59", features = [
+    "Win32_Foundation",
+    "Win32_System_Console",
+    "Win32_System_Com",
+    "Win32_System_SystemInformation",
+    "Win32_UI_Shell",
+    "Win32_Storage_FileSystem",
+] }
+
+# 极限压体积：目标 ~1MB 绿色单文件
+[profile.release]
+opt-level = "z"
+lto = true
+codegen-units = 1
+strip = true
+panic = "abort"
