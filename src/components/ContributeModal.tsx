@@ -19,13 +19,13 @@ type Phase = "intro" | "running" | "done" | "error";
 const FEEDBACK_EMAIL = "ygtq1021@126.com";
 
 /** 拉起用户自己的邮件客户端写草稿（mailto 协议，软件本身不联网不发送） */
-async function draftEmail(mdPath: string) {
-  const fileName = mdPath.split("\\").pop() ?? mdPath;
+async function draftEmail(jsonPath: string) {
+  const fileName = jsonPath.split("\\").pop() ?? jsonPath;
   const subject = encodeURIComponent("C盘管家·规则采集报告");
   const body = encodeURIComponent(
     `你好，这是我的规则采集报告。\n\n` +
-      `（重要：请把桌面上的 ${fileName} 拖进这封邮件作为附件——出于安全考虑，系统不允许软件自动添加附件）\n\n` +
-      `可以顺手补充一句：这台电脑主要用来干什么（办公/游戏/剪辑/家用）？\n`
+      `请把桌面上的 ${fileName} 拖进这封邮件作为附件。\n\n` +
+      `这台电脑主要用来：（办公 / 游戏 / 剪辑 / 家用）\n`
   );
   try {
     await openUrl(`mailto:${FEEDBACK_EMAIL}?subject=${subject}&body=${body}`);
@@ -180,10 +180,7 @@ export default function ContributeModal({ onClose }: { onClose: () => void }) {
                 </div>
               </div>
               <div className="mt-4 rounded-xl bg-[#FFFBEB] p-3.5 text-sm leading-relaxed text-[#92400E]">
-                下一步：用记事本打开报告<b>自己先看一遍</b>
-                ，确认没有你不想分享的内容，再发给收集人。
-                {FEEDBACK_EMAIL &&
-                  "点“用邮箱发给我们”会打开你自己的邮件草稿，把桌面上的报告拖进邮件再发送即可（系统不允许软件自动加附件）。"}
+                先打开报告<b>自己看一遍</b>；发送时把桌面上的 <b>.json 文件</b>拖进邮件附件。
               </div>
               <div className="mt-4 flex justify-end gap-2.5">
                 <button
@@ -193,7 +190,7 @@ export default function ContributeModal({ onClose }: { onClose: () => void }) {
                   关闭
                 </button>
                 <button
-                  onClick={() => void openInExplorer(result.mdPath, false)}
+                  onClick={() => void openInExplorer(result.jsonPath, false)}
                   className={[
                     "flex items-center gap-1.5 rounded-xl px-5 py-2.5 text-[15px] font-medium",
                     FEEDBACK_EMAIL
@@ -206,7 +203,7 @@ export default function ContributeModal({ onClose }: { onClose: () => void }) {
                 </button>
                 {FEEDBACK_EMAIL && (
                   <button
-                    onClick={() => void draftEmail(result.mdPath)}
+                    onClick={() => void draftEmail(result.jsonPath)}
                     className="flex items-center gap-1.5 rounded-xl bg-[var(--color-primary)] px-6 py-2.5 text-[15px] font-medium text-white hover:bg-[var(--color-primary-dark)]"
                   >
                     <Mail size={16} />
