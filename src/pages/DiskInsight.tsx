@@ -92,8 +92,6 @@ export default function DiskInsight({ active = true }: Props) {
   const current = stack.length > 0 ? stack[stack.length - 1] : root;
   const currentDrive = drives.find((d) => d.mountPoint === selected);
   const scannedDriveInfo = drives.find((d) => d.mountPoint === scannedDrive);
-  /** 选中盘 ≠ 已扫描盘：结果与选择不一致，需提示用户扫描新盘 */
-  const driveMismatch = phase === "done" && !!scannedDrive && selected !== scannedDrive;
   /** 后端给了精确百分比（MFT 极速引擎）就直接用；否则按已统计字节 / 磁盘已用空间估算（封顶 100） */
   const exactPct = progress?.percent != null;
   const scanPct = exactPct
@@ -126,11 +124,21 @@ export default function DiskInsight({ active = true }: Props) {
     }
   }
 
-  /** 切换盘符：优先找该盘的缓存，找不到则保持现状（由不匹配提示条引导扫描） */
-  function onSelectDrive(mount: string) {
+  /** 切换盘符：结果视图跟着盘符走——有缓存直接呈现，没有就回到空状态等待扫描 */
+  async function onSelectDrive(mount: string) {
+    if (phase === "scanning") return; // 扫描中下拉框已禁用，双重保险
     setSelected(mount);
-    if (phase !== "scanning" && mount !== scannedDrive) {
-      tryLoadCache(mount);
+    if (mount === scannedDrive && root) return; // 当前结果就是这个盘，不动
+    const hit = await tryLoadCache(mount);
+    if (!hit) {
+      // 这个盘没有任何结果：清空视图，显示空状态
+      setRoot(null);
+      setScannedDrive("");
+      setScannedAt(null);
+      setFromCache(false);
+      setStack([]);
+      setSelectedNode(null);
+      setPhase("idle");
     }
   }
 
@@ -188,11 +196,11 @@ export default function DiskInsight({ active = true }: Props) {
             />
           </div>
 
-          {/* 水位条：盘与结果不匹配时不用旧结果给新盘着色 */}
+          {/* 水位条：切盘后缓存异步加载的瞬间，旧盘的树不能拿来给新盘着色（否则比例超 100% 闪现满条） */}
           <div className="flex-1">
             {currentDrive && (
               <CapacityBar
-                root={driveMismatch ? null : root}
+                root={scannedDrive === selected ? root : null}
                 total={currentDrive.total}
                 free={currentDrive.free}
               />
@@ -207,18 +215,12 @@ export default function DiskInsight({ active = true }: Props) {
           >
             {phase === "scanning" ? (
               <Loader2 size={18} className="animate-spin" />
-            ) : phase === "done" && !driveMismatch ? (
+            ) : phase === "done" ? (
               <RotateCcw size={18} />
             ) : (
               <Search size={18} />
             )}
-            {phase === "scanning"
-              ? "扫描中…"
-              : driveMismatch
-                ? `扫描 ${currentDrive?.letter ?? ""} 盘`
-                : phase === "done"
-                  ? "重新扫描"
-                  : "开始扫描"}
+            {phase === "scanning" ? "扫描中…" : phase === "done" ? "重新扫描" : "开始扫描"}
           </button>
         </div>
       </div>
@@ -233,7 +235,7 @@ export default function DiskInsight({ active = true }: Props) {
           </div>
         )}
 
-        {/* 空状态 */}
+        {/* 空状态：这个盘还没有扫描结果 */}
         {!error && phase === "idle" && (
           <div className="flex flex-1 flex-col items-center justify-center gap-4">
             <motion.div
@@ -244,9 +246,11 @@ export default function DiskInsight({ active = true }: Props) {
               <HardDrive size={36} className="text-[var(--color-primary)]" />
             </motion.div>
             <div className="text-center">
-              <div className="text-base font-medium">选择磁盘，点击"开始扫描"</div>
+              <div className="text-base font-medium">
+                {currentDrive ? `${currentDrive.letter} 盘还没有扫描结果` : "选择磁盘，点击“开始扫描”"}
+              </div>
               <div className="mt-1 text-sm text-[var(--color-text-secondary)]">
-                扫描完全在你的电脑本地进行，不上传任何数据
+                点击“开始扫描”看清空间去向，扫描完全在本地进行，不上传任何数据
               </div>
             </div>
           </div>
@@ -292,14 +296,7 @@ export default function DiskInsight({ active = true }: Props) {
         {!error && phase === "done" && current && (
           <>
             <div className="flex flex-1 flex-col overflow-hidden rounded-2xl bg-[var(--color-surface)] p-5 shadow-[var(--shadow-card)]">
-              {/* 选中盘与结果不一致时的提示条 */}
-              {driveMismatch && (
-                <div className="mb-3 rounded-xl bg-[#FEF3C7] px-4 py-2.5 text-xs leading-relaxed text-[#92400E]">
-                  下方显示的是 <b>{scannedDriveInfo?.letter ?? "?"} 盘</b> 的扫描结果；想查看{" "}
-                  <b>{currentDrive?.letter ?? ""} 盘</b>，请点右上方「扫描 {currentDrive?.letter ?? ""} 盘」。
-                </div>
-              )}
-              {/* 面包屑（盘符标签跟扫描结果走，不跟下拉框走）+ 扫描时间标注 */}
+              {/* 面包屑（盘符标签跟扫描结果走）+ 扫描时间标注 */}
               <div className="mb-4 flex flex-wrap items-center gap-1 text-sm">
                 {crumbs.map((c, i) => (
                   <div key={c.path} className="flex items-center gap-1">
