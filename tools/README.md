@@ -21,12 +21,19 @@ C盘管家的清理白名单和磁盘透视知识库都靠"规则"驱动——�
 2. **双击 `run-collector.bat`**，按提示选择模式（直接回车 = 基础模式），**不需要管理员权限**；
    （为什么不直接双击 .ps1？Windows 默认双击 .ps1 是用记事本打开，不会运行）
 
+   > 黑窗口里是简单英文（不同电脑的中文编码不统一，英文才能保证人人不乱码），对照翻译：
+   > - `Safe: NO delete, NO change, NO network.` → 安全：不删除、不修改、不联网
+   > - `[1] Basic scan` → 基础扫描（约 1 分钟，推荐）
+   > - `[2] Full scan` → 完整扫描（5~10 分钟，会列出 D 盘等处的大文件夹名）
+   > - `Type 1 or 2, then press Enter` → 输入 1 或 2 后按回车（直接回车 = 选 1）
+   > - `Done! Report is on your Desktop` → 完成！报告在桌面上
+
 3. **审查后发送**：桌面上会生成 `diskbutler-rule-report-时间戳.md`，
    用记事本打开**自己先看一遍**，确认没有你不想分享的内容，再发给收集人。
 
 ## 可选：全盘线索模式
 
-双击 `run-collector.bat` 后在菜单里输入 `2`（完整模式）；或命令行直接运行：
+双击 `run-collector.bat` 后在菜单里输入 `2`（Full scan 完整模式）；或命令行直接运行：
 
 ```powershell
 powershell -NoProfile -ExecutionPolicy Bypass -File .\collect-rules.ps1 -IncludeDrives
