@@ -202,7 +202,7 @@ fn candidates() -> Vec<Candidate> {
                     id: "updaters",
                     name: "软件更新包残留",
                     description: "各软件下载的旧版本更新安装包（*-updater 目录）。",
-                    impact: "没有影响。软件需要更新时会重新下载。",
+                    impact: "没有影响。软件需要更新时会重新下载；若某软件正提示“重启以完成更新”，建议先重启它再清理。",
                     safety: "safe",
                     paths: updaters,
                 });
@@ -299,6 +299,16 @@ fn candidates() -> Vec<Candidate> {
                 paths: dd,
             });
         }
+
+        // uv 缓存：Python 包管理器 uv 的下载缓存（同 npm/pip 同类）
+        out.push(Candidate {
+            id: "uv-cache",
+            name: "uv 缓存",
+            description: "Python 包管理器 uv 下载的安装包缓存。",
+            impact: "没有影响。以后安装依赖时会按需重新下载。",
+            safety: "safe",
+            paths: vec![local.join("uv").join("cache")],
+        });
 
         // 图形着色器缓存：完全可再生
         let mut gpu: Vec<PathBuf> = Vec::new();
@@ -404,6 +414,54 @@ fn candidates() -> Vec<Candidate> {
             impact: "⚠ 未完成的下载任务会丢失断点进度，需要从头下载。已完成的文件不受影响。",
             safety: "caution",
             paths: vec![roaming.join("IDM").join("DwnlData")],
+        });
+
+        // VS Code 缓存：仅标准缓存子目录，设置与插件不在其中
+        let mut vsc: Vec<PathBuf> = Vec::new();
+        for sub in ["Cache", "CachedData", "Code Cache", "GPUCache"] {
+            let p = roaming.join("Code").join(sub);
+            if p.exists() {
+                vsc.push(p);
+            }
+        }
+        if !vsc.is_empty() {
+            out.push(Candidate {
+                id: "vscode-cache",
+                name: "VS Code 缓存",
+                description: "VS Code 编辑器的界面与代码缓存（设置、插件和项目不在这里）。",
+                impact: "几乎没有影响。下次启动 VS Code 会自动重建，首次打开稍慢。",
+                safety: "safe",
+                paths: vsc,
+            });
+        }
+
+        // Adobe 媒体缓存：Pr/Ae 的预览渲染缓存，剪辑机上动辄几十 GB
+        let mut amc: Vec<PathBuf> = Vec::new();
+        for sub in ["Media Cache Files", "Media Cache"] {
+            let p = roaming.join("Adobe").join("Common").join(sub);
+            if p.exists() {
+                amc.push(p);
+            }
+        }
+        if !amc.is_empty() {
+            out.push(Candidate {
+                id: "adobe-media-cache",
+                name: "Adobe 媒体缓存 (Pr/Ae)",
+                description: "Premiere/After Effects 等生成的预览与音频缓存（工程文件和素材不在这里）。",
+                impact: "⚠ 打开旧项目时需重新生成媒体缓存，首次会慢。正在剪片子时不建议清。",
+                safety: "caution",
+                paths: amc,
+            });
+        }
+
+        // WPS 缓存：文档本体与云同步数据不在此目录
+        out.push(Candidate {
+            id: "wps-cache",
+            name: "WPS 缓存",
+            description: "WPS Office 的运行缓存（文档和云同步数据不在这里）。",
+            impact: "没有影响。WPS 会在使用中自动重建。",
+            safety: "safe",
+            paths: vec![roaming.join("kingsoft").join("office6").join("cache")],
         });
     }
 
