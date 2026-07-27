@@ -179,8 +179,15 @@ export default function ContributeModal({ onClose }: { onClose: () => void }) {
                   ，用时 {Math.max(1, Math.round(result.elapsedSecs / 60))} 分钟内
                 </div>
               </div>
-              <div className="mt-4 rounded-xl bg-[#FFFBEB] p-3.5 text-sm leading-relaxed text-[#92400E]">
-                先打开报告<b>自己看一遍</b>；发送时把桌面上的 <b>.json 文件</b>拖进邮件附件。
+              <div className="mt-4 space-y-2.5 rounded-xl bg-[#FFFBEB] p-4 text-sm leading-relaxed text-[#92400E]">
+                <div className="flex items-start gap-2.5">
+                  <span className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-[#FDE9CE] text-xs font-bold text-[#B45309]">1</span>
+                  <div>可以先打开报告看一遍——分不分享，你说了算。</div>
+                </div>
+                <div className="flex items-start gap-2.5">
+                  <span className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-[#FDE9CE] text-xs font-bold text-[#B45309]">2</span>
+                  <div>发送时，把桌面上的 <b>.json 文件</b>拖进邮件附件。</div>
+                </div>
               </div>
               <div className="mt-4 flex justify-end gap-2.5">
                 <button
