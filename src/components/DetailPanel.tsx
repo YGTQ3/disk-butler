@@ -1,10 +1,11 @@
-import { Folder, File, Info } from "lucide-react";
+import { Folder, File, Info, FolderOpen } from "lucide-react";
 import {
   TreeNode,
   CATEGORY_COLOR,
   CATEGORY_LABEL,
   SAFETY_META,
   formatBytes,
+  openInExplorer,
 } from "../types";
 
 interface Props {
@@ -88,6 +89,15 @@ export default function DetailPanel({ node, rootSize }: Props) {
         >
           {node.path.replace(/::__others__$/, "（合并的小项目）")}
         </div>
+        {!node.path.endsWith("::__others__") && (
+          <button
+            onClick={() => void openInExplorer(node.path, node.isDir)}
+            className="mt-2 flex w-full items-center justify-center gap-1.5 rounded-xl border border-[var(--color-line)] bg-[var(--color-surface)] px-3 py-2 text-xs font-medium text-[var(--color-primary-dark)] transition-colors hover:bg-[var(--color-bg)]"
+          >
+            <FolderOpen size={14} />
+            在文件夹中打开
+          </button>
+        )}
       </div>
     </div>
   );
