@@ -6,6 +6,18 @@
 
 ---
 
+## -1. 评估前的强制准备（硬性步骤，跳过则整份评估无效）
+
+> 本节来自一次真实的外部模型评估事故：它没读现有代码，交了 40+ 条候选，其中 1/3 早已入库、
+> 多条 needle 路径凭空臆造永不命中、还把微软登录令牌目录当成了安全缓存。
+
+1. **先读现有规则**：打开 `src-tauri/src/cleanup.rs`，列出 `candidates()` 中全部现有 id 与路径；打开 `src-tauri/src/knowledge.rs`，列出 RULES 中全部 needle。评估报告开头必须附上这两份清单；
+2. **逐条去重**：候选与现有规则重叠的，标注"已入库"并跳过，禁止作为新候选提交；
+3. **路径实证**：每条候选必须写出一条真实完整路径（如 `C:\Users\x\AppData\Local\...`）。注意：`ProgramData`、`%USERPROFILE%\.nuget` 等目录**不在 AppData 下**，禁止臆造 `appdata/` 前缀；
+4. **禁止通配符**：清理路径禁止用 `*` 通配整个厂商目录（如 `Adobe\*`、`NVIDIA\*`），只允许点名具体子目录；带版本号的目录用代码枚举（参考 `updaters`/`dingtalk-cache` 的写法）。
+
+---
+
 ## 0. 开始前的自检（全部回答"是"才能继续）
 
 | # | 问题 | 若答"否" |
@@ -25,6 +37,7 @@
 - 浏览器 `User Data` 下除 `Cache`/`Code Cache`/`GPUCache` 以外的任何目录（含密码、Cookie、历史）
 - 任何 `Documents` / `Desktop` / `Pictures` / `Videos` 下的路径
 - 回收站（已有专门实现，走 Shell API，不走文件白名单）
+- **登录凭证与令牌类目录**：`TokenBroker`、`IdentityCache`、`Credentials`、`.ssh`、`.aws` 等——**名字带 Cache 也不许碰**。真实反例：`Microsoft\TokenBroker\Cache` 曾被外部模型判为"安全缓存"，它实为微软账户登录令牌，删除会导致账号登录异常
 
 ---
 

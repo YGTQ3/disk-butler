@@ -6,6 +6,14 @@
 
 ---
 
+## -1. 评估前的强制准备（硬性步骤，跳过则整份评估无效）
+
+1. **先读现有规则**：打开 `src-tauri/src/knowledge.rs`，列出 RULES 中全部 needle（命令：搜索 `needle: "`）。候选与现有 needle 重叠的，标注"已入库"并跳过；
+2. **needle 路径实证**：每条新 needle 必须写出一条能命中它的真实完整路径，并验证“小写+正斜杠”后确实包含该 needle。注意：`ProgramData` 不在 AppData 下（正确：`programdata/xxx`，错误：`appdata/programdata/xxx`）；`.nuget`/`.cargo`/`.m2` 在 `%USERPROFILE%` 下不在 AppData 下；
+3. **语义一致性检查**：`category: Cache` 的规则 `safety` 不得为 `Keep`（“缓存”和“请勿删除”自相矛盾）——若确需保护，category 应改为 Software/Personal/SystemFile。
+
+---
+
 ## 0. 与清理白名单的本质区别（先想清楚再动手）
 
 | | 知识库（本文档） | 清理白名单（RULES-CLEANUP.md） |
