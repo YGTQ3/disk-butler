@@ -15,8 +15,8 @@ import { CollectResult, openInExplorer } from "../types";
 
 type Phase = "intro" | "running" | "done" | "error";
 
-/** 接收贡献报告的邮箱（留空 = 隐藏“用邮箱发给我们”按钮，配好专用邮箱后填入即可上线） */
-const FEEDBACK_EMAIL = "";
+/** 接收贡献报告的邮箱（留空 = 隐藏“用邮箱发给我们”按钮） */
+const FEEDBACK_EMAIL = "ygtq1021@126.com";
 
 /** 拉起用户自己的邮件客户端写草稿（mailto 协议，软件本身不联网不发送） */
 async function draftEmail(mdPath: string) {
