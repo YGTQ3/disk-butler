@@ -56,11 +56,15 @@ pub fn save(app: &tauri::AppHandle, root: &str, tree: &TreeNode) {
     }
 }
 
-/// 读取某个盘的缓存；文件不存在或损坏返回 None。
+/// 读取某个盘的缓存；文件不存在、损坏或是空树（历史异常扫描的产物）返回 None。
 pub fn load(app: &tauri::AppHandle, root: &str) -> Option<ScanCache> {
     let file = cache_file(app, root)?;
     let bytes = std::fs::read(&file).ok()?;
-    serde_json::from_slice::<ScanCache>(&bytes).ok()
+    let cache = serde_json::from_slice::<ScanCache>(&bytes).ok()?;
+    if cache.tree.size == 0 || cache.tree.children.is_empty() {
+        return None;
+    }
+    Some(cache)
 }
 
 #[cfg(test)]
