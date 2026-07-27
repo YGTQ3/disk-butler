@@ -480,31 +480,60 @@ export default function Cleanup() {
                   initial={{ scale: 0.94, y: 10 }}
                   animate={{ scale: 1, y: 0 }}
                   exit={{ scale: 0.94, y: 10 }}
-                  className="w-full max-w-md rounded-2xl bg-[var(--color-surface)] p-6 shadow-[var(--shadow-card-hover)]"
+                  className="w-full max-w-lg rounded-2xl bg-[var(--color-surface)] p-6 shadow-[var(--shadow-card-hover)]"
                   onClick={(e) => e.stopPropagation()}
                 >
-                  <div className="text-base font-semibold">
-                    确认清理这 {selectedItems.length} 项？
-                  </div>
+                  <div className="text-base font-semibold">清理前，最后核对一遍</div>
                   <div className="mt-1 text-sm text-[var(--color-text-secondary)]">
-                    共 {formatBytes(selectedSize)}。正在使用中的文件会自动跳过。
+                    将清理以下 {selectedItems.length} 项，共约{" "}
+                    <b className="text-[var(--color-primary-dark)]">{formatBytes(selectedSize)}</b>
+                    。每一项都标注了“清了会怎样”，请扫一眼再确认：
                   </div>
-                  {cautionSelected.length > 0 && (
-                    <div className="mt-4 rounded-xl bg-[#FEF3C7] p-3.5">
-                      <div className="flex items-center gap-1.5 text-sm font-medium text-[#92400E]">
-                        <AlertTriangle size={15} />
-                        以下项目有代价，请再次确认
-                      </div>
-                      <ul className="mt-1.5 space-y-1 text-xs leading-relaxed text-[#92400E]">
-                        {cautionSelected.map((i) => (
-                          <li key={i.id}>
-                            <b>{i.name}</b>：{i.impact}
-                          </li>
-                        ))}
-                      </ul>
-                    </div>
-                  )}
-                  <div className="mt-5 flex gap-3">
+
+                  {/* 完整清单：谨慎项排前醒目，每项卡片化 = 名称 + 大小 + 影响说明 */}
+                  <div className="mt-4 max-h-72 space-y-2 overflow-y-auto pr-1">
+                    {[...cautionSelected, ...selectedItems.filter((i) => i.safety !== "caution")].map(
+                      (i) => (
+                        <div
+                          key={i.id}
+                          className={[
+                            "rounded-xl border p-3",
+                            i.safety === "caution"
+                              ? "border-[#FDE68A] bg-[#FFFBEB]"
+                              : "border-[var(--color-line)] bg-[var(--color-bg)]",
+                          ].join(" ")}
+                        >
+                          <div className="flex items-center gap-2">
+                            {i.safety === "caution" ? (
+                              <AlertTriangle size={14} className="shrink-0 text-[#D97706]" />
+                            ) : (
+                              <CheckCircle2 size={14} className="shrink-0 text-[var(--color-primary)]" />
+                            )}
+                            <span className="text-sm font-medium">{i.name}</span>
+                            <span className="ml-auto shrink-0 text-xs font-bold text-[var(--color-primary-dark)]">
+                              {formatBytes(i.size)}
+                            </span>
+                          </div>
+                          <div
+                            className={[
+                              "mt-1 pl-6 text-xs leading-relaxed",
+                              i.safety === "caution"
+                                ? "text-[#92400E]"
+                                : "text-[var(--color-text-secondary)]",
+                            ].join(" ")}
+                          >
+                            {i.impact}
+                          </div>
+                        </div>
+                      )
+                    )}
+                  </div>
+
+                  <div className="mt-3 text-[11px] text-[var(--color-text-secondary)]">
+                    只删除列出位置里的内容（目录本身保留）；正在使用中的文件会自动跳过。
+                  </div>
+
+                  <div className="mt-4 flex gap-3">
                     <button
                       onClick={() => setPhase("ready")}
                       className="flex-1 rounded-xl border border-[var(--color-line)] py-2.5 text-sm font-medium transition-colors hover:bg-[var(--color-bg)]"
@@ -515,7 +544,7 @@ export default function Cleanup() {
                       onClick={doClean}
                       className="flex-1 rounded-xl bg-[var(--color-primary)] py-2.5 text-sm font-medium text-white transition-colors hover:bg-[var(--color-primary-dark)]"
                     >
-                      确认清理
+                      确认清理这 {selectedItems.length} 项
                     </button>
                   </div>
                 </motion.div>
