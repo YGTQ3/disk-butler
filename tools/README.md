@@ -18,7 +18,7 @@ C盘管家的清理白名单和磁盘透视知识库都靠"规则"驱动——�
    - [collect-rules.ps1](https://github.com/YGTQ3/disk-butler/blob/main/tools/collect-rules.ps1)（采集脚本本体）
    - [run-collector.bat](https://github.com/YGTQ3/disk-butler/blob/main/tools/run-collector.bat)（双击启动器）
 
-2. **双击 `run-collector.bat`**，约 1 分钟跑完，**不需要管理员权限**；
+2. **双击 `run-collector.bat`**，按提示选择模式（直接回车 = 基础模式），**不需要管理员权限**；
    （为什么不直接双击 .ps1？Windows 默认双击 .ps1 是用记事本打开，不会运行）
 
 3. **审查后发送**：桌面上会生成 `diskbutler-rule-report-时间戳.md`，
@@ -26,7 +26,7 @@ C盘管家的清理白名单和磁盘透视知识库都靠"规则"驱动——�
 
 ## 可选：全盘线索模式
 
-命令行运行并加 `-IncludeDrives` 参数（或把参数传给 bat：`run-collector.bat -IncludeDrives`）：
+双击 `run-collector.bat` 后在菜单里输入 `2`（完整模式）；或命令行直接运行：
 
 ```powershell
 powershell -NoProfile -ExecutionPolicy Bypass -File .\collect-rules.ps1 -IncludeDrives
