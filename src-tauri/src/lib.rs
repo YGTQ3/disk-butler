@@ -1,11 +1,14 @@
 mod cache;
 mod cleanup;
 mod collector;
-mod knowledge;
+pub mod knowledge;
 mod memory;
-mod scan;
+pub mod mft_scan;
+pub mod scan;
 mod startup;
 mod stats;
+pub mod svc;
+mod svc_client;
 
 use cache::ScanCache;
 use cleanup::{CleanupReport, CleanupScan, DeepAnalyzeReport, DeepCleanReport};

@@ -740,12 +740,20 @@ const G_CODE: usize = 4; // 代码/工程文件
 const G_CACHE: usize = 5; // 临时/日志/缓存类
 const G_OTHER: usize = 6;
 
+/// 未知扩展名/无扩展名的兑底分组。
+pub const EXT_GROUP_OTHER: usize = G_OTHER;
+
 /// 根据文件扩展名归入内容组
 pub fn ext_group(path: &std::path::Path) -> usize {
     let Some(ext) = path.extension().map(|e| e.to_string_lossy().to_lowercase()) else {
         return G_OTHER;
     };
-    match ext.as_str() {
+    ext_group_of(&ext)
+}
+
+/// 同 ext_group，但直接接收已小写的扩展名（MFT 扫描零分配路径使用）
+pub fn ext_group_of(ext: &str) -> usize {
+    match ext {
         "mp4" | "mkv" | "avi" | "mov" | "flv" | "wmv" | "ts" | "webm" | "mp3" | "wav" | "flac"
         | "aac" | "m4a" | "jpg" | "jpeg" | "png" | "gif" | "webp" | "heic" | "bmp" | "raw"
         | "psd" => G_MEDIA,
