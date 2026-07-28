@@ -184,6 +184,69 @@ fn build_index(root: &Path, app: Option<&AppHandle>) -> (SizeIndex, u64) {
     )
 }
 
+/// 本次开机内核实际启用的页面文件清单（注册表 ExistingPageFiles，形如 `\??\C:\pagefile.sys`）。
+/// 读取失败返回 None——此时对 pagefile.sys 一律维持保守的「系统文件·保留」。
+fn active_pagefiles() -> Option<Vec<String>> {
+    use winreg::enums::HKEY_LOCAL_MACHINE;
+    use winreg::RegKey;
+    let key = RegKey::predef(HKEY_LOCAL_MACHINE)
+        .open_subkey(r"SYSTEM\CurrentControlSet\Control\Session Manager\Memory Management")
+        .ok()?;
+    let entries: Vec<String> = key.get_value("ExistingPageFiles").ok()?;
+    Some(
+        entries
+            .iter()
+            .map(|e| e.trim_start_matches(r"\??\").trim().to_lowercase())
+            .filter(|e| !e.is_empty())
+            .collect(),
+    )
+}
+
+/// 本次开机时刻（当前时间减去系统运行时长）。
+fn boot_time() -> Option<std::time::SystemTime> {
+    let uptime_ms = unsafe { windows_sys::Win32::System::SystemInformation::GetTickCount64() };
+    std::time::SystemTime::now().checked_sub(std::time::Duration::from_millis(uptime_ms))
+}
+
+/// 孤儿页面文件判定（纯函数，供单测）：
+/// 在用的页面文件每次开机都会被内核打开并写入——不在开机启用清单、
+/// 且自本次开机以来从未被写过的，即为历史配置遗留的孤儿文件。
+/// 证据不足（清单/时间读不到）时返回 false，保守维持「系统文件·保留」。
+fn is_orphan_pagefile_by(
+    path_lower: &str,
+    active: Option<&[String]>,
+    last_write: Option<std::time::SystemTime>,
+    boot: Option<std::time::SystemTime>,
+) -> bool {
+    let Some(active) = active else { return false };
+    if active.iter().any(|a| a == path_lower) {
+        return false;
+    }
+    match (last_write, boot) {
+        (Some(w), Some(b)) => w < b,
+        _ => false,
+    }
+}
+
+/// pagefile.sys 节点的动态精修：孤儿 → 改标「历史遗留」，在用/不确定 → 维持原判。
+fn refine_pagefile_hit(path: &Path, hit: &mut knowledge::KnowledgeHit) {
+    let lower = path.to_string_lossy().to_lowercase();
+    if !lower.ends_with("pagefile.sys") {
+        return;
+    }
+    let active = active_pagefiles();
+    let last_write = std::fs::metadata(path).and_then(|m| m.modified()).ok();
+    if is_orphan_pagefile_by(&lower, active.as_deref(), last_write, boot_time()) {
+        hit.category = knowledge::Category::Cache;
+        hit.friendly_name = "孤儿页面文件 (历史遗留)".to_string();
+        hit.description = "这不是系统正在使用的虚拟内存文件：它不在本次开机的启用清单里，\
+            而且自上次开机前就没再被写过——通常是页面文件挪过位置后留下的旧文件。\
+            正在使用的页面文件不会显示此提示。确认后可手动删除（需管理员权限）。"
+            .to_string();
+        hit.safety = knowledge::Safety::Caution;
+    }
+}
+
 /// 从索引里构建以 `dir` 为根的树，限制深度与每层数量。
 fn build_tree(index: &SizeIndex, dir: &Path, depth: usize) -> TreeNode {
     let path_str = dir.to_string_lossy().to_string();
@@ -229,7 +292,9 @@ fn build_tree(index: &SizeIndex, dir: &Path, depth: usize) -> TreeNode {
             kids.push(build_tree(index, child, depth + 1));
         } else if let Some(fsize) = index.file_sizes.get(child) {
             let cpath = child.to_string_lossy().to_string();
-            let chit = knowledge::classify(&cpath);
+            let mut chit = knowledge::classify(&cpath);
+            // pagefile.sys 动态精修：孤儿文件改标「历史遗留」（检测只读，不提供删除）
+            refine_pagefile_hit(child, &mut chit);
             let cname = child
                 .file_name()
                 .map(|n| n.to_string_lossy().to_string())
@@ -307,4 +372,54 @@ pub fn scan(root: &str, app: Option<&AppHandle>) -> Result<TreeNode, String> {
         );
     }
     Ok(tree)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::time::{Duration, SystemTime};
+
+    #[test]
+    fn orphan_pagefile_judgement() {
+        let active = vec!["c:\\pagefile.sys".to_string()];
+        let boot = SystemTime::now() - Duration::from_secs(3600);
+        let before_boot = Some(boot - Duration::from_secs(86400 * 30));
+        let after_boot = Some(boot + Duration::from_secs(60));
+
+        // 在开机启用清单里：无论时间戳如何，都不是孤儿
+        assert!(!is_orphan_pagefile_by(
+            "c:\\pagefile.sys",
+            Some(&active),
+            before_boot,
+            Some(boot)
+        ));
+        // 不在清单 + 开机前就没写过：孤儿（样本机 D 盘 11GB 场景）
+        assert!(is_orphan_pagefile_by(
+            "d:\\pagefile.sys",
+            Some(&active),
+            before_boot,
+            Some(boot)
+        ));
+        // 不在清单但开机后被写过：不确定，保守不判孤儿
+        assert!(!is_orphan_pagefile_by(
+            "d:\\pagefile.sys",
+            Some(&active),
+            after_boot,
+            Some(boot)
+        ));
+        // 注册表读不到清单：一律保守
+        assert!(!is_orphan_pagefile_by(
+            "d:\\pagefile.sys",
+            None,
+            before_boot,
+            Some(boot)
+        ));
+        // 时间证据缺失：一律保守
+        assert!(!is_orphan_pagefile_by(
+            "d:\\pagefile.sys",
+            Some(&active),
+            None,
+            Some(boot)
+        ));
+    }
 }
