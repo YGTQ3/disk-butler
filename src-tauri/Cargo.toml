@@ -1,6 +1,6 @@
 [package]
 name = "disk-butler"
-version = "0.6.2"
+version = "0.7.0"
 description = "C盘管家 - 磁盘与内存维护助手"
 authors = ["you"]
 edition = "2021"
