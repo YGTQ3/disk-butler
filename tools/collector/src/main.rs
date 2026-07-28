@@ -112,6 +112,45 @@ fn clear_progress() {
     cprint(&format!("\r{:<76}\r", ""));
 }
 
+/// 版本号命名的目录（如 12.1.0.26895 / app-1.2.3）——升级残留探测的基本单元
+fn is_version_dir_name(name: &str) -> bool {
+    let n = name.strip_prefix("app-").unwrap_or(name);
+    !n.is_empty()
+        && n.split('.').count() >= 2
+        && n.split('.')
+            .all(|p| !p.is_empty() && p.chars().all(|c| c.is_ascii_digit()))
+}
+
+/// 顶层目录自身或其一级子目录下，是否存在 ≥2 个版本号命名的兄弟目录。
+/// 命中说明该软件采用「多版本并存」布局（如 WPS/Squirrel 系），旧版本极可能是升级残留，
+/// 打 VERSION-SIBLINGS 标记供规则评估时人工确认（探测只报线索，不做清理判断）。
+fn has_version_siblings(top: &Path) -> bool {
+    fn version_dirs_at(dir: &Path) -> usize {
+        std::fs::read_dir(dir)
+            .map(|rd| {
+                rd.flatten()
+                    .filter(|e| {
+                        e.file_type().map(|t| t.is_dir()).unwrap_or(false)
+                            && is_version_dir_name(&e.file_name().to_string_lossy())
+                    })
+                    .count()
+            })
+            .unwrap_or(0)
+    }
+    if version_dirs_at(top) >= 2 {
+        return true;
+    }
+    if let Ok(rd) = std::fs::read_dir(top) {
+        for e in rd.flatten() {
+            if e.file_type().map(|t| t.is_dir()).unwrap_or(false) && version_dirs_at(&e.path()) >= 2
+            {
+                return true;
+            }
+        }
+    }
+    false
+}
+
 /// 收集顶层目录下两级子目录中缓存类命名的相对路径
 /// （与 ps1 的 Get-ChildItem -Depth 1 枚举顺序一致：先列完一级，再逐个下钻二级）
 fn collect_cache_hits(top: &Path, hits: &mut Vec<String>) {
@@ -179,6 +218,9 @@ fn analyze_root(root: &str, label: &str, min_mb: f64) -> Vec<TopDir> {
         }
         if lname.contains("updater") {
             flags.push("UPDATER-RESIDUE");
+        }
+        if has_version_siblings(d) {
+            flags.push("VERSION-SIBLINGS");
         }
         rows.push(TopDir {
             name,

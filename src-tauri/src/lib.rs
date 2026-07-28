@@ -127,6 +127,12 @@ async fn pagefile_check() -> Result<memory::PagefileCheck, String> {
         .map_err(|e| format!("页面文件核验失败：{}", e))
 }
 
+/// 打开系统回收站窗口（虚拟目录，走 shell: 协议而非文件路径）。
+#[tauri::command]
+fn open_recycle_bin() -> Result<(), String> {
+    cleanup::open_recycle_bin()
+}
+
 /// 生成规则采集报告（写到桌面，由用户自主决定是否分享）。
 #[tauri::command]
 async fn collect_rules(include_drives: bool) -> Result<collector::CollectResult, String> {
@@ -153,6 +159,7 @@ pub fn run() {
             set_startup_enabled,
             memory_report,
             pagefile_check,
+            open_recycle_bin,
             collect_rules
         ])
         .run(tauri::generate_context!())

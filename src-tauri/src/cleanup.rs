@@ -602,6 +602,16 @@ fn candidates() -> Vec<Candidate> {
     out
 }
 
+/// 打开系统回收站窗口。回收站是虚拟目录，没有文件系统路径，
+/// 不能走 openPath（Win10 上会报「找不到」），必须用 shell: 协议。
+pub fn open_recycle_bin() -> Result<(), String> {
+    std::process::Command::new("explorer.exe")
+        .arg("shell:RecycleBinFolder")
+        .spawn()
+        .map(|_| ())
+        .map_err(|e| format!("打开回收站失败：{}", e))
+}
+
 /// 清理策略分型：垃圾残留（删了纯赚）/ 性能缓存（空间充足可留）/ 数据类（默认不动）
 fn kind_of(id: &str) -> &'static str {
     match id {

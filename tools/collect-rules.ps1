@@ -33,6 +33,8 @@ $cachePatterns = @('Cache','Code Cache','GPUCache','CachedData','CacheStorage','
     'DawnCache','Crashpad','blob_storage','Service Worker','logs','log','Temp','tmp',
     'CrashDumps','Dumps','pending','staging')
 $updaterPattern = '*updater*'
+# version-named dirs (e.g. 12.1.0.26895 / app-1.2.3): >=2 siblings = upgrade leftovers clue
+$versionDirPattern = '^(app-)?\d+(\.\d+)+$'
 # personal-data red flags: NEVER become cleanup rules
 $personalPatterns = @('*download*','*document*','*desktop*','*picture*','*photo*','*video*','*music*')
 
@@ -60,6 +62,20 @@ function Analyze-Root([string]$rootPath, [string]$rootLabel, [int]$minMB) {
             if ($d.Name -ilike $pp) { $flags += 'PERSONAL-DO-NOT-ADD'; break }
         }
         if ($d.Name -ilike $updaterPattern) { $flags += 'UPDATER-RESIDUE' }
+        # VERSION-SIBLINGS: >=2 version-named dirs at the same level (top or one level down)
+        $vsLvl1 = 0; $vsByParent = @{}
+        foreach ($c in $children) {
+            if ($c.Name -notmatch $versionDirPattern) { continue }
+            $rel = $c.FullName.Substring($d.FullName.Length + 1)
+            if ($rel -eq $c.Name) { $vsLvl1++ }
+            else {
+                $parent = Split-Path $rel -Parent
+                $vsByParent[$parent] = [int]$vsByParent[$parent] + 1
+            }
+        }
+        if (($vsLvl1 -ge 2) -or (($vsByParent.Values | Where-Object { $_ -ge 2 }).Count -gt 0)) {
+            $flags += 'VERSION-SIBLINGS'
+        }
         $out += [pscustomobject]@{
             root    = $rootLabel
             name    = $d.Name
