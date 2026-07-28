@@ -9,7 +9,8 @@ use std::io::Write as _;
 use std::time::Instant;
 
 use jwalk::WalkDir;
-use ntfs_reader::file_info::{FileInfo, VecCache};
+use ntfs_reader::api::{NtfsAttributeType, ROOT_RECORD};
+use ntfs_reader::file::NtfsFile;
 use ntfs_reader::mft::Mft;
 use ntfs_reader::volume::Volume;
 
@@ -19,20 +20,29 @@ struct Summary {
     bytes: u64,
     /// first-level segment (lowercase) -> total bytes
     top_dirs: HashMap<String, u64>,
+    /// hardlink attribution (MFT channel only; 0 on jwalk)
+    multi_link_files: u64,
+    multi_link_nominal: u64,
+    multi_link_dedup_est: u64,
 }
 
-/// Normalize a path string and return its first segment under the drive root.
-/// Works for both "C:\Users\..." (jwalk) and "\\.\C:\Users\..." (MFT) forms.
-fn first_level_segment(path_str: &str, drive: char) -> Option<String> {
-    let lower = path_str.to_lowercase().replace('/', "\\");
-    let pat = format!("{}:\\", drive.to_ascii_lowercase());
-    let idx = lower.find(&pat)? + pat.len();
-    let rest = &lower[idx..];
-    let seg = rest.split('\\').next().unwrap_or("");
+/// Return the lowercased first-level segment under the drive root.
+/// Hot path: avoids whole-string to_lowercase/replace/format (was ~3 allocations
+/// per file over 745k files); only the short segment itself is allocated+lowercased.
+/// Handles "C:\Users\..." (jwalk) and MFT-form paths alike; falls back to the
+/// first path component when no drive-colon is present.
+fn first_level_segment(path_str: &str) -> Option<String> {
+    let start = match path_str.find(":\\").or_else(|| path_str.find(":/")) {
+        Some(c) => c + 2,
+        None => 0,
+    };
+    let rest = path_str[start..].trim_start_matches(['\\', '/']);
+    let end = rest.find(['\\', '/']).unwrap_or(rest.len());
+    let seg = &rest[..end];
     if seg.is_empty() {
         None
     } else {
-        Some(seg.to_string())
+        Some(seg.to_ascii_lowercase())
     }
 }
 
@@ -51,15 +61,27 @@ fn scan_mft(drive: char) -> Result<Summary, String> {
     let mut files: u64 = 0;
     let mut bytes: u64 = 0;
     let mut top_dirs: HashMap<String, u64> = HashMap::new();
+    let mut multi_link_files: u64 = 0;
+    let mut multi_link_nominal: u64 = 0;
+    let mut multi_link_dedup_est: u64 = 0;
     for file in mft.files() {
         let info = FileInfo::with_cache(&mft, &file, &mut cache);
         if info.is_directory {
             continue;
         }
         let ps = info.path.to_string_lossy();
-        let Some(seg) = first_level_segment(&ps, drive) else { continue };
+        let Some(seg) = first_level_segment(&ps) else { continue };
         if skipped(&seg) {
             continue;
+        }
+        // hardlink attribution: link_count sits in the packed record header;
+        // read_unaligned avoids UB on the packed field.
+        let link_count =
+            unsafe { std::ptr::addr_of!((*file.header).link_count).read_unaligned() };
+        if link_count > 1 {
+            multi_link_files += 1;
+            multi_link_nominal += info.size;
+            multi_link_dedup_est += info.size / link_count as u64;
         }
         files += 1;
         bytes += info.size;
@@ -70,6 +92,9 @@ fn scan_mft(drive: char) -> Result<Summary, String> {
         files,
         bytes,
         top_dirs,
+        multi_link_files,
+        multi_link_nominal,
+        multi_link_dedup_est,
     })
 }
 
@@ -92,7 +117,7 @@ fn scan_jwalk(drive: char) -> Summary {
         }
         let size = entry.metadata().map(|m| m.len()).unwrap_or(0);
         let ps = entry.path().to_string_lossy().to_string();
-        let Some(seg) = first_level_segment(&ps, drive) else { continue };
+        let Some(seg) = first_level_segment(&ps) else { continue };
         if skipped(&seg) {
             continue;
         }
@@ -105,6 +130,9 @@ fn scan_jwalk(drive: char) -> Summary {
         files,
         bytes,
         top_dirs,
+        multi_link_files: 0,
+        multi_link_nominal: 0,
+        multi_link_dedup_est: 0,
     }
 }
 
@@ -209,6 +237,27 @@ fn main() {
             "\nverdict: {} (docs/12 acceptance line: total deviation within +/-2%)\n",
             if pass { "PASS" } else { "FAIL" }
         ));
+    }
+
+    // Hardlink attribution (MFT channel): quantifies how much of the deviation
+    // comes from multi-link files, and estimates the true exclusive footprint.
+    if let Some(m) = &mft_sum {
+        if m.multi_link_files > 0 {
+            let exclusive_est = m.bytes - m.multi_link_nominal + m.multi_link_dedup_est;
+            out.push_str(&format!(
+                "\nHardlink attribution (MFT):\n\
+                   multi-link files : {} ({:.2} GB nominal)\n\
+                   dedup estimate   : {:.2} GB (nominal size / link_count)\n\
+                   exclusive footprint estimate: {:.2} GB (vs nominal {:.2} GB)\n\
+                   -> a directory-walk view (jwalk/Explorer) counts multi-link data once per path;\n\
+                 -> deletion-gain shown to users should be based on exclusive size, or it over-promises.\n",
+                m.multi_link_files,
+                gb(m.multi_link_nominal),
+                gb(m.multi_link_dedup_est),
+                gb(exclusive_est),
+                gb(m.bytes),
+            ));
+        }
     }
 
     print!("{}", out);

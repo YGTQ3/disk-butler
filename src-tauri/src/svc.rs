@@ -16,6 +16,9 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 
+/// 服务注册名（bin 注册与客户端按需拉起共用）。
+pub const SERVICE_NAME: &str = "DiskButlerScanSvc";
+
 /// 管道名（客户端用 std::fs::File 直接打开即可）。
 pub const PIPE_NAME: &str = r"\\.\pipe\disk-butler-scan";
 
@@ -136,7 +139,7 @@ fn serve_client(client: File) {
     let _ = writer.flush();
 }
 
-/// 管道服务主循环：顺序接待客户端，直到 stop 置位。
+/// 管道服务主循环：顺序接待客户端，直到 stop 置位（run-console 调试模式用）。
 pub fn run_server(stop: Arc<AtomicBool>) {
     while !stop.load(Ordering::SeqCst) {
         match wait_for_client() {
@@ -151,6 +154,20 @@ pub fn run_server(stop: Arc<AtomicBool>) {
                 std::thread::sleep(Duration::from_secs(1));
             }
         }
+    }
+}
+
+/// 用完即停模式（正式服务用）：只接待一个客户端，扫完立即返回，服务随之退出。
+/// 配合 OnDemand 启动类型实现「无常驻进程」——服务进程只在扫描期间存在，
+/// 主程序每次扫描按需拉起（进程启动开销 <100ms，对秒级扫描无感）。
+pub fn run_server_once(stop: Arc<AtomicBool>) {
+    match wait_for_client() {
+        Ok(client) => {
+            if !stop.load(Ordering::SeqCst) {
+                serve_client(client);
+            }
+        }
+        Err(_) => {}
     }
 }
 

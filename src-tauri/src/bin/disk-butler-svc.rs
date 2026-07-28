@@ -65,7 +65,8 @@ fn service_main(_args: Vec<OsString>) {
     };
     let _ = status_handle.set_service_status(running);
 
-    svc::run_server(stop);
+    // 用完即停：只接待一个扫描请求，完成后服务立即退出（配合 OnDemand 实现无常驻进程）
+    svc::run_server_once(stop);
 
     let stopped = ServiceStatus {
         service_type: ServiceType::OWN_PROCESS,
@@ -91,7 +92,9 @@ fn install() -> Result<(), String> {
         name: OsString::from(SERVICE_NAME),
         display_name: OsString::from(DISPLAY_NAME),
         service_type: ServiceType::OWN_PROCESS,
-        start_type: ServiceStartType::AutoStart,
+        // OnDemand + 用完即停：平时系统里只有注册项、没有进程；
+        // 主程序扫描时按需拉起（ACL 放行普通用户 start），扫完服务自行退出
+        start_type: ServiceStartType::OnDemand,
         error_control: ServiceErrorControl::Normal,
         executable_path: exe,
         launch_arguments: vec![],
@@ -119,8 +122,21 @@ fn install() -> Result<(), String> {
         }
     };
     let _ = service.set_description(DESCRIPTION);
-    // 立即启动（失败不阻塞安装：下次开机自启）
-    let _ = service.start::<&str>(&[]);
+
+    // OnDemand 模式：安装时不启动（服务由主程序扫描时按需拉起，用完即停）。
+    // 设置服务 DACL：在默认权限外授予 Authenticated Users 启动(RP)/停止(WP)权限，
+    // 使普通权限的主程序无需 UAC 即可拉起只读扫描服务（Everything 同款授权方式）。
+    const SERVICE_SDDL: &str = "D:(A;;CCLCSWRPWPDTLOCRRC;;;SY)(A;;CCDCLCSWRPWPDTLOCRSDRCWDWO;;;BA)(A;;CCLCSWLOCRRC;;;IU)(A;;CCLCSWLOCRRC;;;SU)(A;;RPWPCCLCSWLOCRRC;;;AU)";
+    let out = std::process::Command::new("sc.exe")
+        .args(["sdset", SERVICE_NAME, SERVICE_SDDL])
+        .output()
+        .map_err(|e| format!("设置服务权限失败（sc.exe 不可用）：{}", e))?;
+    if !out.status.success() {
+        return Err(format!(
+            "设置服务权限失败：{}",
+            String::from_utf8_lossy(&out.stdout)
+        ));
+    }
     Ok(())
 }
 
