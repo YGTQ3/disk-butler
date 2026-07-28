@@ -1,0 +1,14 @@
+[package]
+name = "mftscan"
+version = "0.1.0"
+edition = "2021"
+description = "MFT direct-read prototype: speed & data-parity comparison vs jwalk (docs/12 stage 2)"
+
+[dependencies]
+ntfs-reader = "0.4"
+jwalk = "0.8"
+
+[profile.release]
+opt-level = 2
+lto = true
+strip = true
