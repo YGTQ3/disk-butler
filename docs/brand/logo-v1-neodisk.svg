@@ -1,0 +1,51 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024">
+  <!-- V1 新拟物盘片：青绿渐变底 + 白盘片（Big Sur 风光影） -->
+  <defs>
+    <linearGradient id="bg" x1="0.1" y1="0" x2="0.9" y2="1">
+      <stop offset="0" stop-color="#41E0B8"/>
+      <stop offset="0.5" stop-color="#17B698"/>
+      <stop offset="1" stop-color="#0A8F78"/>
+    </linearGradient>
+    <radialGradient id="disk" cx="0.36" cy="0.3" r="0.95">
+      <stop offset="0" stop-color="#FFFFFF"/>
+      <stop offset="0.72" stop-color="#F7FCFA"/>
+      <stop offset="1" stop-color="#DEEEE9"/>
+    </radialGradient>
+    <radialGradient id="hub" cx="0.35" cy="0.3" r="1.05">
+      <stop offset="0" stop-color="#33D6AF"/>
+      <stop offset="1" stop-color="#0A8873"/>
+    </radialGradient>
+    <linearGradient id="topLight" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#FFFFFF" stop-opacity="0.28"/>
+      <stop offset="1" stop-color="#FFFFFF" stop-opacity="0"/>
+    </linearGradient>
+    <linearGradient id="bottomShade" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#000000" stop-opacity="0"/>
+      <stop offset="1" stop-color="#000000" stop-opacity="0.16"/>
+    </linearGradient>
+    <filter id="soft" x="-60%" y="-60%" width="220%" height="220%">
+      <feGaussianBlur stdDeviation="30"/>
+    </filter>
+  </defs>
+
+  <!-- 底与环境光 -->
+  <rect x="64" y="64" width="896" height="896" rx="216" fill="url(#bg)"/>
+  <rect x="64" y="64" width="896" height="448" rx="216" fill="url(#topLight)"/>
+  <rect x="64" y="576" width="896" height="384" rx="216" fill="url(#bottomShade)"/>
+
+  <!-- 盘片投影（柔和景深） -->
+  <ellipse cx="512" cy="800" rx="270" ry="46" fill="#043D33" opacity="0.35" filter="url(#soft)"/>
+
+  <!-- 白盘片 -->
+  <circle cx="512" cy="496" r="286" fill="url(#disk)"/>
+  <!-- 同心盘纹（极淡） -->
+  <circle cx="512" cy="496" r="224" fill="none" stroke="#0A8F78" stroke-width="5" opacity="0.10"/>
+  <circle cx="512" cy="496" r="158" fill="none" stroke="#0A8F78" stroke-width="4" opacity="0.08"/>
+  <!-- 盘面反光弧（左上扫光） -->
+  <path d="M 300 355 A 256 256 0 0 1 620 260" fill="none" stroke="#FFFFFF" stroke-width="46" stroke-linecap="round" opacity="0.75"/>
+
+  <!-- 轴心：渐变青绿 + 白孔 + 轴心高光 -->
+  <circle cx="512" cy="496" r="92" fill="url(#hub)"/>
+  <circle cx="512" cy="496" r="38" fill="#FFFFFF"/>
+  <path d="M 452 448 A 78 78 0 0 1 512 420" fill="none" stroke="#FFFFFF" stroke-width="14" stroke-linecap="round" opacity="0.5"/>
+</svg>

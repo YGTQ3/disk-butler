@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body { width: 1080px; }
+  body {
+    width: 1080px; height: 1440px; overflow: hidden;
+    font-family: "Microsoft YaHei", "PingFang SC", sans-serif;
+    background: linear-gradient(160deg, #EAFBF5 0%, #F6FEFB 38%, #FFFFFF 62%, #E8F9F2 100%);
+    position: relative; color: #14322C;
+    display: flex; flex-direction: column;
+  }
+  /* 背景装饰圆 */
+  .deco { position: absolute; border-radius: 50%; }
+  .deco1 { width: 520px; height: 520px; right: -180px; top: -200px;
+    background: radial-gradient(circle, rgba(47,208,172,0.16), rgba(47,208,172,0)); }
+  .deco2 { width: 420px; height: 420px; left: -160px; bottom: 160px;
+    background: radial-gradient(circle, rgba(18,164,140,0.10), rgba(18,164,140,0)); }
+
+  .wrap { position: relative; flex: 1; overflow: hidden;
+    display: flex; flex-direction: column; padding: 56px 72px 44px; }
+
+  /* 品牌行 */
+  .brand { display: flex; align-items: center; gap: 18px; }
+  .brand-icon {
+    width: 72px; height: 72px; border-radius: 20px;
+    background: linear-gradient(135deg, #2FD0AC, #0FA189);
+    display: flex; align-items: center; justify-content: center;
+    box-shadow: 0 10px 26px rgba(15,161,137,0.35);
+  }
+  .brand-name { font-size: 40px; font-weight: 700; letter-spacing: 1px; }
+  .brand-sub { font-size: 20px; color: #5B7A72; margin-top: 4px; }
+
+  /* 主标题 */
+  .headline { margin-top: 34px; font-size: 66px; font-weight: 800; line-height: 1.24; }
+  .headline .em { color: #0FA189; }
+  .subline { margin-top: 14px; font-size: 27px; color: #40615A; line-height: 1.6; }
+  .subline b { color: #14322C; }
+
+  /* 能清什么：菜单清单 */
+  .menu-title { margin-top: 26px; font-size: 30px; font-weight: 800; }
+  .menu-title span { color: #0FA189; }
+  .menu { margin-top: 14px; display: flex; flex-direction: column; gap: 11px; }
+  .mrow {
+    display: flex; align-items: center; gap: 18px;
+    background: #FFFFFF; border: 1px solid #DFF2EC; border-radius: 15px;
+    padding: 15px 24px; box-shadow: 0 6px 18px rgba(10,80,68,0.06);
+  }
+  .mrow .mi { flex-shrink: 0; font-size: 32px; line-height: 1; }
+  .mrow .mt { font-size: 24px; font-weight: 700; }
+  .mrow .md { margin-top: 2px; font-size: 19px; color: #5B7A72; line-height: 1.5; }
+  .mrow .mn {
+    margin-left: auto; flex-shrink: 0; text-align: right;
+    font-size: 22px; font-weight: 800; color: #0FA189; white-space: nowrap;
+  }
+  .mrow .mn span { display: block; font-size: 15px; font-weight: 400; color: #7FA69D; }
+  .menu-more { margin-top: 10px; font-size: 20px; color: #5B7A72; }
+
+  /* 截图卡：占满剩余高度，从顶部裁切 */
+  .shot-card {
+    flex: 1; margin-top: 26px; border-radius: 22px; overflow: hidden;
+    box-shadow: 0 26px 60px rgba(10,80,68,0.20);
+    border: 1px solid #D8EEE7; background: #fff;
+  }
+  .shot-card img { width: 100%; height: 100%; object-fit: cover; object-position: top; display: block; }
+
+  /* 底栏 */
+  .footer {
+    flex-shrink: 0; height: 190px;
+    background: linear-gradient(135deg, #0E8A75, #075E50);
+    display: flex; align-items: center; padding: 0 72px; gap: 30px;
+    position: relative; z-index: 1;
+  }
+  .qr-box { width: 138px; height: 138px; background: #fff; border-radius: 16px;
+    padding: 9px; flex-shrink: 0; }
+  .qr-box img { width: 100%; height: 100%; }
+  .foot-text { color: #fff; flex: 1; }
+  .foot-text .l1 { font-size: 28px; font-weight: 700; }
+  .foot-text .l2 { font-size: 20px; opacity: 0.85; margin-top: 8px; letter-spacing: 0.5px; }
+  .ver-badge {
+    flex-shrink: 0; color: rgba(255,255,255,0.85); text-align: right;
+    font-size: 18px; line-height: 1.7;
+  }
+</style>
+</head>
+<body>
+  <div class="deco deco1"></div>
+  <div class="deco deco2"></div>
+
+  <div class="wrap">
+    <div class="brand">
+      <div class="brand-icon">
+        <svg width="42" height="42" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.2"
+             stroke-linecap="round" stroke-linejoin="round">
+          <path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"/>
+          <path d="m9 12 2 2 4-4"/>
+        </svg>
+      </div>
+      <div>
+        <div class="brand-name">C盘管家 <span style="font-weight:400;color:#7FA69D;font-size:26px;">DiskButler</span></div>
+        <div class="brand-sub">给普通人的 Windows 磁盘 · 内存管家</div>
+      </div>
+    </div>
+
+    <div class="headline">C盘又没空间了？<br><span class="em">看明白，再清理。</span></div>
+
+    <div class="subline">
+      每一项都先告诉你：<b>这是什么、删了会怎样</b>。不恐吓，不套路。
+    </div>
+
+    <div class="menu-title">它能帮你清什么？<span>都是实打实的大头：</span></div>
+    <div class="menu">
+      <div class="mrow">
+        <div class="mi">🪟</div>
+        <div>
+          <div class="mt">Windows 旧更新备份</div>
+          <div class="md">走微软官方 DISM 通道，先只读分析再确认执行</div>
+        </div>
+        <div class="mn">11.4 GB<span>我们机器实测</span></div>
+      </div>
+      <div class="mrow">
+        <div class="mi">📦</div>
+        <div>
+          <div class="mt">软件更新遗留的旧安装包</div>
+          <div class="md">各软件下载完就忘的更新包，藏在犄角旮旯里</div>
+        </div>
+        <div class="mn">6.1 GB<span>一次翻出 24 处</span></div>
+      </div>
+      <div class="mrow">
+        <div class="mi">🎬</div>
+        <div>
+          <div class="mt">软件缓存</div>
+          <div class="md">剪映 / Adobe Pr·Ae / WPS / 钉钉 / 浏览器与显卡着色器缓存</div>
+        </div>
+        <div class="mn">动辄几十 GB<span>剪辑机重灾区</span></div>
+      </div>
+      <div class="mrow">
+        <div class="mi">💻</div>
+        <div>
+          <div class="mt">开发缓存</div>
+          <div class="md">npm / pip / conda / uv / JetBrains 索引，用时自动重建</div>
+        </div>
+        <div class="mn">4.9 GB<span>我们机器实测</span></div>
+      </div>
+    </div>
+    <div class="menu-more">还有临时文件、崩溃报告、回收站……共 20+ 项，每一项都标着“删了会怎样”：</div>
+
+    <div class="shot-card">
+      <img src="../../screenshots/cleanup-groups.png" alt="一键清理">
+    </div>
+  </div>
+
+  <div class="footer">
+    <div class="qr-box"><img src="qr.png" alt="下载二维码"></div>
+    <div class="foot-text">
+      <div class="l1">扫码直接下载（国内加速）</div>
+      <div class="l2">打开后点“开始下载”即可　·　GitHub 开源：github.com/YGTQ3/disk-butler</div>
+    </div>
+    <div class="ver-badge">免费 · 开源 · 2.4MB · 零联网<br>无广告 · Windows 10 / 11</div>
+  </div>
+</body>
+</html>

@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024">
+  <!-- X1 霓虹棱角盘（白底版）：同一几何，白底衬电光渐变 -->
+  <defs>
+    <linearGradient id="neonL" x1="0.1" y1="0.1" x2="0.9" y2="0.9">
+      <stop offset="0" stop-color="#17E8B8"/>
+      <stop offset="0.55" stop-color="#00C3A0"/>
+      <stop offset="1" stop-color="#0080F5"/>
+    </linearGradient>
+  </defs>
+
+  <!-- 白底 + 极淡描边 -->
+  <rect x="64" y="64" width="896" height="896" rx="216" fill="#FFFFFF"/>
+  <rect x="72" y="72" width="880" height="880" rx="208" fill="none" stroke="#E7F1EE" stroke-width="10"/>
+
+  <!-- C 环：平切断口，电光渐变 -->
+  <path d="M 718.8 338.4 A 270 270 0 1 0 718.8 685.6"
+        fill="none" stroke="url(#neonL)" stroke-width="170" stroke-linecap="butt"/>
+
+  <!-- 盘轴：斜切菱形 -->
+  <rect x="472" y="472" width="80" height="80" fill="#00C3A0" transform="rotate(45 512 512)"/>
+</svg>

@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body { width: 1080px; }
+  body {
+    width: 1080px; height: 1440px; overflow: hidden;
+    font-family: "Microsoft YaHei", "PingFang SC", sans-serif;
+    background: linear-gradient(160deg, #EAFBF5 0%, #F6FEFB 38%, #FFFFFF 62%, #E8F9F2 100%);
+    position: relative; color: #14322C;
+    display: flex; flex-direction: column;
+  }
+  .deco { position: absolute; border-radius: 50%; }
+  .deco1 { width: 520px; height: 520px; right: -180px; top: -200px;
+    background: radial-gradient(circle, rgba(47,208,172,0.16), rgba(47,208,172,0)); }
+  .deco2 { width: 420px; height: 420px; left: -160px; bottom: 160px;
+    background: radial-gradient(circle, rgba(18,164,140,0.10), rgba(18,164,140,0)); }
+
+  .wrap { position: relative; flex: 1; overflow: hidden;
+    display: flex; flex-direction: column; padding: 56px 72px 56px; }
+
+  .brand { display: flex; align-items: center; gap: 18px; }
+  .brand-icon {
+    width: 72px; height: 72px; border-radius: 20px;
+    background: linear-gradient(135deg, #2FD0AC, #0FA189);
+    display: flex; align-items: center; justify-content: center;
+    box-shadow: 0 10px 26px rgba(15,161,137,0.35);
+  }
+  .brand-name { font-size: 40px; font-weight: 700; letter-spacing: 1px; }
+  .brand-sub { font-size: 20px; color: #5B7A72; margin-top: 4px; }
+
+  .headline { margin-top: 38px; font-size: 64px; font-weight: 800; line-height: 1.26; }
+  .headline .em { color: #0FA189; }
+  .subline { margin-top: 16px; font-size: 27px; color: #40615A; line-height: 1.65; }
+  .subline b { color: #14322C; }
+
+  /* 三不承诺条 */
+  .promise {
+    margin-top: 26px; display: flex; gap: 14px;
+  }
+  .promise .chip {
+    flex: 1; text-align: center; padding: 14px 0;
+    background: #FFFFFF; border: 1px solid #DFF2EC; border-radius: 14px;
+    font-size: 23px; font-weight: 700; color: #0C6B5B;
+    box-shadow: 0 6px 16px rgba(10,80,68,0.06);
+  }
+  .promise .chip span { display: block; font-size: 17px; font-weight: 400; color: #5B7A72; margin-top: 3px; }
+
+  /* 三步流程（紧凑版） */
+  .steps { margin-top: 34px; display: flex; flex-direction: column; gap: 18px; }
+  .step {
+    display: flex; align-items: center; gap: 20px;
+    background: #FFFFFF; border: 1px solid #DFF2EC; border-radius: 16px;
+    padding: 24px 28px; box-shadow: 0 8px 22px rgba(10,80,68,0.07);
+  }
+  .num {
+    flex-shrink: 0; width: 50px; height: 50px; border-radius: 50%;
+    background: linear-gradient(135deg, #2FD0AC, #0FA189); color: #fff;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 27px; font-weight: 800;
+    box-shadow: 0 6px 16px rgba(15,161,137,0.3);
+  }
+  .step .t1 { font-size: 26px; font-weight: 700; line-height: 1.4; }
+  .step .t1 .hl { color: #0FA189; }
+  .step .t2 { margin-top: 4px; font-size: 20px; color: #5B7A72; line-height: 1.55; }
+  .step .t2 b { color: #B45309; font-weight: 700; }
+  .step .btn-look {
+    display: inline-block; background: #EAF9F4; color: #0C6B5B; font-weight: 700;
+    border-radius: 8px; padding: 2px 12px;
+  }
+
+  /* 隐私对照：视觉中心 */
+  .privacy-title { margin-top: 38px; font-size: 30px; font-weight: 800; }
+  .privacy-title span { color: #0FA189; }
+  .privacy { margin-top: 16px; display: flex; gap: 18px; }
+  .pcol {
+    flex: 1; border-radius: 18px; padding: 26px 30px;
+  }
+  .pcol.yes { background: #FFFFFF; border: 1.5px solid #BFE8DC; }
+  .pcol.no  { background: #FFF7ED; border: 1.5px solid #FDE68A; }
+  .pcol .ph { font-size: 26px; font-weight: 800; margin-bottom: 14px; }
+  .pcol.yes .ph { color: #0C6B5B; }
+  .pcol.no .ph { color: #B45309; }
+  .prow { display: flex; align-items: center; gap: 12px; font-size: 22px; padding: 10px 0; }
+  .pcol.yes .prow { color: #40615A; }
+  .pcol.no .prow { color: #92400E; }
+  .pmark { flex-shrink: 0; width: 30px; height: 30px; border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 17px; font-weight: 800; }
+  .pcol.yes .pmark { background: #D9F4EB; color: #0C8A72; }
+  .pcol.no .pmark { background: #FDE9CE; color: #C2410C; }
+
+  /* 底部收尾小字 */
+  .tail { margin-top: auto; padding-top: 24px; display: flex; align-items: center;
+    justify-content: space-between; font-size: 18px; color: #7FA69D; }
+
+  .footer {
+    flex-shrink: 0; height: 190px;
+    background: linear-gradient(135deg, #0E8A75, #075E50);
+    display: flex; align-items: center; padding: 0 72px; gap: 30px;
+    position: relative; z-index: 1;
+  }
+  .qr-box { width: 138px; height: 138px; background: #fff; border-radius: 16px;
+    padding: 9px; flex-shrink: 0; }
+  .qr-box img { width: 100%; height: 100%; }
+  .foot-text { color: #fff; flex: 1; }
+  .foot-text .l1 { font-size: 28px; font-weight: 700; }
+  .foot-text .l2 { font-size: 20px; opacity: 0.85; margin-top: 8px; letter-spacing: 0.5px; }
+  .ver-badge {
+    flex-shrink: 0; color: rgba(255,255,255,0.85); text-align: right;
+    font-size: 18px; line-height: 1.7;
+  }
+</style>
+</head>
+<body>
+  <div class="deco deco1"></div>
+  <div class="deco deco2"></div>
+
+  <div class="wrap">
+    <div class="brand">
+      <div class="brand-icon">
+        <svg width="42" height="42" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.2"
+             stroke-linecap="round" stroke-linejoin="round">
+          <path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"/>
+          <path d="m9 12 2 2 4-4"/>
+        </svg>
+      </div>
+      <div>
+        <div class="brand-name">C盘管家 <span style="font-weight:400;color:#7FA69D;font-size:26px;">帮它认识更多软件</span></div>
+        <div class="brand-sub">软件内置功能 · 不用另外下载任何东西</div>
+      </div>
+    </div>
+
+    <div class="headline">每台电脑装的软件都不一样，<br><span class="em">借你的一分钟，让它更懂电脑。</span></div>
+
+    <div class="subline">
+      哪些软件的缓存能安全清理，靠大家的真实样本一条条积累。
+      报告里只有<b>目录名和大小</b>，你能<b>逐行看懂</b>。
+    </div>
+
+    <div class="steps">
+      <div class="step">
+        <div class="num">1</div>
+        <div>
+          <div class="t1">打开 C盘管家，点左下角 <span class="hl">「帮它认识更多软件」</span></div>
+          <div class="t2">选基础模式，约 1 分钟，全程在你电脑上完成</div>
+        </div>
+      </div>
+      <div class="step">
+        <div class="num">2</div>
+        <div>
+          <div class="t1">报告生成到桌面，<span class="hl">自己先看一遍</span></div>
+          <div class="t2">记事本就能打开，每一行都是人话——确认没有你不想分享的内容</div>
+        </div>
+      </div>
+      <div class="step">
+        <div class="num">3</div>
+        <div>
+          <div class="t1">点 <span class="btn-look">用邮箱发给我们</span>，把报告拖进邮件即可</div>
+          <div class="t2">发不发、发给谁，完全由你决定（收件：ygtq1021@126.com）</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="privacy-title">隐私边界，<span>白纸黑字说清楚：</span></div>
+    <div class="privacy">
+      <div class="pcol yes">
+        <div class="ph">报告里有的</div>
+        <div class="prow"><span class="pmark">✓</span>已装软件清单（名称+大小）</div>
+        <div class="prow"><span class="pmark">✓</span>缓存目录的名字和大小</div>
+        <div class="prow"><span class="pmark">✓</span>系统版本、磁盘容量</div>
+      </div>
+      <div class="pcol no">
+        <div class="ph">永远不会有的</div>
+        <div class="prow"><span class="pmark">✗</span>任何文件名、文件内容</div>
+        <div class="prow"><span class="pmark">✗</span>你的用户名（已自动抹去）</div>
+        <div class="prow"><span class="pmark">✗</span>聊天记录、账号、浏览记录</div>
+      </div>
+    </div>
+
+    <div class="tail">
+      <div>不删除 · 不联网 · 报告只在你电脑上</div>
+      <div>C盘管家 · 免费开源 · github.com/YGTQ3/disk-butler</div>
+    </div>
+  </div>
+</body>
+</html>

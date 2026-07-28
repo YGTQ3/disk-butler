@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body { width: 1080px; }
+  body {
+    width: 1080px; height: 1440px; overflow: hidden;
+    font-family: "Microsoft YaHei", "PingFang SC", sans-serif;
+    background: linear-gradient(160deg, #EAFBF5 0%, #F6FEFB 38%, #FFFFFF 62%, #E8F9F2 100%);
+    color: #14322C; display: flex; flex-direction: column; position: relative;
+  }
+  .deco { position: absolute; border-radius: 50%; }
+  .deco1 { width: 520px; height: 520px; right: -180px; top: -200px;
+    background: radial-gradient(circle, rgba(47,208,172,0.16), rgba(47,208,172,0)); }
+  .wrap { position: relative; flex: 1; display: flex; flex-direction: column; padding: 52px 72px 48px; }
+
+  .brand { display: flex; align-items: center; gap: 16px; }
+  .brand-icon { width: 64px; height: 64px; border-radius: 18px;
+    background: linear-gradient(135deg, #2FD0AC, #0FA189);
+    display: flex; align-items: center; justify-content: center;
+    box-shadow: 0 10px 26px rgba(15,161,137,0.35); }
+  .brand-name { font-size: 36px; font-weight: 700; }
+  .brand-sub { font-size: 19px; color: #5B7A72; margin-top: 3px; }
+
+  .headline { margin-top: 34px; font-size: 60px; font-weight: 800; line-height: 1.25; }
+  .headline .em { color: #0FA189; }
+
+  /* 大二维码区 */
+  .qr-zone { margin-top: 36px; display: flex; align-items: center; gap: 40px;
+    background: #fff; border: 1px solid #DFF2EC; border-radius: 22px; padding: 40px 44px;
+    box-shadow: 0 18px 44px rgba(10,80,68,0.12); }
+  .qr-big { width: 300px; height: 300px; flex-shrink: 0; border-radius: 16px;
+    border: 1px solid #E7F1EE; padding: 12px; background: #fff; }
+  .qr-big img { width: 100%; height: 100%; }
+  .qr-text .q1 { font-size: 34px; font-weight: 800; line-height: 1.4; }
+  .qr-text .q1 span { color: #0FA189; }
+  .qr-text .q2 { margin-top: 14px; font-size: 23px; color: #5B7A72; line-height: 1.7; }
+  .qr-text .q2 b { color: #14322C; }
+
+  /* 步骤 */
+  .steps { margin-top: 32px; display: flex; flex-direction: column; gap: 14px; flex: 1; }
+  .step { display: flex; align-items: flex-start; gap: 20px;
+    background: #FFFFFF; border: 1px solid #DFF2EC; border-radius: 16px;
+    padding: 20px 26px; box-shadow: 0 6px 18px rgba(10,80,68,0.06); }
+  .num { flex-shrink: 0; width: 50px; height: 50px; border-radius: 50%;
+    background: linear-gradient(135deg, #2FD0AC, #0FA189); color: #fff;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 26px; font-weight: 800; box-shadow: 0 6px 16px rgba(15,161,137,0.3); }
+  .step .t1 { font-size: 26px; font-weight: 700; line-height: 1.45; }
+  .step .t1 .hl { color: #0FA189; }
+  .step .t2 { margin-top: 5px; font-size: 20px; color: #5B7A72; line-height: 1.6; }
+  .step .t2 b { color: #B45309; }
+
+  .tail { margin-top: 18px; display: flex; align-items: center; justify-content: space-between;
+    font-size: 18px; color: #7FA69D; }
+</style>
+</head>
+<body>
+  <div class="deco deco1"></div>
+  <div class="wrap">
+    <div class="brand">
+      <div class="brand-icon">
+        <svg width="38" height="38" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"/>
+          <path d="m9 12 2 2 4-4"/>
+        </svg>
+      </div>
+      <div>
+        <div class="brand-name">C盘管家</div>
+        <div class="brand-sub">给普通人的 Windows 磁盘 · 内存管家</div>
+      </div>
+    </div>
+
+    <div class="headline">装它，<span class="em">只要一分钟。</span></div>
+
+    <div class="qr-zone">
+      <div class="qr-big"><img src="qr.png" alt="下载二维码"></div>
+      <div class="qr-text">
+        <div class="q1">扫码<span>直接下载</span><br>（国内已加速）</div>
+        <div class="q2">打开后点蓝色<b>「开始下载」</b>按钮即可，<br>不用注册、不用登录、不用找链接。</div>
+      </div>
+    </div>
+
+    <div class="steps">
+      <div class="step">
+        <div class="num">1</div>
+        <div>
+          <div class="t1">下载 <span class="hl">DiskButler-Setup.exe</span>（2.4 MB）</div>
+          <div class="t2">安装包比一首歌还小，几秒下完</div>
+        </div>
+      </div>
+      <div class="step">
+        <div class="num">2</div>
+        <div>
+          <div class="t1">双击安装，转瞬装完</div>
+          <div class="t2">Windows 10 / 11 直接装，不需要任何额外运行库</div>
+        </div>
+      </div>
+      <div class="step">
+        <div class="num">3</div>
+        <div>
+          <div class="t1">若提示“未知发布者”，点 <span class="hl">更多信息 → 仍要运行</span></div>
+          <div class="t2">个人开源项目暂无代码签名证书，<b>属正常现象</b>——源码全部公开，可自行审计</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="tail">
+      <div>GitHub 开源：github.com/YGTQ3/disk-butler</div>
+      <div>免费 · 无广告 · 无捆绑 · 关掉就是关掉</div>
+    </div>
+  </div>
+</body>
+</html>

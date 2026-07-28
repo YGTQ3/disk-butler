@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024">
+  <!-- V5 倾斜双色 C：白底 + 两段撞色圆弧拼成的 C 环（盘片）+ 盘轴点。
+       设计来源：实测桌面标杆图标（ToDesk 等）= 纯色撞色 + 交叠 + 动态角度，无细线细节 -->
+
+  <!-- 白底 + 极淡描边 -->
+  <rect x="64" y="64" width="896" height="896" rx="216" fill="#FFFFFF"/>
+  <rect x="72" y="72" width="880" height="880" rx="208" fill="none" stroke="#E7F1EE" stroke-width="10"/>
+
+  <g transform="rotate(-18 512 512)">
+    <!-- 亮薄荷段：45°→200°（C 的上半） -->
+    <path d="M 702.9 321.1 A 270 270 0 0 0 258.3 604.3"
+          fill="none" stroke="#2BDDB9" stroke-width="150" stroke-linecap="round"/>
+    <!-- 深青绿段：200°→315°（C 的下半，后绘盖住接缝形成圆弧咬合） -->
+    <path d="M 258.3 604.3 A 270 270 0 0 0 702.9 702.9"
+          fill="none" stroke="#0FA189" stroke-width="150" stroke-linecap="round"/>
+    <!-- 盘轴点 -->
+    <circle cx="512" cy="512" r="70" fill="#0A7E6B"/>
+  </g>
+</svg>

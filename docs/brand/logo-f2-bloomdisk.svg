@@ -1,0 +1,50 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024">
+<defs>
+<linearGradient id="g0" x1="627.6668268676765" y1="357.3895916749502" x2="774.2200452816348" y2="161.4937280644274" gradientUnits="userSpaceOnUse">
+    <stop offset="0" stop-color="#076b5b"/>
+    <stop offset="1" stop-color="#23bfa0"/>
+  </linearGradient>
+<linearGradient id="g1" x1="539.0422772915159" y1="323.74260097736567" x2="563.3383964295558" y2="154.60284451512217" gradientUnits="userSpaceOnUse">
+    <stop offset="0" stop-color="#087261"/>
+    <stop offset="1" stop-color="#2fd2af"/>
+  </linearGradient>
+<linearGradient id="g2" x1="425.48910966797234" y1="352.1295561587315" x2="299.69762422450685" y2="119.66933603943687" gradientUnits="userSpaceOnUse">
+    <stop offset="0" stop-color="#0a7967"/>
+    <stop offset="1" stop-color="#3ae2bb"/>
+  </linearGradient>
+<linearGradient id="g3" x1="348.8974458032037" y1="423.8910011250965" x2="191.96487746089275" y2="339.1150664035299" gradientUnits="userSpaceOnUse">
+    <stop offset="0" stop-color="#0b806d"/>
+    <stop offset="1" stop-color="#41ecc3"/>
+  </linearGradient>
+<linearGradient id="g4" x1="325.3271694936917" y1="510.5564157622272" x2="75.33316993867788" y2="508.62315425696914" gradientUnits="userSpaceOnUse">
+    <stop offset="0" stop-color="#0d8874"/>
+    <stop offset="1" stop-color="#43f0c6"/>
+  </linearGradient>
+<linearGradient id="g5" x1="345.1922823405845" y1="604.2371018481832" x2="199.57081081157287" y2="684.7591705460377" gradientUnits="userSpaceOnUse">
+    <stop offset="0" stop-color="#0e8f7a"/>
+    <stop offset="1" stop-color="#41ecc3"/>
+  </linearGradient>
+<linearGradient id="g6" x1="429.16321766959413" y1="678.3333223282317" x2="313.4172253883062" y2="910.7471715955003" gradientUnits="userSpaceOnUse">
+    <stop offset="0" stop-color="#0f9680"/>
+    <stop offset="1" stop-color="#3ae2bb"/>
+  </linearGradient>
+<linearGradient id="g7" x1="537.012940755821" y1="692.7034245544037" x2="563.7977813115422" y2="886.2077574440145" gradientUnits="userSpaceOnUse">
+    <stop offset="0" stop-color="#119d86"/>
+    <stop offset="1" stop-color="#2fd2af"/>
+  </linearGradient>
+<linearGradient id="g8" x1="615.734160853972" y1="662.9395596874615" x2="768.3082958691211" y2="884.9442741353939" gradientUnits="userSpaceOnUse">
+    <stop offset="0" stop-color="#12a48c"/>
+    <stop offset="1" stop-color="#23bfa0"/>
+  </linearGradient>
+</defs>
+<line x1="627.7" y1="357.4" x2="774.2" y2="161.5" stroke="url(#g0)" stroke-width="106" stroke-linecap="round" opacity="0.93"/>
+<line x1="539.0" y1="323.7" x2="563.3" y2="154.6" stroke="url(#g1)" stroke-width="109" stroke-linecap="round" opacity="0.93"/>
+<line x1="425.5" y1="352.1" x2="299.7" y2="119.7" stroke="url(#g2)" stroke-width="117" stroke-linecap="round" opacity="0.93"/>
+<line x1="348.9" y1="423.9" x2="192.0" y2="339.1" stroke="url(#g3)" stroke-width="111" stroke-linecap="round" opacity="0.93"/>
+<line x1="325.3" y1="510.6" x2="75.3" y2="508.6" stroke="url(#g4)" stroke-width="117" stroke-linecap="round" opacity="0.93"/>
+<line x1="345.2" y1="604.2" x2="199.6" y2="684.8" stroke="url(#g5)" stroke-width="109" stroke-linecap="round" opacity="0.93"/>
+<line x1="429.2" y1="678.3" x2="313.4" y2="910.7" stroke="url(#g6)" stroke-width="114" stroke-linecap="round" opacity="0.93"/>
+<line x1="537.0" y1="692.7" x2="563.8" y2="886.2" stroke="url(#g7)" stroke-width="105" stroke-linecap="round" opacity="0.93"/>
+<line x1="615.7" y1="662.9" x2="768.3" y2="884.9" stroke="url(#g8)" stroke-width="105" stroke-linecap="round" opacity="0.93"/>
+<circle cx="512" cy="512" r="62" fill="#0FA189"/>
+</svg>

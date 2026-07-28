@@ -1,0 +1,24 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#2FCDA9"/>
+      <stop offset="1" stop-color="#0FA189"/>
+    </linearGradient>
+  </defs>
+  <rect x="64" y="64" width="896" height="896" rx="216" fill="url(#bg)"/>
+
+  <!-- 彩色环形盘（磁盘构成饼图：绿/紫/蓝/橙） -->
+  <circle cx="512" cy="500" r="240" fill="none" stroke="#FFFFFF" stroke-width="128"/>
+  <path d="M 512 260 A 240 240 0 0 1 653 694" fill="none" stroke="#3ECF9B" stroke-width="92"/>
+  <path d="M 653 694 A 240 240 0 0 1 318 641" fill="none" stroke="#8B7CF6" stroke-width="92"/>
+  <path d="M 318 641 A 240 240 0 0 1 318 359" fill="none" stroke="#4D9DE0" stroke-width="92"/>
+  <path d="M 318 359 A 240 240 0 0 1 512 260" fill="none" stroke="#F5A94B" stroke-width="92"/>
+
+  <!-- 中心轴（保留硬盘身份） -->
+  <circle cx="512" cy="500" r="70" fill="#FFFFFF"/>
+  <circle cx="512" cy="500" r="28" fill="#0FA189"/>
+
+  <!-- 星光 -->
+  <path d="M812 152 L830 206 L884 224 L830 242 L812 296 L794 242 L740 224 L794 206 Z" fill="#FFFFFF" opacity="0.95"/>
+  <path d="M896 320 L905 346 L931 355 L905 364 L896 390 L887 364 L861 355 L887 346 Z" fill="#FFFFFF" opacity="0.8"/>
+</svg>

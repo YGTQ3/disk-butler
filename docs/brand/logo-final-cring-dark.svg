@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024">
+  <!-- 反色版：青绿底 + 白色 C 环（用于头像/深色场景/社交平台） -->
+  <rect x="64" y="64" width="896" height="896" rx="216" fill="#12A98E"/>
+
+  <path d="M 672.7 320.5 A 250 250 0 1 0 672.7 703.5"
+        fill="none" stroke="#FFFFFF" stroke-width="132" stroke-linecap="round"/>
+
+  <circle cx="512" cy="512" r="84" fill="#FFFFFF"/>
+</svg>

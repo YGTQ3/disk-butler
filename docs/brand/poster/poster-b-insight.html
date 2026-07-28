@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body { width: 1080px; }
+  body {
+    width: 1080px; height: 1440px; overflow: hidden;
+    font-family: "Microsoft YaHei", "PingFang SC", sans-serif;
+    background: linear-gradient(160deg, #EAFBF5 0%, #F6FEFB 38%, #FFFFFF 62%, #E8F9F2 100%);
+    color: #14322C; display: flex; flex-direction: column; position: relative;
+  }
+  .deco { position: absolute; border-radius: 50%; }
+  .deco1 { width: 520px; height: 520px; right: -180px; top: -200px;
+    background: radial-gradient(circle, rgba(47,208,172,0.16), rgba(47,208,172,0)); }
+  .wrap { position: relative; flex: 1; display: flex; flex-direction: column; padding: 52px 72px 40px; }
+
+  .brand { display: flex; align-items: center; gap: 16px; }
+  .brand-icon { width: 64px; height: 64px; border-radius: 18px;
+    background: linear-gradient(135deg, #2FD0AC, #0FA189);
+    display: flex; align-items: center; justify-content: center;
+    box-shadow: 0 10px 26px rgba(15,161,137,0.35); }
+  .brand-name { font-size: 36px; font-weight: 700; }
+  .brand-sub { font-size: 19px; color: #5B7A72; margin-top: 3px; }
+
+  .headline { margin-top: 30px; font-size: 58px; font-weight: 800; line-height: 1.25; }
+  .headline .em { color: #0FA189; }
+  .subline { margin-top: 12px; font-size: 25px; color: #40615A; line-height: 1.6; }
+  .subline b { color: #14322C; }
+
+  /* 四色语义 chips */
+  .legend { margin-top: 22px; display: flex; gap: 14px; }
+  .lg { flex: 1; display: flex; align-items: center; gap: 10px; justify-content: center;
+    background: #fff; border: 1px solid #DFF2EC; border-radius: 12px; padding: 12px 0;
+    font-size: 20px; font-weight: 600; color: #40615A; }
+  .dot { width: 18px; height: 18px; border-radius: 6px; }
+
+  .shot { flex: 1; margin-top: 24px; border-radius: 20px; overflow: hidden;
+    border: 1px solid #D8EEE7; box-shadow: 0 24px 56px rgba(10,80,68,0.18); background: #fff;
+    display: flex; align-items: center; }
+  .shot img { width: 100%; height: 100%; object-fit: contain; display: block; }
+
+  .tips { margin-top: 20px; display: flex; gap: 14px; }
+  .tip { flex: 1; background: #fff; border: 1px solid #DFF2EC; border-radius: 14px;
+    padding: 16px 20px; font-size: 20px; line-height: 1.55; color: #40615A;
+    box-shadow: 0 5px 14px rgba(10,80,68,0.05); }
+  .tip b { color: #0C6B5B; }
+
+  .tail { margin-top: 16px; display: flex; align-items: center; justify-content: space-between;
+    font-size: 18px; color: #7FA69D; }
+</style>
+</head>
+<body>
+  <div class="deco deco1"></div>
+  <div class="wrap">
+    <div class="brand">
+      <div class="brand-icon">
+        <svg width="38" height="38" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"/>
+          <path d="m9 12 2 2 4-4"/>
+        </svg>
+      </div>
+      <div>
+        <div class="brand-name">C盘管家</div>
+        <div class="brand-sub">给普通人的 Windows 磁盘 · 内存管家</div>
+      </div>
+    </div>
+
+    <div class="headline">先看清，<span class="em">谁占了你的 C盘。</span></div>
+    <div class="subline">
+      磁盘占用画成<b>彩色拼图</b>，大块头一眼可见，点击色块层层深入——每个目录都用人话告诉你<b>“这是什么、能不能动”</b>。
+    </div>
+
+    <div class="legend">
+      <div class="lg"><span class="dot" style="background:#4D9DE0"></span>系统</div>
+      <div class="lg"><span class="dot" style="background:#8B7CF6"></span>软件</div>
+      <div class="lg"><span class="dot" style="background:#F5A94B"></span>缓存</div>
+      <div class="lg"><span class="dot" style="background:#3ECF9B"></span>个人文件</div>
+    </div>
+
+    <div class="shot"><img src="../../screenshots/disk-insight.png" alt="磁盘透视真实截图"></div>
+
+    <div class="tips">
+      <div class="tip"><b>90+ 条中文知识库</b><br>剪映、微信、百度网盘、npm、conda……都认识</div>
+      <div class="tip"><b>结果本地留存</b><br>下次打开秒显上次结果，不重复扫盘</div>
+      <div class="tip"><b>右键直达目录</b><br>删之前，先亲眼看看里面是什么</div>
+    </div>
+
+    <div class="tail">
+      <div>真实界面截图 · 未经修饰</div>
+      <div>免费 · 开源 · 2.4MB · 零联网</div>
+    </div>
+  </div>
+</body>
+</html>

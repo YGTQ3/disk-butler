@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024">
+  <!-- X1 霓虹棱角盘（黑底版）：JetBrains 配方 = 深色底 + 电光渐变 + 锐利切口。
+       概念内核不变：C 环 = C盘/盘片，中心 = 盘轴（菱形切角，加棱角气质） -->
+  <defs>
+    <linearGradient id="neon" x1="0.1" y1="0.1" x2="0.9" y2="0.9">
+      <stop offset="0" stop-color="#3CFFD8"/>
+      <stop offset="0.55" stop-color="#00D4B0"/>
+      <stop offset="1" stop-color="#0090FF"/>
+    </linearGradient>
+  </defs>
+
+  <!-- 深青黑底 -->
+  <rect x="64" y="64" width="896" height="896" rx="216" fill="#0A1412"/>
+
+  <!-- C 环：平切断口（锐利），电光渐变 -->
+  <path d="M 718.8 338.4 A 270 270 0 1 0 718.8 685.6"
+        fill="none" stroke="url(#neon)" stroke-width="170" stroke-linecap="butt"/>
+
+  <!-- 盘轴：斜切菱形（棱角） -->
+  <rect x="472" y="472" width="80" height="80" fill="#3CFFD8" transform="rotate(45 512 512)"/>
+</svg>

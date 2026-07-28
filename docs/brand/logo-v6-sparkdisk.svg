@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024">
+  <!-- V6 星散盘：无容器自由形。三段长短不一的圆头弧段散摆成 C 环（盘片/能量环/星芒三重隐喻），
+       配方来自 CC Switch：圆头笔画 + 不对称节奏 + 暖冷撞色（青绿家族 + 琥珀金点睛） -->
+  <g transform="rotate(-8 512 512)">
+    <!-- 长段·亮薄荷：40°→130° -->
+    <path d="M 741.8 319.2 A 300 300 0 0 0 319.2 282.2"
+          fill="none" stroke="#2BDDB9" stroke-width="150" stroke-linecap="round"/>
+    <!-- 短段·琥珀金（点睛暖色）：140°→175° -->
+    <path d="M 282.2 319.2 A 300 300 0 0 0 213.2 485.8"
+          fill="none" stroke="#F5B23E" stroke-width="128" stroke-linecap="round"/>
+    <!-- 主段·深青绿：185°→320° -->
+    <path d="M 213.2 538.2 A 300 300 0 0 0 741.8 704.8"
+          fill="none" stroke="#0FA189" stroke-width="150" stroke-linecap="round"/>
+    <!-- 盘轴点 -->
+    <circle cx="512" cy="512" r="78" fill="#0A7E6B"/>
+  </g>
+</svg>

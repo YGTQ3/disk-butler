@@ -1,0 +1,42 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#34D6B0"/>
+      <stop offset="1" stop-color="#0FA189"/>
+    </linearGradient>
+    <linearGradient id="knot" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#0E8A75"/>
+      <stop offset="1" stop-color="#0A6B5B"/>
+    </linearGradient>
+  </defs>
+
+  <!-- 底：清新青绿渐变圆角方 -->
+  <rect x="64" y="64" width="896" height="896" rx="216" fill="url(#bg)"/>
+  <!-- 顶部柔光 -->
+  <path d="M64 280 Q512 120 960 280 L960 280 Q512 40 64 280 Z" fill="#FFFFFF" opacity="0.10"/>
+
+  <!-- 盘片投影 -->
+  <ellipse cx="512" cy="768" rx="230" ry="34" fill="#000000" opacity="0.10"/>
+
+  <!-- 硬盘盘片（白色圆盘） -->
+  <circle cx="512" cy="480" r="252" fill="#FFFFFF"/>
+  <!-- 盘纹 -->
+  <circle cx="512" cy="480" r="196" fill="none" stroke="#BFEAE0" stroke-width="14"/>
+  <circle cx="512" cy="480" r="132" fill="none" stroke="#D9F3ED" stroke-width="10"/>
+  <!-- 中心轴孔 -->
+  <circle cx="512" cy="480" r="58" fill="#0FA189"/>
+  <circle cx="512" cy="480" r="24" fill="#FFFFFF"/>
+  <!-- 盘面高光 -->
+  <path d="M330 350 A252 252 0 0 1 512 228 L512 300 A180 180 0 0 0 388 396 Z" fill="#EFFBF8"/>
+
+  <!-- 管家领结（盘片下缘） -->
+  <g>
+    <path d="M497 726 L368 664 Q346 654 346 678 L346 774 Q346 798 368 788 L497 726 Z" fill="url(#knot)"/>
+    <path d="M527 726 L656 664 Q678 654 678 678 L678 774 Q678 798 656 788 L527 726 Z" fill="url(#knot)"/>
+    <rect x="478" y="694" width="68" height="64" rx="18" fill="#0C7563"/>
+  </g>
+
+  <!-- 星光 -->
+  <path d="M778 214 L794 262 L842 278 L794 294 L778 342 L762 294 L714 278 L762 262 Z" fill="#FFFFFF" opacity="0.95"/>
+  <path d="M854 356 L862 380 L886 388 L862 396 L854 420 L846 396 L822 388 L846 380 Z" fill="#FFFFFF" opacity="0.8"/>
+</svg>

@@ -1,0 +1,31 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#34D6B0"/>
+      <stop offset="1" stop-color="#0FA189"/>
+    </linearGradient>
+  </defs>
+
+  <!-- 底：清新青绿渐变圆角方 -->
+  <rect x="64" y="64" width="896" height="896" rx="216" fill="url(#bg)"/>
+  <path d="M64 280 Q512 120 960 280 L960 280 Q512 40 64 280 Z" fill="#FFFFFF" opacity="0.10"/>
+
+  <!-- 盾牌投影 -->
+  <path d="M512 880 C 360 830 250 720 250 560 L250 330 L512 244 L774 330 L774 560 C774 720 664 830 512 880 Z"
+        fill="#000000" opacity="0.10" transform="translate(0,14)"/>
+  <!-- 白色盾牌 -->
+  <path d="M512 880 C 360 830 250 720 250 560 L250 330 L512 244 L774 330 L774 560 C774 720 664 830 512 880 Z"
+        fill="#FFFFFF"/>
+
+  <!-- 盾内硬盘盘片 -->
+  <circle cx="512" cy="530" r="150" fill="#0FA189"/>
+  <circle cx="512" cy="530" r="108" fill="none" stroke="#FFFFFF" stroke-width="12" opacity="0.55"/>
+  <circle cx="512" cy="530" r="40" fill="#FFFFFF"/>
+  <circle cx="512" cy="530" r="16" fill="#0FA189"/>
+  <!-- 盘片高光 -->
+  <path d="M404 422 A150 150 0 0 1 512 380 L512 424 A106 106 0 0 0 436 456 Z" fill="#FFFFFF" opacity="0.5"/>
+
+  <!-- 星光 -->
+  <path d="M778 214 L794 262 L842 278 L794 294 L778 342 L762 294 L714 278 L762 262 Z" fill="#FFFFFF" opacity="0.95"/>
+  <path d="M854 356 L862 380 L886 388 L862 396 L854 420 L846 396 L822 388 L846 380 Z" fill="#FFFFFF" opacity="0.8"/>
+</svg>

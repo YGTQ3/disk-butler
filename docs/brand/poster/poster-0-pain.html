@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body { width: 1080px; }
+  body {
+    width: 1080px; height: 1440px; overflow: hidden;
+    font-family: "Microsoft YaHei", "PingFang SC", sans-serif;
+    background: linear-gradient(165deg, #F7F8FA 0%, #FFFFFF 40%, #FDF3F2 100%);
+    color: #1F2937; display: flex; flex-direction: column; position: relative;
+  }
+  .deco { position: absolute; border-radius: 50%; }
+  .deco1 { width: 560px; height: 560px; right: -200px; top: -220px;
+    background: radial-gradient(circle, rgba(220,38,38,0.08), rgba(220,38,38,0)); }
+  .wrap { position: relative; flex: 1; display: flex; flex-direction: column; padding: 60px 72px 48px; }
+
+  .tag { align-self: flex-start; background: #FEF2F2; border: 1.5px solid #FECACA;
+    color: #B91C1C; border-radius: 999px; padding: 10px 26px; font-size: 21px; font-weight: 700; }
+
+  .headline { margin-top: 34px; font-size: 68px; font-weight: 800; line-height: 1.3; }
+  .headline .em { color: #DC2626; }
+
+  /* Windows 风格磁盘卡 */
+  .disk-card { margin-top: 46px; background: #FFFFFF; border: 1px solid #E5E7EB;
+    border-radius: 16px; padding: 34px 40px; box-shadow: 0 16px 40px rgba(31,41,55,0.10); }
+  .disk-top { display: flex; align-items: center; gap: 16px; }
+  .disk-ico { font-size: 40px; }
+  .disk-name { font-size: 26px; font-weight: 700; color: #374151; }
+  .disk-bar { margin-top: 18px; height: 30px; border-radius: 6px; background: #E5E7EB; overflow: hidden; }
+  .disk-fill { width: 81%; height: 100%; background: linear-gradient(90deg, #EF4444, #DC2626); }
+  .disk-text { margin-top: 12px; font-size: 22px; color: #6B7280; }
+  .disk-text b { color: #DC2626; }
+
+  /* 两难 */
+  .dilemma { margin-top: 42px; display: flex; gap: 18px; }
+  .dl { flex: 1; background: #fff; border: 1px solid #E5E7EB; border-radius: 16px;
+    padding: 28px 32px; box-shadow: 0 8px 22px rgba(31,41,55,0.06); }
+  .dl .d1 { font-size: 28px; font-weight: 800; }
+  .dl .d2 { margin-top: 10px; font-size: 21px; color: #6B7280; line-height: 1.6; }
+
+  /* 市面的路 */
+  .roads-title { margin-top: 42px; font-size: 28px; font-weight: 800; }
+  .roads { margin-top: 16px; display: flex; flex-direction: column; gap: 16px; }
+  .road { display: flex; align-items: center; gap: 18px; background: #fff;
+    border: 1px solid #E5E7EB; border-radius: 14px; padding: 24px 28px;
+    box-shadow: 0 6px 16px rgba(31,41,55,0.05); }
+  .road .x { flex-shrink: 0; width: 42px; height: 42px; border-radius: 50%;
+    background: #FEF2F2; color: #DC2626; display: flex; align-items: center;
+    justify-content: center; font-size: 22px; font-weight: 800; }
+  .road .r1 { font-size: 24px; font-weight: 700; }
+  .road .r2 { margin-top: 4px; font-size: 20px; color: #6B7280; line-height: 1.55; }
+  .road .scream { color: #DC2626; font-weight: 700; }
+  .road code { font-family: Consolas, monospace; font-size: 17px; background: #F3F4F6;
+    color: #6B7280; border-radius: 5px; padding: 2px 8px; }
+
+  .ending { margin-top: auto; padding-top: 30px; display: flex;
+    align-items: center; justify-content: space-between; }
+  .ending .e1 { font-size: 24px; color: #4B5563; }
+  .ending .e1 b { color: #1F2937; }
+  .ending .e2 { font-size: 26px; font-weight: 800; color: #0FA189; }
+</style>
+</head>
+<body>
+  <div class="deco deco1"></div>
+  <div class="wrap">
+    <div class="tag">一段真实经历 · 第 1 篇</div>
+
+    <div class="headline">C盘发红不可怕，<br>可怕的是<span class="em">不知道能删什么。</span></div>
+
+    <div class="disk-card">
+      <div class="disk-top">
+        <div class="disk-ico">💾</div>
+        <div class="disk-name">本地磁盘 (C:)</div>
+      </div>
+      <div class="disk-bar"><div class="disk-fill"></div></div>
+      <div class="disk-text">238 GB，仅剩 <b>46.2 GB</b> 可用——每天开机都红给你看</div>
+    </div>
+
+    <div class="dilemma">
+      <div class="dl">
+        <div class="d1">删吧？</div>
+        <div class="d2">WinSxS 是什么？pagefile.sys 敢动吗？删坏了系统谁负责？</div>
+      </div>
+      <div class="dl">
+        <div class="d1">不删吧？</div>
+        <div class="d2">软件装不下、更新失败、电脑越用越卡，红条天天提醒你。</div>
+      </div>
+    </div>
+
+    <div class="roads-title">然后你发现，摆在面前的路都不好走：</div>
+    <div class="roads">
+      <div class="road">
+        <div class="x">✗</div>
+        <div>
+          <div class="r1">打开某"清理大师"</div>
+          <div class="r2">它尖叫着<span class="scream">"检测到 3247 个垃圾！你的电脑危在旦夕！"</span>——趁你慌乱，装上三个全家桶</div>
+        </div>
+      </div>
+      <div class="road">
+        <div class="x">✗</div>
+        <div>
+          <div class="r1">去问懂电脑的朋友</div>
+          <div class="r2">他甩来一个专业工具和一句"自己看"——满屏 <code>WinSxS\amd64_microsoft-windows...</code>，更不敢删了</div>
+        </div>
+      </div>
+      <div class="road">
+        <div class="x">✗</div>
+        <div>
+          <div class="r1">心一横，重装系统</div>
+          <div class="r2">文件备来备去折腾一整天，软件重装一遍——半年后，C盘又红了</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="ending">
+      <div class="e1">这是<b>我们自己上周的真实处境</b>。后来的事，往后翻。</div>
+      <div class="e2">→</div>
+    </div>
+  </div>
+</body>
+</html>

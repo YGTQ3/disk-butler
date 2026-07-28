@@ -1,0 +1,54 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024">
+  <!-- A2 「盘片 × 领结」终版：C盘(盘片) + 管家(领结) 的直译。
+       纪律：三层大形（盘/领结/轴），白底容器，青绿家族+白 ≤3色，
+       无星光/细线/窄弧；精致感 = 面级渐变 + 宽幅光泽 + 领结造型 -->
+  <defs>
+    <linearGradient id="disk" x1="0.15" y1="0.05" x2="0.85" y2="1">
+      <stop offset="0" stop-color="#3EDFB5"/>
+      <stop offset="0.55" stop-color="#12AE90"/>
+      <stop offset="1" stop-color="#0B9078"/>
+    </linearGradient>
+    <linearGradient id="gloss" x1="0.2" y1="0" x2="0.6" y2="1">
+      <stop offset="0" stop-color="#FFFFFF" stop-opacity="0.30"/>
+      <stop offset="0.5" stop-color="#FFFFFF" stop-opacity="0"/>
+    </linearGradient>
+    <linearGradient id="tie" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#0B7A69"/>
+      <stop offset="1" stop-color="#075E50"/>
+    </linearGradient>
+  </defs>
+
+  <!-- 白底容器 -->
+  <rect x="64" y="64" width="896" height="896" rx="216" fill="#FFFFFF"/>
+  <rect x="72" y="72" width="880" height="880" rx="208" fill="none" stroke="#E7F1EE" stroke-width="10"/>
+
+  <!-- 盘片：渐变主体 + 宽幅光泽 -->
+  <circle cx="512" cy="478" r="292" fill="url(#disk)"/>
+  <circle cx="512" cy="478" r="292" fill="url(#gloss)"/>
+
+  <!-- 轴心 -->
+  <circle cx="512" cy="478" r="112" fill="#FFFFFF"/>
+  <circle cx="512" cy="478" r="46" fill="#0C9B81"/>
+
+  <!-- 领结：系在盘片下缘。两翼圆润、外端微扬，中结最深 -->
+  <g>
+    <!-- 左翼 -->
+    <path d="M 484 748
+             C 440 722, 380 704, 346 700
+             C 322 697, 310 710, 312 730
+             L 320 800
+             C 322 822, 338 830, 360 822
+             C 396 809, 450 789, 484 784
+             C 496 782, 496 754, 484 748 Z" fill="url(#tie)"/>
+    <!-- 右翼 -->
+    <path d="M 540 748
+             C 584 722, 644 704, 678 700
+             C 702 697, 714 710, 712 730
+             L 704 800
+             C 702 822, 686 830, 664 822
+             C 628 809, 574 789, 540 784
+             C 528 782, 528 754, 540 748 Z" fill="url(#tie)"/>
+    <!-- 中结 -->
+    <rect x="474" y="732" width="76" height="70" rx="24" fill="#064F43"/>
+  </g>
+</svg>

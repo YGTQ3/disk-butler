@@ -1,0 +1,269 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body { width: 1080px; }
+  body {
+    width: 1080px;
+    font-family: "Microsoft YaHei", "PingFang SC", sans-serif;
+    background: linear-gradient(175deg, #EAFBF5 0%, #F8FEFC 25%, #FFFFFF 55%, #EDFAF5 100%);
+    color: #14322C;
+  }
+  .wrap { padding: 0 64px; }
+
+  /* ============ 头部品牌区 ============ */
+  .hero {
+    background: linear-gradient(150deg, #0E8A75, #0FA189 55%, #2FD0AC);
+    padding: 72px 64px 60px; text-align: center; color: #fff;
+  }
+  .hero .logo {
+    width: 96px; height: 96px; margin: 0 auto; border-radius: 26px;
+    background: rgba(255,255,255,0.16); border: 2px solid rgba(255,255,255,0.4);
+    display: flex; align-items: center; justify-content: center;
+  }
+  .hero h1 { margin-top: 24px; font-size: 64px; font-weight: 800; letter-spacing: 2px; }
+  .hero .sub { margin-top: 12px; font-size: 27px; opacity: 0.92; }
+  .hero .slogan { margin-top: 18px; font-size: 30px; font-weight: 700; letter-spacing: 8px; }
+  .badges { margin-top: 28px; display: flex; justify-content: center; flex-wrap: wrap; gap: 12px; }
+  .badge {
+    background: rgba(255,255,255,0.15); border: 1px solid rgba(255,255,255,0.45);
+    border-radius: 999px; padding: 8px 22px; font-size: 20px; font-weight: 600;
+  }
+
+  /* ============ 章节通用 ============ */
+  .sec { margin-top: 64px; }
+  .sec-title { font-size: 40px; font-weight: 800; }
+  .sec-title .emo { margin-right: 10px; }
+  .sec-body { margin-top: 18px; font-size: 25px; line-height: 1.75; color: #40615A; }
+  .sec-body b { color: #14322C; }
+  .sec-body .em { color: #0FA189; font-weight: 700; }
+
+  /* 为什么做这个 */
+  .why-punch {
+    margin-top: 22px; padding: 22px 30px; border-radius: 16px;
+    background: #FFFFFF; border-left: 6px solid #0FA189;
+    box-shadow: 0 8px 22px rgba(10,80,68,0.07);
+    font-size: 27px; font-weight: 700; line-height: 1.6;
+  }
+  .why-punch span { color: #0FA189; }
+
+  /* 对比表 */
+  table.vs { margin-top: 24px; width: 100%; border-collapse: separate; border-spacing: 0;
+    background: #fff; border-radius: 18px; overflow: hidden;
+    box-shadow: 0 12px 30px rgba(10,80,68,0.10); font-size: 22px; }
+  table.vs th, table.vs td { padding: 18px 22px; text-align: left; vertical-align: top; line-height: 1.5; }
+  table.vs thead th { font-size: 24px; font-weight: 800; }
+  table.vs thead th:nth-child(2) { background: #0FA189; color: #fff; }
+  table.vs thead th:nth-child(3) { background: #F3F4F6; color: #6B7280; }
+  table.vs tbody tr:nth-child(odd) { background: #FBFEFD; }
+  table.vs tbody td:first-child { font-weight: 700; width: 190px; color: #14322C; }
+  table.vs tbody td:nth-child(2) { color: #0C6B5B; }
+  table.vs tbody td:nth-child(2) b { color: #0A8873; }
+  table.vs tbody td:nth-child(3) { color: #9CA3AF; }
+
+  /* Rust 引用条 */
+  .rust {
+    margin-top: 26px; padding: 24px 30px; border-radius: 16px;
+    background: #FFF7ED; border: 1.5px solid #FDE68A;
+    font-size: 23px; line-height: 1.7; color: #92400E;
+  }
+  .rust b { color: #B45309; }
+
+  /* 功能块 */
+  .feat { margin-top: 56px; }
+  .feat h3 { font-size: 33px; font-weight: 800; }
+  .feat h3 span { color: #0FA189; }
+  .feat .desc { margin-top: 14px; font-size: 23px; line-height: 1.7; color: #40615A; }
+  .feat .desc b { color: #14322C; }
+  .feat ul { margin: 14px 0 0 6px; list-style: none; }
+  .feat li { font-size: 23px; line-height: 1.9; color: #40615A; }
+  .feat li b { color: #14322C; }
+  .shot {
+    margin-top: 22px; border-radius: 18px; overflow: hidden;
+    border: 1px solid #D8EEE7; box-shadow: 0 18px 44px rgba(10,80,68,0.16); background: #fff;
+  }
+  .shot img { width: 100%; display: block; }
+  .shot2 { display: flex; gap: 20px; margin-top: 22px; }
+  .shot2 .shot { flex: 1; margin-top: 0; }
+
+  /* 设计原则 */
+  .rules { margin-top: 24px; display: flex; flex-direction: column; gap: 12px; }
+  .rule {
+    display: flex; align-items: flex-start; gap: 16px;
+    background: #fff; border: 1px solid #DFF2EC; border-radius: 14px;
+    padding: 16px 24px; box-shadow: 0 6px 16px rgba(10,80,68,0.05);
+  }
+  .rule .n {
+    flex-shrink: 0; width: 40px; height: 40px; border-radius: 50%;
+    background: linear-gradient(135deg, #2FD0AC, #0FA189); color: #fff;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 21px; font-weight: 800;
+  }
+  .rule .t { font-size: 22px; line-height: 1.6; color: #40615A; padding-top: 4px; }
+  .rule .t b { color: #14322C; }
+
+  /* 结尾故事 */
+  .origin {
+    margin-top: 64px; text-align: center; padding: 44px 60px;
+    background: #FFFFFF; border-radius: 20px; border: 1px solid #DFF2EC;
+    box-shadow: 0 12px 30px rgba(10,80,68,0.08);
+  }
+  .origin .quote { font-size: 26px; line-height: 1.85; color: #40615A; }
+  .origin .quote b { color: #0C6B5B; }
+  .origin .star { margin-top: 18px; font-size: 24px; font-weight: 700; }
+
+  /* 底栏 */
+  .footer {
+    margin-top: 64px; background: linear-gradient(135deg, #0E8A75, #075E50);
+    display: flex; align-items: center; padding: 40px 64px; gap: 32px;
+  }
+  .qr-box { width: 150px; height: 150px; background: #fff; border-radius: 16px; padding: 10px; flex-shrink: 0; }
+  .qr-box img { width: 100%; height: 100%; }
+  .foot-text { color: #fff; flex: 1; }
+  .foot-text .l1 { font-size: 31px; font-weight: 800; }
+  .foot-text .l2 { font-size: 21px; opacity: 0.88; margin-top: 10px; line-height: 1.6; }
+  .ver-badge { flex-shrink: 0; color: rgba(255,255,255,0.85); text-align: right; font-size: 19px; line-height: 1.8; }
+</style>
+</head>
+<body>
+
+  <!-- 头部 -->
+  <div class="hero">
+    <div class="logo">
+      <svg width="54" height="54" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.1"
+           stroke-linecap="round" stroke-linejoin="round">
+        <path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"/>
+        <path d="m9 12 2 2 4-4"/>
+      </svg>
+    </div>
+    <h1>C盘管家</h1>
+    <div class="sub">给普通人的 Windows 磁盘与内存维护助手</div>
+    <div class="slogan">看得懂 · 敢放心 · 零负担</div>
+    <div class="badges">
+      <div class="badge">🦀 Rust 内核</div>
+      <div class="badge">📦 安装包 2.4 MB</div>
+      <div class="badge">🔌 零网络请求</div>
+      <div class="badge">🔓 MIT 开源</div>
+      <div class="badge">🪟 Win 10 / 11</div>
+    </div>
+  </div>
+
+  <div class="wrap">
+
+    <!-- 为什么做这个 -->
+    <div class="sec">
+      <div class="sec-title"><span class="emo">🤔</span>为什么做这个？</div>
+      <div class="sec-body">
+        C 盘又红了。你打开某款"清理大师"，它尖叫着<b>"发现 3247 个垃圾！你的电脑危在旦夕！"</b>——然后趁你慌乱，装上三个全家桶。<br><br>
+        你去问懂电脑的朋友，他甩来一个专业工具和一句"自己看"。满屏英文路径，你不知道 WinSxS 是干嘛的，更不敢删。
+      </div>
+      <div class="why-punch">
+        C盘管家选择第三条路：<span>把你当成年人。</span><br>
+        每一项操作都先回答：这是什么？为什么占空间？删了会怎样？
+      </div>
+    </div>
+
+    <!-- 对比表 -->
+    <div class="sec">
+      <div class="sec-title"><span class="emo">💎</span>它凭什么让你放心</div>
+      <table class="vs">
+        <thead>
+          <tr><th></th><th>C盘管家</th><th>某些"清理大师"</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>安装包体积</td><td><b>2.4 MB</b>，Rust 原生</td><td>100~300 MB</td></tr>
+          <tr><td>联网行为</td><td><b>零网络请求</b>，不上传不统计</td><td>云端"分析"你的文件</td></tr>
+          <tr><td>广告 / 弹窗</td><td><b>没有，永远没有</b></td><td>右下角惊喜不断</td></tr>
+          <tr><td>后台驻留</td><td><b>关掉就是关掉</b>，无守护进程</td><td>三个常驻服务互相拉起</td></tr>
+          <tr><td>删除逻辑</td><td><b>白名单强制</b>，想越界删都做不到</td><td>删了什么天知道</td></tr>
+          <tr><td>代码</td><td><b>全部开源</b>，每一行可审计</td><td>黑箱</td></tr>
+        </tbody>
+      </table>
+      <div class="rust">
+        🦀 <b>为什么是 Rust？</b>内存安全由编译器保证，并行扫描全盘只要十几秒，运行占用只有传统工具的零头——<b>安全和轻快，不必二选一。</b>
+      </div>
+    </div>
+
+    <!-- 四大功能 -->
+    <div class="sec">
+      <div class="sec-title"><span class="emo">✨</span>四大功能</div>
+
+      <div class="feat">
+        <h3>🗺️ 磁盘透视 <span>—— 看清每一寸空间被谁占用</span></h3>
+        <div class="desc">
+          磁盘占用画成彩色拼图，点击色块层层深入。色彩即语义：🔵系统 / 🟣软件 / 🟠缓存 / 🟢个人文件，
+          配合 <b>90+ 条中文软件知识库</b>（剪映、微信、百度网盘、npm、conda……），每个目录都用人话告诉你"这是什么、能不能动"。
+        </div>
+        <div class="shot"><img src="../../screenshots/disk-insight.png" alt="磁盘透视"></div>
+      </div>
+
+      <div class="feat">
+        <h3>🧹 一键清理 <span>—— 三层策略，只清该清的</span></h3>
+        <ul>
+          <li>🗑️ <b>垃圾残留</b>：临时文件、更新包残留——删了纯赚，默认勾选；</li>
+          <li>⚡ <b>性能缓存</b>：npm、浏览器、IDE 索引——<b>空间充足时我们会劝你留着</b>，这是别的清理软件不会说的实话；</li>
+          <li>📦 <b>含个人数据</b>：回收站、下载断点——永不默认勾选，看清说明再动手。</li>
+        </ul>
+        <div class="desc">每一项都能展开详情，<b>将被清理的每个具体路径白纸黑字列出来</b>——界面显示的，就是实际执行的。</div>
+        <div class="shot"><img src="../../screenshots/cleanup-groups.png" alt="一键清理"></div>
+      </div>
+
+      <div class="feat">
+        <h3>🔧 系统深度清理 <span>—— 先分析，后动手</span></h3>
+        <div class="desc">
+          Windows 更新旧备份动辄十几 GB。调用<b>微软官方 DISM 工具</b>分两步走：
+          先只读分析，大字告诉你能清多少、微软是否推荐；你确认了才真正执行。与系统自带清理同源，不碰第三方黑科技。
+        </div>
+        <div class="shot"><img src="../../screenshots/deep-clean-analyze.png" alt="深度清理"></div>
+      </div>
+
+      <div class="feat">
+        <h3>🚀 启动管理 + 🧠 内存体检</h3>
+        <div class="desc">
+          自启项标注真实路径、内存占用和"建议禁用 / 看你习惯 / 建议保留"，开关可逆；
+          内存大户按程序分组排行，谁在吃内存一目了然。
+        </div>
+        <div class="shot2">
+          <div class="shot"><img src="../../screenshots/startup.png" alt="启动管理"></div>
+          <div class="shot"><img src="../../screenshots/memory-check.png" alt="内存体检"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 设计原则 -->
+    <div class="sec">
+      <div class="sec-title"><span class="emo">📜</span>五条设计原则</div>
+      <div class="rules">
+        <div class="rule"><div class="n">1</div><div class="t"><b>用户知情权优先</b>——讲清作用对象、原理、影响，禁止恐吓式文案；</div></div>
+        <div class="rule"><div class="n">2</div><div class="t"><b>保守安全</b>——白名单强制、个人数据永不默认勾、高危操作两步式确认；</div></div>
+        <div class="rule"><div class="n">3</div><div class="t"><b>数据诚实</b>——"扫描于 5 分钟前"就是 5 分钟前，绝不装实时；</div></div>
+        <div class="rule"><div class="n">4</div><div class="t"><b>隐私即默认</b>——一切分析在你的电脑本地完成；</div></div>
+        <div class="rule"><div class="n">5</div><div class="t"><b>说人话</b>——1.5 GB，而不是 1610612736 字节。</div></div>
+      </div>
+    </div>
+
+    <!-- 结尾故事 -->
+    <div class="origin">
+      <div class="quote">
+        这个项目源自一次真实的 C 盘救援：<br>
+        从剩余 46 GB 清出 80+ GB 之后，<br>
+        我们把整套分析经验和安全边界，做成了这个 <b>2.4 MB 的小工具</b>。
+      </div>
+      <div class="star">如果它帮到了你，点个 ⭐ 就是最好的支持。</div>
+    </div>
+  </div>
+
+  <!-- 底栏 -->
+  <div class="footer">
+    <div class="qr-box"><img src="qr.png" alt="下载二维码"></div>
+    <div class="foot-text">
+      <div class="l1">扫码直接下载（国内加速）</div>
+      <div class="l2">打开后点"开始下载"即可　·　GitHub 开源：github.com/YGTQ3/disk-butler</div>
+    </div>
+    <div class="ver-badge">免费 · 开源 · MIT<br>Windows 10 / 11 x64</div>
+  </div>
+
+</body>
+</html>

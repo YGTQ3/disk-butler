@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024">
+  <!-- V4 纯色扁平：原生应用路线（资源管理器/系统工具气质），零渐变零装饰 -->
+  <rect x="64" y="64" width="896" height="896" rx="216" fill="#12A48C"/>
+
+  <!-- 白盘片 -->
+  <circle cx="512" cy="512" r="316" fill="#FFFFFF"/>
+  <!-- 轴心：同底色 + 白点 -->
+  <circle cx="512" cy="512" r="122" fill="#12A48C"/>
+  <circle cx="512" cy="512" r="50" fill="#FFFFFF"/>
+</svg>

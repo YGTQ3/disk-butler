@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024">
+  <!-- 白色外框（浅描边防止白底页面上消失） -->
+  <rect x="64" y="64" width="896" height="896" rx="216" fill="#FFFFFF"/>
+  <rect x="70" y="70" width="884" height="884" rx="210" fill="none" stroke="#DFF2ED" stroke-width="12"/>
+
+  <!-- 彩色构成环 -->
+  <circle cx="512" cy="512" r="252" fill="#EAF9F4"/>
+  <path d="M 512 260 A 252 252 0 0 1 660 716" fill="none" stroke="#3ECF9B" stroke-width="104"/>
+  <path d="M 660 716 A 252 252 0 0 1 308 660" fill="none" stroke="#8B7CF6" stroke-width="104"/>
+  <path d="M 308 660 A 252 252 0 0 1 308 364" fill="none" stroke="#4D9DE0" stroke-width="104"/>
+  <path d="M 308 364 A 252 252 0 0 1 512 260" fill="none" stroke="#F5A94B" stroke-width="104"/>
+
+  <!-- 青绿中芯 -->
+  <circle cx="512" cy="512" r="120" fill="#12A98E"/>
+  <circle cx="512" cy="512" r="52" fill="#FFFFFF"/>
+
+  <!-- 星光（青绿色，点在白底上） -->
+  <path d="M 812 180 L 828 228 L 876 244 L 828 260 L 812 308 L 796 260 L 748 244 L 796 228 Z" fill="#2FC3A2"/>
+  <path d="M 888 330 L 896 354 L 920 362 L 896 370 L 888 394 L 880 370 L 856 362 L 880 354 Z" fill="#7ADBC4"/>
+</svg>

@@ -1,0 +1,27 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024">
+  <!-- V3 粗几何盘：白底 + 青绿渐变盘片。只有三层大形（底/盘/轴），精美感全靠渐变与宽幅光泽，16px 不丢形 -->
+  <defs>
+    <linearGradient id="diskbody" x1="0.15" y1="0.05" x2="0.85" y2="1">
+      <stop offset="0" stop-color="#3FE0B6"/>
+      <stop offset="0.55" stop-color="#12B093"/>
+      <stop offset="1" stop-color="#068B73"/>
+    </linearGradient>
+    <!-- 宽幅光泽：覆盖盘片上半的"面"光，缩小后依然可见 -->
+    <linearGradient id="gloss" x1="0.2" y1="0" x2="0.6" y2="1">
+      <stop offset="0" stop-color="#FFFFFF" stop-opacity="0.32"/>
+      <stop offset="0.5" stop-color="#FFFFFF" stop-opacity="0"/>
+    </linearGradient>
+  </defs>
+
+  <!-- 白底 + 极淡描边 -->
+  <rect x="64" y="64" width="896" height="896" rx="216" fill="#FFFFFF"/>
+  <rect x="72" y="72" width="880" height="880" rx="208" fill="none" stroke="#E7F1EE" stroke-width="10"/>
+
+  <!-- 盘片（渐变主体 + 宽幅光泽叠层） -->
+  <circle cx="512" cy="512" r="316" fill="url(#diskbody)"/>
+  <circle cx="512" cy="512" r="316" fill="url(#gloss)"/>
+
+  <!-- 轴心：白孔 + 青绿点（大而清晰） -->
+  <circle cx="512" cy="512" r="122" fill="#FFFFFF"/>
+  <circle cx="512" cy="512" r="50" fill="#0C9B81"/>
+</svg>

@@ -206,6 +206,70 @@ fn wps_stale_version_dirs(dir_names: &[String], installed: &str) -> Vec<String> 
         .collect()
 }
 
+/// Chromium 缓存指纹：同级目录下 Cache 与 (Code Cache 或 GPUCache) 并存才认定——
+/// 单独一个 "Cache" 命名太泛（可能是应用自定义数据），不认。
+/// 命中后只点名标准可重建缓存子目录，绝不返回同级的其他目录（账号/配置/聊天数据）。
+fn chromium_cache_dirs(dir: &Path) -> Vec<PathBuf> {
+    let cache = dir.join("Cache");
+    if !cache.is_dir() {
+        return Vec::new();
+    }
+    if !dir.join("Code Cache").is_dir() && !dir.join("GPUCache").is_dir() {
+        return Vec::new();
+    }
+    let mut out = vec![cache];
+    for sub in ["Code Cache", "GPUCache", "DawnCache", "ShaderCache"] {
+        let p = dir.join(sub);
+        if p.is_dir() {
+            out.push(p);
+        }
+    }
+    out
+}
+
+/// 扫描 LOCALAPPDATA/APPDATA 顶层目录的 Electron 应用缓存（指纹见 chromium_cache_dirs）。
+/// 下探两级：顶层目录自身（如 taobao）+ 一级子目录（如千牛的多实例编号目录）。
+/// 排除名单：已有专项规则的（防重复计数）+ 聊天数据同树的 Tencent 系（观察名单永久拒绝）。
+fn collect_electron_caches(root: &Path, out: &mut Vec<PathBuf>) {
+    fn excluded(name: &str) -> bool {
+        let n = name.to_lowercase();
+        n.starts_with("dingtalk")
+            || matches!(
+                n.as_str(),
+                "microsoft"
+                    | "google"
+                    | "360chrome"
+                    | "360chromex"
+                    | "360se6"
+                    | "code"
+                    | "jianyingpro"
+                    | "com.diskbutler.app"
+                    | "temp"
+                    | "packages"
+                    | "tencent"
+            )
+    }
+    let Ok(read) = std::fs::read_dir(root) else { return };
+    for e in read.flatten() {
+        let top = e.path();
+        if !top.is_dir() {
+            continue;
+        }
+        if excluded(&e.file_name().to_string_lossy()) {
+            continue;
+        }
+        out.extend(chromium_cache_dirs(&top));
+        if let Ok(subs) = std::fs::read_dir(&top) {
+            for s in subs.flatten() {
+                let sp = s.path();
+                if sp.is_dir() {
+                    out.extend(chromium_cache_dirs(&sp));
+                }
+            }
+        }
+    }
+}
+
 /// 组装候选清理项。路径全部由环境变量动态解析。
 fn candidates() -> Vec<Candidate> {
     let local = env_path("LOCALAPPDATA");
@@ -599,6 +663,27 @@ fn candidates() -> Vec<Candidate> {
         });
     }
 
+    // Electron 通用缓存：Chromium 指纹识别（Cache 与 Code Cache/GPUCache 同级并存才认定），
+    // 一条引擎规则覆盖淘宝/千牛/Notion 等网页内核应用；已有专项规则的目录列入排除名单防重复。
+    let mut electron: Vec<PathBuf> = Vec::new();
+    for root in [&local, &roaming] {
+        if let Some(root) = root {
+            collect_electron_caches(root, &mut electron);
+        }
+    }
+    if !electron.is_empty() {
+        electron.sort();
+        electron.dedup();
+        out.push(Candidate {
+            id: "electron-cache",
+            name: "网页型应用缓存 (Electron)",
+            description: "淘宝、千牛等网页内核应用的运行缓存（按 Chromium 缓存指纹识别，只清缓存目录，不碰账号与数据）。",
+            impact: "几乎没有影响。应用下次启动时会自动重建缓存，首次打开稍慢一点。",
+            safety: "safe",
+            paths: electron,
+        });
+    }
+
     out
 }
 
@@ -985,8 +1070,46 @@ mod tests {
         assert_eq!(kind_of("crash-reports"), "junk");
         assert_eq!(kind_of("wps-old-versions"), "junk");
         assert_eq!(kind_of("npm-cache"), "cache");
+        assert_eq!(kind_of("electron-cache"), "cache");
         assert_eq!(kind_of("recycle-bin"), "data");
         assert_eq!(kind_of("idm-dwnldata"), "data");
+    }
+
+    #[test]
+    fn chromium_fingerprint_requires_sibling_caches() {
+        let base = std::env::temp_dir().join(format!("db-electron-test-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&base);
+
+        // 完整指纹：Cache + Code Cache + GPUCache → 三个都命中
+        let full = base.join("full");
+        for d in ["Cache", "Code Cache", "GPUCache"] {
+            std::fs::create_dir_all(full.join(d)).unwrap();
+        }
+        let hits = chromium_cache_dirs(&full);
+        assert_eq!(hits.len(), 3);
+
+        // 只有单独的 Cache（可能是应用自定义数据）→ 不认
+        let lone = base.join("lone");
+        std::fs::create_dir_all(lone.join("Cache")).unwrap();
+        assert!(chromium_cache_dirs(&lone).is_empty());
+
+        // 只有 Code Cache 没有 Cache → 不认
+        let nocache = base.join("nocache");
+        std::fs::create_dir_all(nocache.join("Code Cache")).unwrap();
+        assert!(chromium_cache_dirs(&nocache).is_empty());
+
+        // 命中结果只含缓存子目录，绝不包含同级其他目录
+        let mixed = base.join("mixed");
+        for d in ["Cache", "GPUCache", "Local Storage", "blob_storage"] {
+            std::fs::create_dir_all(mixed.join(d)).unwrap();
+        }
+        let hits = chromium_cache_dirs(&mixed);
+        assert!(hits.iter().all(|p| {
+            let n = p.file_name().unwrap().to_string_lossy().to_string();
+            n == "Cache" || n == "GPUCache"
+        }));
+
+        let _ = std::fs::remove_dir_all(&base);
     }
 
     #[test]

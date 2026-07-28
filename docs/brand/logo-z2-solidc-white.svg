@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024">
+  <!-- Z2 立体 C 盘（白底版）：C 体用品牌青绿（白底上白 C 会消失），薄荷段加量同黑底版 -->
+
+  <rect x="64" y="64" width="896" height="896" rx="216" fill="#FFFFFF"/>
+  <rect x="72" y="72" width="880" height="880" rx="208" fill="none" stroke="#E7F1EE" stroke-width="10"/>
+
+  <!-- 厚度层 -->
+  <path d="M 702.9 309.1 A 270 270 0 1 0 733.2 654.9"
+        fill="none" stroke="#075E50" stroke-width="170" stroke-linecap="butt"
+        transform="translate(22 30)"/>
+
+  <!-- 顶面·青绿段：45°→224° -->
+  <path d="M 702.9 309.1 A 270 270 0 0 0 317.8 687.6"
+        fill="none" stroke="#12A48C" stroke-width="170" stroke-linecap="butt"/>
+  <!-- 顶面·薄荷段：224°→325° -->
+  <path d="M 317.8 687.6 A 270 270 0 0 0 733.2 654.9"
+        fill="none" stroke="#2BDDB9" stroke-width="170" stroke-linecap="butt"/>
+
+  <!-- 切面 -->
+  <path d="M 642.8 369.2 L 763.0 249.0 L 785.0 279.0 L 664.8 399.2 Z" fill="#2BDDB9"/>
+  <path d="M 663.6 606.1 L 802.8 703.6 L 824.8 733.6 L 685.6 636.1 Z" fill="#2BDDB9"/>
+</svg>

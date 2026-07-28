@@ -1,0 +1,44 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#2FCDA9"/>
+      <stop offset="1" stop-color="#0FA189"/>
+    </linearGradient>
+    <linearGradient id="knot" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#0D7A67"/>
+      <stop offset="1" stop-color="#0A6152"/>
+    </linearGradient>
+  </defs>
+  <rect x="64" y="64" width="896" height="896" rx="216" fill="url(#bg)"/>
+
+  <!-- 白色盘片（干净版：无光带无缺角） -->
+  <circle cx="512" cy="464" r="248" fill="#000000" opacity="0.10" transform="translate(0,12)"/>
+  <circle cx="512" cy="464" r="248" fill="#FFFFFF"/>
+  <circle cx="512" cy="464" r="178" fill="none" stroke="#D6F2EB" stroke-width="18"/>
+  <circle cx="512" cy="464" r="118" fill="none" stroke="#EAF9F5" stroke-width="12"/>
+  <circle cx="512" cy="464" r="62" fill="#0FA189"/>
+  <circle cx="512" cy="464" r="25" fill="#FFFFFF"/>
+
+  <!-- 领结（圆润版） -->
+  <g>
+    <path d="M492 740
+             C 448 712 396 696 362 692
+             C 340 690 330 702 332 722
+             L 340 796
+             C 342 816 356 824 376 816
+             C 410 802 456 780 492 764
+             C 500 760 500 745 492 740 Z" fill="url(#knot)"/>
+    <path d="M532 740
+             C 576 712 628 696 662 692
+             C 684 690 694 702 692 722
+             L 684 796
+             C 682 816 668 824 648 816
+             C 614 802 568 780 532 764
+             C 524 760 524 745 532 740 Z" fill="url(#knot)"/>
+    <rect x="478" y="716" width="68" height="70" rx="22" fill="#0B6B59"/>
+  </g>
+
+  <!-- 星光 -->
+  <path d="M812 152 L830 206 L884 224 L830 242 L812 296 L794 242 L740 224 L794 206 Z" fill="#FFFFFF" opacity="0.95"/>
+  <path d="M896 320 L905 346 L931 355 L905 364 L896 390 L887 364 L861 355 L887 346 Z" fill="#FFFFFF" opacity="0.8"/>
+</svg>

@@ -1,0 +1,36 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024">
+  <!-- V2 新拟物盘片：白底 + 青绿渐变盘片（ToDesk 式：白底衬饱和主体） -->
+  <defs>
+    <linearGradient id="diskbody" x1="0.15" y1="0.05" x2="0.85" y2="1">
+      <stop offset="0" stop-color="#45E3BB"/>
+      <stop offset="0.55" stop-color="#14B295"/>
+      <stop offset="1" stop-color="#078A72"/>
+    </linearGradient>
+    <radialGradient id="hubwhite" cx="0.38" cy="0.32" r="1">
+      <stop offset="0" stop-color="#FFFFFF"/>
+      <stop offset="1" stop-color="#E9F5F1"/>
+    </radialGradient>
+    <filter id="soft2" x="-60%" y="-60%" width="220%" height="220%">
+      <feGaussianBlur stdDeviation="26"/>
+    </filter>
+  </defs>
+
+  <!-- 白底 + 极淡描边 -->
+  <rect x="64" y="64" width="896" height="896" rx="216" fill="#FFFFFF"/>
+  <rect x="72" y="72" width="880" height="880" rx="208" fill="none" stroke="#E7F1EE" stroke-width="10"/>
+
+  <!-- 盘片投影 -->
+  <ellipse cx="512" cy="812" rx="264" ry="42" fill="#0A8F78" opacity="0.22" filter="url(#soft2)"/>
+
+  <!-- 青绿渐变盘片 -->
+  <circle cx="512" cy="500" r="300" fill="url(#diskbody)"/>
+  <!-- 同心盘纹（白色细线，透出层次） -->
+  <circle cx="512" cy="500" r="234" fill="none" stroke="#FFFFFF" stroke-width="6" opacity="0.22"/>
+  <circle cx="512" cy="500" r="166" fill="none" stroke="#FFFFFF" stroke-width="5" opacity="0.16"/>
+  <!-- 盘面反光弧（左上扫光） -->
+  <path d="M 288 350 A 268 268 0 0 1 624 252" fill="none" stroke="#FFFFFF" stroke-width="50" stroke-linecap="round" opacity="0.45"/>
+
+  <!-- 轴心：白色 + 青绿点 -->
+  <circle cx="512" cy="500" r="96" fill="url(#hubwhite)"/>
+  <circle cx="512" cy="500" r="40" fill="#0E9D84"/>
+</svg>

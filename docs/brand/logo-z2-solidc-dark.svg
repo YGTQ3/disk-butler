@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024">
+  <!-- Z2 立体 C 盘（黑底·薄荷加量版）：下段弧整段换薄荷，与下切面连成一体，
+       白:薄荷 比例对齐 Qoder Q 的 白:绿 -->
+
+  <rect x="64" y="64" width="896" height="896" rx="216" fill="#0B0F0E"/>
+
+  <!-- 厚度层（整条 C，右下偏移） -->
+  <path d="M 702.9 309.1 A 270 270 0 1 0 733.2 654.9"
+        fill="none" stroke="#0A6B5C" stroke-width="170" stroke-linecap="butt"
+        transform="translate(22 30)"/>
+
+  <!-- 顶面·白段：45°→224° -->
+  <path d="M 702.9 309.1 A 270 270 0 0 0 317.8 687.6"
+        fill="none" stroke="#FFFFFF" stroke-width="170" stroke-linecap="butt"/>
+  <!-- 顶面·薄荷段：224°→325°（与下切面相连成大色块） -->
+  <path d="M 317.8 687.6 A 270 270 0 0 0 733.2 654.9"
+        fill="none" stroke="#2BDDB9" stroke-width="170" stroke-linecap="butt"/>
+
+  <!-- 切面 -->
+  <path d="M 642.8 369.2 L 763.0 249.0 L 785.0 279.0 L 664.8 399.2 Z" fill="#2BDDB9"/>
+  <path d="M 663.6 606.1 L 802.8 703.6 L 824.8 733.6 L 685.6 636.1 Z" fill="#2BDDB9"/>
+</svg>

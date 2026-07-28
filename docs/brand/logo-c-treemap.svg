@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#2FCDA9"/>
+      <stop offset="1" stop-color="#0FA189"/>
+    </linearGradient>
+  </defs>
+  <rect x="64" y="64" width="896" height="896" rx="216" fill="url(#bg)"/>
+
+  <!-- 白色卡片 -->
+  <rect x="208" y="220" width="608" height="608" rx="64" fill="#000000" opacity="0.10" transform="translate(0,14)"/>
+  <rect x="208" y="220" width="608" height="608" rx="64" fill="#FFFFFF"/>
+
+  <!-- TreeMap 色块（对应产品四色语义：绿=个人 紫=软件 蓝=系统 橙=缓存） -->
+  <rect x="256" y="268" width="312" height="312" rx="30" fill="#3ECf9B"/>
+  <rect x="588" y="268" width="180" height="180" rx="26" fill="#8B7CF6"/>
+  <rect x="588" y="468" width="180" height="112" rx="24" fill="#4D9DE0"/>
+  <rect x="256" y="600" width="196" height="180" rx="26" fill="#F5A94B"/>
+  <rect x="472" y="600" width="96" height="180" rx="22" fill="#C4CEd6"/>
+  <rect x="588" y="600" width="180" height="180" rx="26" fill="#63D8BC"/>
+
+  <!-- 星光 -->
+  <path d="M812 152 L830 206 L884 224 L830 242 L812 296 L794 242 L740 224 L794 206 Z" fill="#FFFFFF" opacity="0.95"/>
+  <path d="M896 320 L905 346 L931 355 L905 364 L896 390 L887 364 L861 355 L887 346 Z" fill="#FFFFFF" opacity="0.8"/>
+</svg>

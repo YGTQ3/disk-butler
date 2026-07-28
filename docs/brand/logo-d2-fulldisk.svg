@@ -1,0 +1,24 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024">
+  <defs>
+    <mask id="hole">
+      <rect width="1024" height="1024" fill="#FFFFFF"/>
+      <!-- 中心镂空：真透明圆孔 -->
+      <circle cx="512" cy="512" r="64" fill="#000000"/>
+    </mask>
+  </defs>
+
+  <g mask="url(#hole)">
+    <!-- 盘片本体：白色大圆充满画布 -->
+    <circle cx="512" cy="512" r="478" fill="#FFFFFF"/>
+    <!-- 彩色构成环（绿/紫/蓝/橙 = 个人/软件/系统/缓存） -->
+    <path d="M 512 92  A 420 420 0 0 1 759 851" fill="none" stroke="#3ECF9B" stroke-width="180"/>
+    <path d="M 759 851 A 420 420 0 0 1 173 758" fill="none" stroke="#8B7CF6" stroke-width="180"/>
+    <path d="M 173 758 A 420 420 0 0 1 173 266" fill="none" stroke="#4D9DE0" stroke-width="180"/>
+    <path d="M 173 266 A 420 420 0 0 1 512 92"  fill="none" stroke="#F5A94B" stroke-width="180"/>
+    <!-- 环与中芯之间的白圈 -->
+    <circle cx="512" cy="512" r="322" fill="#FFFFFF"/>
+    <!-- 青绿中芯（环绕镂空孔） -->
+    <circle cx="512" cy="512" r="188" fill="#12A98E"/>
+    <circle cx="512" cy="512" r="112" fill="#FFFFFF"/>
+  </g>
+</svg>

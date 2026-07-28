@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024">
+  <!-- 白色圆角方底 + 极淡描边（防白色页面中消失） -->
+  <rect x="64" y="64" width="896" height="896" rx="216" fill="#FFFFFF"/>
+  <rect x="72" y="72" width="880" height="880" rx="208" fill="none" stroke="#E7F1EE" stroke-width="10"/>
+
+  <!-- C 环：既是字母 C，也是硬盘盘片轮廓（开口朝右，圆头端点） -->
+  <!-- 弧：从 -50° 到 +50°（右侧开口 100°），逆时针大弧 260° -->
+  <path d="M 672.7 320.5 A 250 250 0 1 0 672.7 703.5"
+        fill="none" stroke="#12A98E" stroke-width="132" stroke-linecap="round"/>
+
+  <!-- 盘轴：中心圆点（深一档青绿，形成层次） -->
+  <circle cx="512" cy="512" r="84" fill="#0B7C6A"/>
+</svg>
