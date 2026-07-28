@@ -211,10 +211,16 @@ fn candidates() -> Vec<Candidate> {
 
         // 浏览器缓存（仅 Cache/Code Cache 目录，不碰账户与历史记录）
         let mut browser: Vec<PathBuf> = Vec::new();
-        for base in [
+        let mut bases = vec![
             local.join("Microsoft").join("Edge").join("User Data").join("Default"),
             local.join("Google").join("Chrome").join("User Data").join("Default"),
-        ] {
+            local.join("360Chrome").join("Chrome").join("User Data").join("Default"),
+            local.join("360ChromeX").join("Chrome").join("User Data").join("Default"),
+        ];
+        if let Some(r) = &roaming {
+            bases.push(r.join("360se6").join("User Data").join("Default"));
+        }
+        for base in bases {
             for sub in ["Cache", "Code Cache", "GPUCache"] {
                 let p = base.join(sub);
                 if p.exists() {
@@ -225,7 +231,7 @@ fn candidates() -> Vec<Candidate> {
         if !browser.is_empty() {
             out.push(Candidate {
                 id: "browser-cache",
-                name: "浏览器缓存 (Edge/Chrome)",
+                name: "浏览器缓存 (Edge/Chrome/360系)",
                 description: "浏览器缓存的网页图片和脚本，只清缓存，不碰账户、密码和历史记录。",
                 impact: "几乎没有影响。常用网页首次打开会稍慢一点，浏览器使用中时部分文件会跳过。",
                 safety: "safe",
