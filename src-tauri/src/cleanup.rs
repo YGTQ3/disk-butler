@@ -359,6 +359,8 @@ fn candidates() -> Vec<Candidate> {
             local.join("Google").join("Chrome").join("User Data").join("Default"),
             local.join("360Chrome").join("Chrome").join("User Data").join("Default"),
             local.join("360ChromeX").join("Chrome").join("User Data").join("Default"),
+            local.join("CentBrowser").join("User Data").join("Default"),
+            local.join("Quark").join("User Data").join("Default"),
         ];
         if let Some(r) = &roaming {
             bases.push(r.join("360se6").join("User Data").join("Default"));
@@ -374,7 +376,7 @@ fn candidates() -> Vec<Candidate> {
         if !browser.is_empty() {
             out.push(Candidate {
                 id: "browser-cache",
-                name: "浏览器缓存 (Edge/Chrome/360系)",
+                name: "浏览器缓存 (Edge/Chrome/360系/夸克等)",
                 description: "浏览器缓存的网页图片和脚本，只清缓存，不碰账户、密码和历史记录。",
                 impact: "几乎没有影响。常用网页首次打开会稍慢一点，浏览器使用中时部分文件会跳过。",
                 safety: "safe",

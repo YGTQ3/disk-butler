@@ -35,8 +35,8 @@ $cachePatterns = @('Cache','Code Cache','GPUCache','CachedData','CacheStorage','
 $updaterPattern = '*updater*'
 # version-named dirs (e.g. 12.1.0.26895 / app-1.2.3): >=2 siblings = upgrade leftovers clue
 $versionDirPattern = '^(app-)?\d+(\.\d+)+$'
-# personal-data red flags: NEVER become cleanup rules
-$personalPatterns = @('*download*','*document*','*desktop*','*picture*','*photo*','*video*','*music*')
+# personal-data red flags: NEVER become cleanup rules (exact dir-name match, avoids hitting package names like ai.opencode.desktop)
+$personalPatterns = @('downloads','download','documents','document','desktop','pictures','photos','videos','music')
 
 function Analyze-Root([string]$rootPath, [string]$rootLabel, [int]$minMB) {
     $out = @()
@@ -59,7 +59,7 @@ function Analyze-Root([string]$rootPath, [string]$rootLabel, [int]$minMB) {
         }
         $flags = @()
         foreach ($pp in $personalPatterns) {
-            if ($d.Name -ilike $pp) { $flags += 'PERSONAL-DO-NOT-ADD'; break }
+            if ($d.Name -ieq $pp) { $flags += 'PERSONAL-DO-NOT-ADD'; break }
         }
         if ($d.Name -ilike $updaterPattern) { $flags += 'UPDATER-RESIDUE' }
         # VERSION-SIBLINGS: >=2 version-named dirs at the same level (top or one level down)

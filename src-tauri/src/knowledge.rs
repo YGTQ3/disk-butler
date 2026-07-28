@@ -351,6 +351,13 @@ const RULES: &[Rule] = &[
         safety: Safety::Keep,
     },
     Rule {
+        needle: ".minecraft",
+        category: Category::Personal,
+        friendly_name: "Minecraft 游戏数据",
+        description: "我的世界的存档、材质包与模组（saves 里是你亲手搭建的世界），删除无法找回，请勿删除。",
+        safety: Safety::Keep,
+    },
+    Rule {
         needle: "mailmasterdata",
         category: Category::Personal,
         friendly_name: "网易邮箱大师邮件数据",
@@ -991,6 +998,13 @@ mod tests {
     fn steamapps_is_software_keep() {
         let hit = classify(r"D:\Steam\steamapps\common\Game");
         assert_eq!(hit.category, Category::Software);
+        assert_eq!(hit.safety, Safety::Keep);
+    }
+
+    #[test]
+    fn minecraft_is_personal_keep() {
+        let hit = classify(r"C:\Users\x\AppData\Roaming\.minecraft\saves");
+        assert_eq!(hit.category, Category::Personal);
         assert_eq!(hit.safety, Safety::Keep);
     }
 

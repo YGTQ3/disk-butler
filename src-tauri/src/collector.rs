@@ -26,7 +26,8 @@ const CACHE_PATTERNS: &[&str] = &[
     "tmp", "crashdumps", "dumps", "pending", "staging",
 ];
 const PERSONAL_PATTERNS: &[&str] = &[
-    "download", "document", "desktop", "picture", "photo", "video", "music",
+    "downloads", "download", "documents", "document",
+    "desktop", "pictures", "photos", "videos", "music",
 ];
 
 #[derive(Serialize)]
@@ -199,7 +200,7 @@ fn analyze_root(root: &str, min_mb: f64) -> Vec<TopDir> {
         let cache_hits = hits.iter().take(8).cloned().collect::<Vec<_>>().join("; ");
         let lname = name.to_lowercase();
         let mut flags: Vec<&str> = Vec::new();
-        if PERSONAL_PATTERNS.iter().any(|p| lname.contains(p)) {
+        if PERSONAL_PATTERNS.iter().any(|p| lname == *p) {
             flags.push("PERSONAL-DO-NOT-ADD");
         }
         if lname.contains("updater") {
