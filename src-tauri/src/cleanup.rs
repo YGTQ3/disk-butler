@@ -152,6 +152,60 @@ struct Candidate {
     paths: Vec<PathBuf>,
 }
 
+/// 注册表卸载表中 WPS Office 当前安装版本（如 "12.1.0.26895"）。
+/// 查不到、或多处记录版本不一致（歧义）时返回 None——此时宁可不提供旧版本清理项。
+fn wps_installed_version() -> Option<String> {
+    use winreg::enums::{HKEY_CURRENT_USER, HKEY_LOCAL_MACHINE};
+    use winreg::RegKey;
+    let hives: [(winreg::HKEY, &str); 3] = [
+        (HKEY_LOCAL_MACHINE, r"SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall"),
+        (HKEY_LOCAL_MACHINE, r"SOFTWARE\WOW6432Node\Microsoft\Windows\CurrentVersion\Uninstall"),
+        (HKEY_CURRENT_USER, r"SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall"),
+    ];
+    let mut found: Option<String> = None;
+    for (hive, path) in hives {
+        let Ok(key) = RegKey::predef(hive).open_subkey(path) else { continue };
+        for sub in key.enum_keys().flatten() {
+            let Ok(k) = key.open_subkey(&sub) else { continue };
+            let Ok(name) = k.get_value::<String, _>("DisplayName") else { continue };
+            if !name.contains("WPS Office") {
+                continue;
+            }
+            let Ok(ver) = k.get_value::<String, _>("DisplayVersion") else { continue };
+            let ver = ver.trim().to_string();
+            if ver.is_empty() {
+                continue;
+            }
+            match &found {
+                Some(v) if *v != ver => return None,
+                _ => found = Some(ver),
+            }
+        }
+    }
+    found
+}
+
+/// 从 WPS Office 目录下的子目录名中挑出「非当前版本」的版本目录（升级残留）。
+/// 以注册表安装版本为锚点：当前版本目录必须存在于列表中，否则说明目录结构与
+/// 注册表对不上（可能是绿色版/异常安装），返回空——宁可不清。
+/// 只认纯版本号命名（如 12.1.0.26375），其余目录名一律不碰。
+fn wps_stale_version_dirs(dir_names: &[String], installed: &str) -> Vec<String> {
+    fn is_version_name(s: &str) -> bool {
+        !s.is_empty()
+            && s.split('.').count() >= 2
+            && s.split('.')
+                .all(|p| !p.is_empty() && p.chars().all(|c| c.is_ascii_digit()))
+    }
+    if !dir_names.iter().any(|d| d == installed) {
+        return Vec::new();
+    }
+    dir_names
+        .iter()
+        .filter(|d| is_version_name(d) && d.as_str() != installed)
+        .cloned()
+        .collect()
+}
+
 /// 组装候选清理项。路径全部由环境变量动态解析。
 fn candidates() -> Vec<Candidate> {
     let local = env_path("LOCALAPPDATA");
@@ -206,6 +260,31 @@ fn candidates() -> Vec<Candidate> {
                     safety: "safe",
                     paths: updaters,
                 });
+            }
+        }
+
+        // WPS 旧版本残留：升级后遗留的完整旧程序目录。
+        // 以注册表安装版本为锚点（而非“保留最新版”——用户可能降级或回滚），
+        // 查不到版本、或版本目录对不上时一律不提供，宁可漏清。
+        if let Some(installed) = wps_installed_version() {
+            let wps_root = local.join("Kingsoft").join("WPS Office");
+            if let Ok(read) = std::fs::read_dir(&wps_root) {
+                let names: Vec<String> = read
+                    .flatten()
+                    .filter(|e| e.path().is_dir())
+                    .map(|e| e.file_name().to_string_lossy().to_string())
+                    .collect();
+                let stale = wps_stale_version_dirs(&names, &installed);
+                if !stale.is_empty() {
+                    out.push(Candidate {
+                        id: "wps-old-versions",
+                        name: "WPS 旧版本残留",
+                        description: "WPS Office 升级后留下的旧版本程序文件（正在使用的版本不会列入）。",
+                        impact: "没有影响。WPS 现在运行的是新版本，这些只是升级没删干净的旧程序。",
+                        safety: "safe",
+                        paths: stale.iter().map(|n| wps_root.join(n)).collect(),
+                    });
+                }
             }
         }
 
@@ -526,7 +605,8 @@ fn candidates() -> Vec<Candidate> {
 /// 清理策略分型：垃圾残留（删了纯赚）/ 性能缓存（空间充足可留）/ 数据类（默认不动）
 fn kind_of(id: &str) -> &'static str {
     match id {
-        "temp" | "updaters" | "crash-reports" | "androidstudio-logs" | "synology-logs" => "junk",
+        "temp" | "updaters" | "crash-reports" | "androidstudio-logs" | "synology-logs"
+        | "wps-old-versions" => "junk",
         "idm-dwnldata" | "recycle-bin" => "data",
         _ => "cache",
     }
@@ -893,9 +973,37 @@ mod tests {
     fn kind_mapping_is_sensible() {
         assert_eq!(kind_of("temp"), "junk");
         assert_eq!(kind_of("crash-reports"), "junk");
+        assert_eq!(kind_of("wps-old-versions"), "junk");
         assert_eq!(kind_of("npm-cache"), "cache");
         assert_eq!(kind_of("recycle-bin"), "data");
         assert_eq!(kind_of("idm-dwnldata"), "data");
+    }
+
+    #[test]
+    fn wps_stale_dirs_anchor_on_installed_version() {
+        let dirs = |v: &[&str]| v.iter().map(|s| s.to_string()).collect::<Vec<_>>();
+        // 正常升级：装的是新版，旧版目录是残留
+        assert_eq!(
+            wps_stale_version_dirs(&dirs(&["12.1.0.26375", "12.1.0.26895"]), "12.1.0.26895"),
+            vec!["12.1.0.26375".to_string()]
+        );
+        // 用户在用旧版（降级/回滚）：残留的反而是更新的那个目录
+        assert_eq!(
+            wps_stale_version_dirs(&dirs(&["12.1.0.26375", "12.1.0.26895"]), "12.1.0.26375"),
+            vec!["12.1.0.26895".to_string()]
+        );
+        // 注册表版本在目录里找不到（绿色版/异常安装）：一律不清
+        assert!(wps_stale_version_dirs(&dirs(&["12.1.0.26375"]), "12.1.0.26895").is_empty());
+        // 非版本号命名的目录（如配置目录）永不列入残留
+        assert_eq!(
+            wps_stale_version_dirs(
+                &dirs(&["12.1.0.26375", "12.1.0.26895", "Common", "6.0"]),
+                "12.1.0.26895"
+            ),
+            vec!["12.1.0.26375".to_string(), "6.0".to_string()]
+        );
+        // 只装了一个版本：没有残留
+        assert!(wps_stale_version_dirs(&dirs(&["12.1.0.26895"]), "12.1.0.26895").is_empty());
     }
 
     #[test]
