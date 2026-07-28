@@ -91,10 +91,15 @@ fn wait_for_client() -> Result<File, String> {
 
 /// 处理一个客户端：读一行请求，流式回写进度与结果。
 fn serve_client(client: File) {
-    let mut reader = BufReader::new(match client.try_clone() {
-        Ok(c) => c,
-        Err(_) => return,
-    });
+    // 请求行长度上限：防恶意客户端灌超长数据造成内存压力（正常请求几十字节）
+    const MAX_REQUEST_BYTES: u64 = 4096;
+    let mut reader = std::io::Read::take(
+        BufReader::new(match client.try_clone() {
+            Ok(c) => c,
+            Err(_) => return,
+        }),
+        MAX_REQUEST_BYTES,
+    );
     let mut writer = client;
 
     let mut line = String::new();

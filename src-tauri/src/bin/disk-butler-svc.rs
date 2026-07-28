@@ -124,9 +124,9 @@ fn install() -> Result<(), String> {
     let _ = service.set_description(DESCRIPTION);
 
     // OnDemand 模式：安装时不启动（服务由主程序扫描时按需拉起，用完即停）。
-    // 设置服务 DACL：在默认权限外授予 Authenticated Users 启动(RP)/停止(WP)权限，
-    // 使普通权限的主程序无需 UAC 即可拉起只读扫描服务（Everything 同款授权方式）。
-    const SERVICE_SDDL: &str = "D:(A;;CCLCSWRPWPDTLOCRRC;;;SY)(A;;CCDCLCSWRPWPDTLOCRSDRCWDWO;;;BA)(A;;CCLCSWLOCRRC;;;IU)(A;;CCLCSWLOCRRC;;;SU)(A;;RPWPCCLCSWLOCRRC;;;AU)";
+    // 设置服务 DACL：在默认权限外授予 Authenticated Users 仅「启动(RP)+查询」权限
+    // （不给停止权 WP——客户端不需要，最小授权），使普通权限主程序免 UAC 拉起只读扫描。
+    const SERVICE_SDDL: &str = "D:(A;;CCLCSWRPWPDTLOCRRC;;;SY)(A;;CCDCLCSWRPWPDTLOCRSDRCWDWO;;;BA)(A;;CCLCSWLOCRRC;;;IU)(A;;CCLCSWLOCRRC;;;SU)(A;;RPCCLCSWLOCRRC;;;AU)";
     let out = std::process::Command::new("sc.exe")
         .args(["sdset", SERVICE_NAME, SERVICE_SDDL])
         .output()
