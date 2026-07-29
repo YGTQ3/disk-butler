@@ -2,7 +2,7 @@ import { useEffect, useRef, useState, useLayoutEffect } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { motion } from "framer-motion";
-import { HardDrive, Search, ChevronRight, Loader2, RotateCcw } from "lucide-react";
+import { HardDrive, Search, ChevronRight, Loader2, RotateCcw, AlertTriangle, Wrench } from "lucide-react";
 import { DriveInfo, TreeNode, ScanProgress, ScanCache, formatBytes, formatCount, formatAgo } from "../types";
 import CapacityBar from "../components/CapacityBar";
 import TreeMap from "../components/TreeMap";
@@ -30,6 +30,10 @@ export default function DiskInsight({ active = true }: Props) {
   const [stack, setStack] = useState<TreeNode[]>([]); // 下钻路径栈
   const [selectedNode, setSelectedNode] = useState<TreeNode | null>(null);
   const [error, setError] = useState<string>("");
+  /** 秒级加速服务是否缺失（缺失时扫描回退慢速遍历，提示一键修复） */
+  const [svcMissing, setSvcMissing] = useState(false);
+  const [repairing, setRepairing] = useState(false);
+  const [repairMsg, setRepairMsg] = useState<string>("");
 
   const mapAreaRef = useRef<HTMLDivElement>(null);
   const [mapSize, setMapSize] = useState({ w: 640, h: 420 });
@@ -77,6 +81,13 @@ export default function DiskInsight({ active = true }: Props) {
     };
   }, []);
 
+  // 自检秒级加速服务是否在场（缺失多因被安全软件清理，扫描会静默回退慢速遍历）
+  useEffect(() => {
+    invoke<boolean>("scan_service_available")
+      .then((ok) => setSvcMissing(!ok))
+      .catch(() => {});
+  }, []);
+
   // 测量 TreeMap 可用区域（页面重新可见时也重测，避免隐藏期间窗口缩放导致尺寸归零）
   useLayoutEffect(() => {
     if (phase !== "done" || !active) return;
@@ -121,6 +132,21 @@ export default function DiskInsight({ active = true }: Props) {
     } catch (e) {
       setError(String(e));
       setPhase("idle");
+    }
+  }
+
+  /** 一键修复：重装秒级加速服务（提权，弹一次 UAC） */
+  async function repairService() {
+    setRepairing(true);
+    setRepairMsg("");
+    try {
+      await invoke("repair_scan_service");
+      setSvcMissing(false);
+      setRepairMsg("秒级加速已恢复 ✓ 下次扫描将自动提速。");
+    } catch (e) {
+      setRepairMsg(`修复未完成：${String(e)}`);
+    } finally {
+      setRepairing(false);
     }
   }
 
@@ -224,6 +250,30 @@ export default function DiskInsight({ active = true }: Props) {
           </button>
         </div>
       </div>
+
+      {/* 秒级加速服务缺失提示（回退慢速遍历时引导一键修复） */}
+      {svcMissing && (
+        <div className="mx-8 mt-3 flex items-center gap-3 rounded-xl border border-[var(--color-caution)] bg-[var(--color-surface)] px-4 py-3 text-sm shadow-[var(--shadow-card)]">
+          <AlertTriangle size={18} className="shrink-0 text-[var(--color-caution)]" />
+          <div className="flex-1 text-[var(--color-text-secondary)]">
+            <span className="font-medium text-[var(--color-text-main)]">秒级加速未启用</span>
+            ：后台扫描服务不在（常见于被安全软件清理），磁盘扫描已回退到较慢的遍历模式——结果一样准确，只是慢一些。
+          </div>
+          <button
+            onClick={repairService}
+            disabled={repairing}
+            className="flex shrink-0 items-center gap-1.5 rounded-lg bg-[var(--color-primary)] px-3.5 py-2 text-sm font-medium text-white transition-colors hover:bg-[var(--color-primary-dark)] disabled:opacity-50"
+          >
+            {repairing ? <Loader2 size={16} className="animate-spin" /> : <Wrench size={16} />}
+            {repairing ? "修复中…（需管理员）" : "一键修复"}
+          </button>
+        </div>
+      )}
+      {repairMsg && (
+        <div className="mx-8 mt-3 rounded-xl bg-[var(--color-primary-soft)] px-4 py-2.5 text-sm text-[var(--color-primary-dark)]">
+          {repairMsg}
+        </div>
+      )}
 
       {/* 主体区 */}
       <div className="flex flex-1 gap-5 overflow-hidden p-8 pt-5">

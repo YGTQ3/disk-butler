@@ -144,6 +144,20 @@ async fn collect_rules(include_drives: bool) -> Result<collector::CollectResult,
         .map_err(|e| format!("采集失败：{}", e))?
 }
 
+/// 自检：后台 MFT 秒扫服务是否已注册。false = 已被移除、扫描将回退慢速遍历。
+#[tauri::command]
+fn scan_service_available() -> bool {
+    svc_client::service_installed()
+}
+
+/// 一键修复：重装扫描服务恢复秒级加速（提权，弹一次 UAC）。
+#[tauri::command]
+async fn repair_scan_service() -> Result<(), String> {
+    tauri::async_runtime::spawn_blocking(svc_client::repair_service)
+        .await
+        .map_err(|e| format!("修复任务失败：{}", e))?
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
@@ -163,7 +177,9 @@ pub fn run() {
             memory_report,
             pagefile_check,
             open_recycle_bin,
-            collect_rules
+            collect_rules,
+            scan_service_available,
+            repair_scan_service
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

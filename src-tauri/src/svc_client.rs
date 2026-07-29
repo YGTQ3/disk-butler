@@ -9,6 +9,49 @@ use std::fs::File;
 use std::io::{BufRead, BufReader, Write};
 use std::time::Duration;
 
+/// 查询扫描服务是否已注册。用于主程序自检"秒级加速是否可用"：
+/// 服务若被安全软件等移除，扫描会静默回退慢速遍历，主程序据此引导用户一键修复。
+pub fn service_installed() -> bool {
+    use windows_service::service::ServiceAccess;
+    use windows_service::service_manager::{ServiceManager, ServiceManagerAccess};
+    let Ok(manager) =
+        ServiceManager::local_computer(None::<&str>, ServiceManagerAccess::CONNECT)
+    else {
+        return false;
+    };
+    manager
+        .open_service(SERVICE_NAME, ServiceAccess::QUERY_STATUS)
+        .is_ok()
+}
+
+/// 重装扫描服务：提权运行安装目录下的 disk-butler-svc.exe install（弹一次 UAC）。
+/// 服务注册需管理员；成败以「重装后服务是否已注册」为准（UAC 被取消 → 仍未注册 → 报错）。
+pub fn repair_service() -> Result<(), String> {
+    let exe = std::env::current_exe()
+        .map_err(|e| format!("定位程序路径失败：{}", e))?
+        .parent()
+        .ok_or_else(|| "无法定位安装目录".to_string())?
+        .join("disk-butler-svc.exe");
+    if !exe.exists() {
+        return Err("找不到扫描服务程序（disk-butler-svc.exe）".to_string());
+    }
+    // 经 PowerShell 提权运行并等待完成（-Verb RunAs 弹 UAC；-Wait 等安装结束）
+    let ps = format!(
+        "Start-Process -FilePath '{}' -ArgumentList 'install' -Verb RunAs -Wait -WindowStyle Hidden",
+        exe.display()
+    );
+    let _ = std::process::Command::new("powershell")
+        .args(["-NoProfile", "-Command", &ps])
+        .status()
+        .map_err(|e| format!("启动提权进程失败：{}", e))?;
+    // 以最终事实为准：服务是否已注册
+    if service_installed() {
+        Ok(())
+    } else {
+        Err("修复未完成（可能取消了管理员授权），请重试".to_string())
+    }
+}
+
 /// 按需拉起扫描服务（普通权限；ACL 未放行/服务未安装时返回 Err，由调用方回退）。
 fn ensure_service_started() -> Result<(), String> {
     use windows_service::service::{ServiceAccess, ServiceState};
