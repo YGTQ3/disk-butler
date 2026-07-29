@@ -7,7 +7,7 @@ use std::path::{Path, PathBuf};
 use std::time::Instant;
 use windows_sys::Win32::Foundation::SYSTEMTIME;
 use windows_sys::Win32::Storage::FileSystem::{
-    GetDiskFreeSpaceExW, GetDriveTypeW, GetLogicalDrives,
+    GetDiskFreeSpaceExW, GetDriveTypeW, GetLogicalDrives, GetVolumeInformationW,
 };
 use windows_sys::Win32::System::Com::CoTaskMemFree;
 use windows_sys::Win32::System::SystemInformation::GetLocalTime;
@@ -322,6 +322,82 @@ fn scan_drives(profile: &str, user: &str) -> Vec<DriveRow> {
     rows
 }
 
+/// 盘符（"C:"）文件系统是否为 NTFS —— 只有 NTFS 才能走 MFT 直读。
+fn is_ntfs(drive: &str) -> bool {
+    let root: Vec<u16> = format!("{}\\", drive).encode_utf16().chain(std::iter::once(0)).collect();
+    let mut fsname = [0u16; 32];
+    let ok = unsafe {
+        GetVolumeInformationW(
+            root.as_ptr(),
+            std::ptr::null_mut(),
+            0,
+            std::ptr::null_mut(),
+            std::ptr::null_mut(),
+            std::ptr::null_mut(),
+            fsname.as_mut_ptr(),
+            fsname.len() as u32,
+        )
+    };
+    if ok == 0 {
+        return false;
+    }
+    let n = fsname.iter().position(|&c| c == 0).unwrap_or(fsname.len());
+    String::from_utf16_lossy(&fsname[..n]).eq_ignore_ascii_case("NTFS")
+}
+
+/// 把一棵 MFT 剪枝树展开为 driveTopDirs 行（跳过合并的「其他」占位节点，只收 >=1GB，路径脱敏）。
+fn flatten_tree(
+    node: &crate::scan::TreeNode,
+    depth: u32,
+    drive: &str,
+    profile: &str,
+    user: &str,
+    out: &mut Vec<DriveRow>,
+) {
+    for child in &node.children {
+        if child.path.contains("::__others__") {
+            continue;
+        }
+        let gb = child.size as f64 / GB;
+        if gb >= 1.0 {
+            out.push(DriveRow {
+                drive: drive.to_string(),
+                depth,
+                path: mask(&child.path, profile, user),
+                size_gb: round2(gb),
+            });
+        }
+        if child.is_dir {
+            flatten_tree(child, depth + 1, drive, profile, user, out);
+        }
+    }
+}
+
+/// 用内置 MFT 扫描服务（免额外 UAC——服务 ACL 已放行普通用户启动）秒级产出全盘大目录。
+/// 逐个 NTFS 固定盘经命名管道请求服务扫描 → 展开为 driveTopDirs 行。
+/// 服务未安装/不可用、或无 NTFS 固定盘时返回 None，由调用方回退到 jwalk 慢速遍历。
+fn scan_drives_mft(profile: &str, user: &str) -> Option<Vec<DriveRow>> {
+    let mut rows: Vec<DriveRow> = Vec::new();
+    let mut any_ok = false;
+    for dv in fixed_drives() {
+        if !is_ntfs(&dv) {
+            continue;
+        }
+        let root = format!("{}\\", dv);
+        if let Ok(tree) = crate::svc_client::scan_via_service(&root, |_f, _b, _p, _ph| {}) {
+            if tree.size > 0 {
+                any_ok = true;
+                flatten_tree(&tree, 1, &dv, profile, user, &mut rows);
+            }
+        }
+    }
+    if any_ok {
+        Some(rows)
+    } else {
+        None
+    }
+}
+
 fn os_version() -> String {
     if let Ok(k) =
         RegKey::predef(HKEY_LOCAL_MACHINE).open_subkey(r"SOFTWARE\Microsoft\Windows NT\CurrentVersion")
@@ -423,8 +499,10 @@ pub fn collect(include_drives: bool) -> Result<CollectResult, String> {
         }
     }
 
+    // 完整模式：优先用内置 MFT 服务秒级全盘扫描（免额外 UAC），
+    // 服务不可用/无 NTFS 盘时回退到 jwalk 慢速遍历，保证功能不中断。
     let drive_rows = if include_drives {
-        scan_drives(&profile, &user)
+        scan_drives_mft(&profile, &user).unwrap_or_else(|| scan_drives(&profile, &user))
     } else {
         Vec::new()
     };
@@ -520,12 +598,12 @@ pub fn collect(include_drives: bool) -> Result<CollectResult, String> {
     }
     if include_drives {
         md.push("".into());
-        md.push("## Drive Top Directories (2 levels, >=1GB) - knowledge-base clues".into());
+        md.push("## Drive Top Directories (whole-disk, >=1GB) - knowledge-base clues".into());
         md.push("".into());
         md.push("| Path | Size (GB) |".into());
         md.push("|---|---|".into());
         for r in &drive_rows {
-            let indent = if r.depth == 2 { "&nbsp;&nbsp;&nbsp;&nbsp;" } else { "" };
+            let indent = "&nbsp;".repeat((r.depth.saturating_sub(1) * 4) as usize);
             md.push(format!("| {}{} | {} |", indent, r.path, r.size_gb));
         }
     }
