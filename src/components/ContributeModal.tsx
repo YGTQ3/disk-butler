@@ -127,7 +127,7 @@ export default function ContributeModal({ onClose }: { onClose: () => void }) {
                 >
                   <div className="font-medium">完整模式</div>
                   <div className="mt-0.5 text-[13px] text-[var(--color-text-secondary)]">
-                    另外收集各磁盘的大目录线索，约 5~10 分钟。
+                    另外收集各磁盘的大目录线索（磁盘部分已用内置极速引擎，大幅提速），通常几十秒。
                     ⚠ 报告会包含 D 盘等根目录下大文件夹的名字，发送前请自行审查
                   </div>
                 </button>
@@ -154,7 +154,7 @@ export default function ContributeModal({ onClose }: { onClose: () => void }) {
             <div className="flex flex-col items-center py-10">
               <Loader2 size={40} className="animate-spin text-[var(--color-primary)]" />
               <div className="mt-5 text-[15px] font-medium">
-                正在扫描{fullMode ? "（完整模式，约 5~10 分钟）" : "（约 1 分钟）"}……
+                正在扫描{fullMode ? "（完整模式，通常几十秒）" : "（约 1 分钟内）"}……
               </div>
               <div className="mt-2 text-sm text-[var(--color-text-secondary)]">
                 只读取目录名和大小，不碰任何文件内容，期间可正常使用电脑
@@ -176,7 +176,7 @@ export default function ContributeModal({ onClose }: { onClose: () => void }) {
                 <div className="mt-2 text-center text-sm leading-relaxed text-[var(--color-text-secondary)]">
                   收录 {result.softwareCount} 个软件、{result.dirRows} 个目录线索
                   {result.driveRows > 0 && `、${result.driveRows} 条磁盘大目录`}
-                  ，用时 {Math.max(1, Math.round(result.elapsedSecs / 60))} 分钟内
+                  ，用时 {result.elapsedSecs < 60 ? `${Math.max(1, result.elapsedSecs)} 秒` : `${Math.round(result.elapsedSecs / 60)} 分钟`}
                 </div>
               </div>
               <div className="mt-4 space-y-2.5 rounded-xl bg-[#FFFBEB] p-4 text-sm leading-relaxed text-[#92400E]">
