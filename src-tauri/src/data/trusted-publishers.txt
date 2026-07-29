@@ -1,0 +1,183 @@
+# 受信任/系统软件——发行商指纹（一行一个，小写不敏感，# 开头为注释）
+# 命中已装软件的"发行商(Publisher)"字段即视为常用/系统，折叠降噪。仅正面声明，不定性。
+# 刻意不收边界型软件（如 2345/鲁大师 等），让其留在主列表由用户自行判断。
+
+# 系统 / 平台
+Microsoft Corporation
+Microsoft
+Google
+Google LLC
+Mozilla
+Apple
+Canonical
+
+# 硬件 / 驱动
+NVIDIA
+NVIDIA Corporation
+Realtek
+Realtek Semiconductor
+Intel
+Intel Corporation
+Advanced Micro Devices
+AMD
+Lenovo
+Dell
+Hewlett-Packard
+HP Inc
+ASUS
+ASUSTeK
+Logitech
+Razer
+
+# 开发 / 生产力
+JetBrains
+GitHub
+Docker
+Oracle
+Python Software Foundation
+Node.js
+Git
+Adobe
+Autodesk
+MathWorks
+
+# 主流厂商（中国区常见）
+Tencent
+腾讯
+Kingsoft
+金山
+珠海金山
+Alibaba
+阿里巴巴
+ByteDance
+字节跳动
+Baidu
+百度
+NetEase
+网易
+Sogou
+搜狗
+
+# 安全软件
+Huorong
+火绒
+Qihoo
+奇虎
+360
+Kaspersky
+Bitdefender
+Avast
+AVIRA
+ESET
+
+# 通讯 / 会议 / 娱乐
+Valve
+Zoom
+Spotify
+
+# 输入法 / 工具
+Dropbox
+Synology
+
+# —— 联网扩充（2026-07-30 常用软件厂商）——
+# 创意 / 影音 / 阅读
+Wondershare
+万兴
+Foxit
+福昕
+VideoLAN
+RARLAB
+win.rar
+Igor Pavlov
+Piriform
+GIMP
+CyberLink
+
+# 开发 / 运维 / 游戏
+Sublime HQ
+Scooter Software
+PremiumSoft
+NetSarang
+MobaTek
+Atlassian
+GitLab
+HashiCorp
+Postman
+Unity Technologies
+Epic Games
+Riot Games
+Blizzard
+Electronic Arts
+Ubisoft
+
+# 通讯 / 会议 / 远程
+Skype
+Telegram
+Discord
+Slack
+Cisco
+Citrix
+TeamViewer
+Oray
+Line
+
+# 浏览器
+Opera
+Brave
+Vivaldi
+
+# 中国区常见厂商
+迅雷
+Xunlei
+哔哩哔哩
+Bilibili
+爱奇艺
+iQIYI
+优酷
+Youku
+快手
+Kuaishou
+小米
+Xiaomi
+华为
+Huawei
+大疆
+DJI
+米哈游
+miHoYo
+深信服
+Sangfor
+有道
+Youdao
+印象笔记
+Evernote
+Notion
+
+# —— 本机/样本库联网确认（2026-07-30，均为正规软件）——
+# 创意 / 影音 / 3D
+Blender Foundation
+Blackmagic Design
+Maxon
+Boris FX
+Axure
+
+# 开发 / 网络 / 工具
+Bandisoft.com
+Bandisoft
+JGraph
+Tonec Inc.
+Jellyfin
+NAPS2 Software
+Nmap Project
+geek software GmbH
+Qoder
+Tailscale Inc.
+VanDyke Software
+Riverbed Technology
+The Wireshark developer community
+Anaconda
+voidtools
+Eyeware Tech SA
+International GeoGebra Institute
+Clash Verge Rev
+Bandisoft.com

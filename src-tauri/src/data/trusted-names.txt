@@ -1,0 +1,232 @@
+# 受信任/系统软件——软件名指纹（一行一个，小写不敏感，# 开头为注释）
+# 命中已装软件的"名称(DisplayName)"字段即视为常用/系统，折叠降噪。仅正面声明，不定性。
+# 刻意不收边界型软件（如 2345/鲁大师 等），让其留在主列表由用户自行判断。
+
+# 系统 / 运行库
+Windows
+Microsoft
+DirectX
+Visual C++
+.NET
+OneDrive
+OneNote
+
+# 浏览器
+Google Chrome
+Chrome
+Microsoft Edge
+Firefox
+
+# 办公 / 生产力
+Office
+WPS
+Visual Studio
+Visual Studio Code
+Notepad++
+Typora
+有道
+石墨
+
+# 通讯
+微信
+WeChat
+TIM
+腾讯QQ
+QQ
+企业微信
+钉钉
+DingTalk
+飞书
+Lark
+腾讯会议
+Zoom
+向日葵
+ToDesk
+
+# 影音 / 娱乐
+网易云音乐
+QQ音乐
+酷狗
+酷我
+PotPlayer
+VLC
+Spotify
+Steam
+
+# 开发 / 工具
+Python
+Node.js
+Git
+Docker
+VMware
+VirtualBox
+7-Zip
+WinRAR
+Everything
+Snipaste
+Fiddler
+Postman
+
+# 硬件 / 驱动
+NVIDIA
+GeForce
+Realtek
+Intel
+Lenovo
+联想
+
+# 安全软件
+火绒
+360安全
+360杀毒
+Defender
+Kaspersky
+
+# 常用工具
+百度网盘
+Adobe
+Photoshop
+Premiere
+AutoCAD
+MATLAB
+
+# —— 联网扩充（2026-07-30 常用软件名）——
+# 影音 / 创意
+剪映
+CapCut
+Filmora
+喵影
+OBS Studio
+DaVinci Resolve
+Foobar2000
+QQ影音
+腾讯视频
+爱奇艺
+优酷
+哔哩哔哩
+芒果TV
+Lightroom
+After Effects
+Illustrator
+Acrobat
+福昕
+Foxit
+GIMP
+会声会影
+
+# 下载 / 传输
+迅雷
+Thunder
+FileZilla
+WinSCP
+Motrix
+文件传输助手
+
+# 开发工具
+IntelliJ IDEA
+PyCharm
+WebStorm
+GoLand
+Android Studio
+Eclipse
+Sublime Text
+JDK
+Java
+Anaconda
+Miniconda
+Sourcetree
+GitKraken
+Navicat
+DBeaver
+Xshell
+Xftp
+FinalShell
+MobaXterm
+PuTTY
+Beyond Compare
+CMake
+
+# 笔记 / 效率
+有道云笔记
+为知笔记
+Notion
+Obsidian
+幕布
+XMind
+MindManager
+ProcessOn
+Visio
+Project
+Ditto
+
+# 通讯 / 远程
+Skype
+Telegram
+Discord
+TeamViewer
+Line
+
+# 游戏平台
+Epic Games
+WeGame
+Origin
+Battle.net
+Ubisoft Connect
+Xbox
+原神
+网易UU
+Steam
+
+# 系统工具
+CCleaner
+Total Commander
+TreeSize
+腾讯电脑管家
+迅捷
+
+# —— 本机/样本库联网确认（2026-07-30，均为正规软件）——
+# 创意 / 影音 / 3D
+Blender
+Cinema 4D
+Boris FX
+Axure
+ImageGlass
+Graphviz
+Blackmagic
+
+# 开发工具
+CLion
+DataGrip
+JetBrains
+Cherry Studio
+Antigravity
+Qoder
+Rustup
+Docker Desktop
+NAPS2
+
+# 网络 / 下载 / 远程
+Internet Download Manager
+Clash Verge
+Clash for Windows
+Tailscale
+SecureCRT
+Wireshark
+Npcap
+Jellyfin
+
+# 办公 / 通讯 / 国产常用
+Foxmail
+夸克网盘
+抖音
+豆包
+千问
+微信输入法
+GeoGebra
+PDF24
+
+# 桌面 / 系统工具
+Bandizip
+Coodesker
+HiBit Uninstaller
+图吧工具箱

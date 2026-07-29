@@ -1,3 +1,4 @@
+mod bloatware;
 mod cache;
 mod cleanup;
 mod collector;
@@ -158,6 +159,50 @@ async fn repair_scan_service() -> Result<(), String> {
         .map_err(|e| format!("修复任务失败：{}", e))?
 }
 
+/// 软件体检：陈述软件的客观行为（开机自启/后台常驻/占用较大），不定性、不点名（只读）。
+#[tauri::command]
+async fn scan_bloatware(app: tauri::AppHandle) -> Result<bloatware::BloatwareScan, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        let ignored = bloatware::load_ignored(&app);
+        bloatware::scan(&ignored)
+    })
+    .await
+    .map_err(|e| format!("软件体检失败：{}", e))
+}
+
+/// 一键卸载：运行指定软件自带的官方卸载程序（后端据 id 重读卸载命令）。
+#[tauri::command]
+async fn uninstall_software(id: String) -> Result<(), String> {
+    tauri::async_runtime::spawn_blocking(move || bloatware::uninstall(&id))
+        .await
+        .map_err(|e| format!("卸载任务失败：{}", e))?
+}
+
+/// 扫描某已卸载软件安装目录的残留（严格路径校验，无则返回 null）。
+#[tauri::command]
+async fn scan_residue(install_location: String) -> Option<bloatware::ResidueDetail> {
+    tauri::async_runtime::spawn_blocking(move || bloatware::scan_residue(&install_location))
+        .await
+        .ok()
+        .flatten()
+}
+
+/// 清理残留目录（逐个再次校验路径安全后删除）。
+#[tauri::command]
+async fn clean_residue(paths: Vec<String>) -> Result<bloatware::ResidueReport, String> {
+    tauri::async_runtime::spawn_blocking(move || bloatware::clean_residue(paths))
+        .await
+        .map_err(|e| format!("清理残留失败：{}", e))
+}
+
+/// 软件体检白名单：记录/取消用户"不再提醒"某软件（本地持久化）。
+#[tauri::command]
+async fn bloatware_set_ignored(app: tauri::AppHandle, key: String, ignored: bool) -> Result<(), String> {
+    tauri::async_runtime::spawn_blocking(move || bloatware::set_ignored(&app, key, ignored))
+        .await
+        .map_err(|e| format!("更新失败：{}", e))
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
@@ -179,7 +224,12 @@ pub fn run() {
             open_recycle_bin,
             collect_rules,
             scan_service_available,
-            repair_scan_service
+            repair_scan_service,
+            scan_bloatware,
+            uninstall_software,
+            scan_residue,
+            clean_residue,
+            bloatware_set_ignored
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

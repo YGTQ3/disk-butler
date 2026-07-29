@@ -1,12 +1,13 @@
 import { useState } from "react";
-import { HardDrive, Sparkles, Rocket, Cpu, ShieldCheck, HeartHandshake } from "lucide-react";
+import { HardDrive, Sparkles, Rocket, Cpu, ShieldCheck, ShieldAlert, HeartHandshake } from "lucide-react";
 import DiskInsight from "./pages/DiskInsight";
 import Cleanup from "./pages/Cleanup";
 import Startup from "./pages/Startup";
 import MemoryCheck from "./pages/MemoryCheck";
+import BloatwareCheck from "./pages/BloatwareCheck";
 import ContributeModal from "./components/ContributeModal";
 
-type PageId = "insight" | "clean" | "startup" | "memory";
+type PageId = "insight" | "clean" | "startup" | "memory" | "bloatware";
 
 interface NavItem {
   id: PageId;
@@ -20,6 +21,7 @@ const NAV_ITEMS: NavItem[] = [
   { id: "clean", label: "一键清理", icon: <Sparkles size={20} />, ready: true },
   { id: "startup", label: "启动管理", icon: <Rocket size={20} />, ready: true },
   { id: "memory", label: "内存体检", icon: <Cpu size={20} />, ready: true },
+  { id: "bloatware", label: "软件体检", icon: <ShieldAlert size={20} />, ready: true },
 ];
 
 function App() {
@@ -119,6 +121,11 @@ function App() {
         {visited.has("memory") && (
           <div className={page === "memory" ? "h-full" : "hidden"}>
             <MemoryCheck />
+          </div>
+        )}
+        {visited.has("bloatware") && (
+          <div className={page === "bloatware" ? "h-full" : "hidden"}>
+            <BloatwareCheck />
           </div>
         )}
       </main>
