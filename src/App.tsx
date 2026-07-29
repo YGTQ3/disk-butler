@@ -1,12 +1,13 @@
 import { useState } from "react";
-import { HardDrive, Sparkles, Rocket, Cpu, ShieldCheck, HeartHandshake } from "lucide-react";
+import { HardDrive, Sparkles, Rocket, Cpu, Trash2, ShieldCheck, HeartHandshake } from "lucide-react";
 import DiskInsight from "./pages/DiskInsight";
 import Cleanup from "./pages/Cleanup";
 import Startup from "./pages/Startup";
 import MemoryCheck from "./pages/MemoryCheck";
+import Uninstall from "./pages/Uninstall";
 import ContributeModal from "./components/ContributeModal";
 
-type PageId = "insight" | "clean" | "startup" | "memory";
+type PageId = "insight" | "clean" | "uninstall" | "startup" | "memory";
 
 interface NavItem {
   id: PageId;
@@ -18,6 +19,7 @@ interface NavItem {
 const NAV_ITEMS: NavItem[] = [
   { id: "insight", label: "磁盘透视", icon: <HardDrive size={20} />, ready: true },
   { id: "clean", label: "一键清理", icon: <Sparkles size={20} />, ready: true },
+  { id: "uninstall", label: "软件卸载", icon: <Trash2 size={20} />, ready: true },
   { id: "startup", label: "启动管理", icon: <Rocket size={20} />, ready: true },
   { id: "memory", label: "内存体检", icon: <Cpu size={20} />, ready: true },
 ];
@@ -95,7 +97,7 @@ function App() {
         </div>
 
         <div className="px-5 pb-4 text-[11px] leading-relaxed text-[var(--color-text-secondary)]">
-          v{__APP_VERSION__.split(".").slice(0, 2).join(".")} · 透视 / 清理 / 启动 / 内存
+          v{__APP_VERSION__.split(".").slice(0, 2).join(".")} · 透视 / 清理 / 卸载 / 启动 / 内存
           <br />
           所有操作都会先告诉你“这是什么”
         </div>
@@ -109,6 +111,11 @@ function App() {
         {visited.has("clean") && (
           <div className={page === "clean" ? "h-full" : "hidden"}>
             <Cleanup />
+          </div>
+        )}
+        {visited.has("uninstall") && (
+          <div className={page === "uninstall" ? "h-full" : "hidden"}>
+            <Uninstall />
           </div>
         )}
         {visited.has("startup") && (

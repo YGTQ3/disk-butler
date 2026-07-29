@@ -236,3 +236,35 @@ export function formatAgo(unixSecs: number): string {
   if (diff < 86400) return `${Math.floor(diff / 3600)} 小时前`;
   return `${Math.floor(diff / 86400)} 天前`;
 }
+
+// ---------- 软件卸载（类 Geek Uninstaller） ----------
+
+/** 一个已安装的桌面软件（与 Rust uninstall::InstalledApp 对应） */
+export interface InstalledApp {
+  id: string;
+  name: string;
+  version: string;
+  publisher: string;
+  installLocation: string;
+  iconPath: string;
+  size: number;
+  hasQuiet: boolean;
+  uninstallString: string;
+}
+
+/** 卸载后扫出的单个残留项 */
+export interface LeftoverItem {
+  /** "dir" 文件夹 | "reg" 注册表项 */
+  kind: "dir" | "reg";
+  path: string;
+  size: number;
+  /** "high" 高置信度 | "low" 需谨慎（默认不勾） */
+  confidence: "high" | "low";
+}
+
+/** 单项残留删除结果 */
+export interface RemoveResult {
+  path: string;
+  ok: boolean;
+  error: string | null;
+}

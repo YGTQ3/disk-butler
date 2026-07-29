@@ -796,9 +796,11 @@ dependencies = [
 name = "disk-butler"
 version = "0.7.2"
 dependencies = [
+ "base64 0.22.1",
  "encoding_rs",
  "jwalk",
  "ntfs-reader",
+ "png 0.17.16",
  "rayon",
  "serde",
  "serde_json",
