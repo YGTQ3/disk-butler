@@ -31,6 +31,8 @@ pub struct StartupItem {
     pub advice: String,
     /// 建议理由（人话）
     pub reason: String,
+    /// 软件图标（PNG data URL，带透明通道）；提取失败为 None
+    pub icon: Option<String>,
 }
 
 // ---------- 建议知识引擎（来自真实优化实战） ----------
@@ -155,6 +157,20 @@ fn perm_hint(e: &std::io::Error) -> String {
 
 // ---------- 进程内存匹配 ----------
 
+/// 从启动命令里解析出图标来源文件（exe/lnk）：优先带引号路径，其次原样存在则用，最后去参数。
+fn icon_source(cmd: &str) -> String {
+    let c = cmd.trim();
+    if let Some(rest) = c.strip_prefix('"') {
+        if let Some(end) = rest.find('"') {
+            return rest[..end].to_string();
+        }
+    }
+    if std::path::Path::new(c).exists() {
+        return c.to_string();
+    }
+    c.split(" /").next().unwrap_or(c).split(" -").next().unwrap_or(c).trim().to_string()
+}
+
 /// 从启动命令中提取 exe 名（小写、去扩展名）
 fn exe_stem(command: &str) -> Option<String> {
     let cmd = command.trim().trim_start_matches('"');
@@ -218,13 +234,14 @@ pub fn list_items() -> Vec<StartupItem> {
                 out.push(StartupItem {
                     id: format!("{}::{}", prefix, name),
                     name,
-                    command,
                     location: location.to_string(),
                     enabled,
                     needs_admin,
                     mem_mb,
                     advice: advice.to_string(),
                     reason: reason.to_string(),
+                    icon: crate::icon::from_file(&icon_source(&command)),
+                    command,
                 });
             }
         }
@@ -282,6 +299,7 @@ pub fn list_items() -> Vec<StartupItem> {
                 mem_mb,
                 advice: advice.to_string(),
                 reason: reason.to_string(),
+                icon: crate::icon::from_file(&entry.path().to_string_lossy()),
             });
         }
     }

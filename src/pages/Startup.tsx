@@ -190,6 +190,9 @@ export default function Startup() {
 
                         <div className="min-w-0 flex-1">
                           <div className="flex items-center gap-2">
+                            {item.icon && (
+                              <img src={item.icon} alt="" className="h-5 w-5 shrink-0 rounded-sm" />
+                            )}
                             <span className="truncate text-sm font-semibold">{item.name}</span>
                             <span
                               className="rounded-full px-2 py-0.5 text-[10px] font-medium"

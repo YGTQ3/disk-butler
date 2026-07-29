@@ -145,6 +145,7 @@ export interface StartupItem {
   memMb: number;
   advice: "disable" | "keep" | "neutral";
   reason: string;
+  icon?: string | null;
 }
 
 export interface MemoryOverview {

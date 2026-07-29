@@ -2,6 +2,7 @@ mod bloatware;
 mod cache;
 mod cleanup;
 mod collector;
+pub mod icon;
 pub mod knowledge;
 mod memory;
 pub mod mft_scan;
@@ -161,10 +162,10 @@ async fn repair_scan_service() -> Result<(), String> {
 
 /// 软件体检：陈述软件的客观行为（开机自启/后台常驻/占用较大），不定性、不点名（只读）。
 #[tauri::command]
-async fn scan_bloatware(app: tauri::AppHandle) -> Result<bloatware::BloatwareScan, String> {
+async fn scan_bloatware(app: tauri::AppHandle, include_all: bool) -> Result<bloatware::BloatwareScan, String> {
     tauri::async_runtime::spawn_blocking(move || {
         let ignored = bloatware::load_ignored(&app);
-        bloatware::scan(&ignored)
+        bloatware::scan(&ignored, include_all)
     })
     .await
     .map_err(|e| format!("软件体检失败：{}", e))
@@ -203,6 +204,52 @@ async fn bloatware_set_ignored(app: tauri::AppHandle, key: String, ignored: bool
         .map_err(|e| format!("更新失败：{}", e))
 }
 
+/// 打开 Windows「应用和功能」设置页（无卸载命令的软件兜底）。
+#[tauri::command]
+fn open_apps_settings() -> Result<(), String> {
+    std::process::Command::new("explorer")
+        .arg("ms-settings:appsfeatures")
+        .spawn()
+        .map(|_| ())
+        .map_err(|e| format!("打开设置失败：{}", e))
+}
+
+/// 停止某软件的后台服务与进程（提权，破占用/自我保护）。
+#[tauri::command]
+async fn stop_software(install_location: String) -> Result<(), String> {
+    tauri::async_runtime::spawn_blocking(move || bloatware::stop_software(&install_location))
+        .await
+        .map_err(|e| format!("停止失败：{}", e))?
+}
+
+/// 强力卸载预览：列出将删除的安装目录/服务/计划任务/注册表项。
+#[tauri::command]
+async fn bloatware_force_preview(id: String) -> Result<bloatware::ForcePlan, String> {
+    tauri::async_runtime::spawn_blocking(move || bloatware::force_preview(&id))
+        .await
+        .map_err(|e| format!("预览失败：{}", e))
+}
+
+/// 强力卸载：停/删服务、计划任务、进程、安装目录、注册表项（单次提权）。
+#[tauri::command]
+async fn force_uninstall_software(id: String) -> Result<(), String> {
+    tauri::async_runtime::spawn_blocking(move || bloatware::force_uninstall(&id))
+        .await
+        .map_err(|e| format!("强力卸载任务失败：{}", e))?
+}
+
+/// 设置主窗口是否始终置顶（卸载期间置顶，遮盖厂商弹窗）。
+#[tauri::command]
+fn set_always_on_top(window: tauri::Window, on: bool) -> Result<(), String> {
+    window.set_always_on_top(on).map_err(|e| e.to_string())
+}
+
+/// 提权操作是否已真正开始（UAC 已授权）——供前端进度条从"授权"推进到"执行中"。
+#[tauri::command]
+fn op_started() -> bool {
+    bloatware::op_started()
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
@@ -229,7 +276,13 @@ pub fn run() {
             uninstall_software,
             scan_residue,
             clean_residue,
-            bloatware_set_ignored
+            bloatware_set_ignored,
+            open_apps_settings,
+            stop_software,
+            bloatware_force_preview,
+            force_uninstall_software,
+            set_always_on_top,
+            op_started
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

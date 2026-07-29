@@ -13,6 +13,12 @@ import {
   Bell,
   ChevronDown,
   ChevronRight,
+  Box,
+  Power,
+  Flame,
+  X,
+  ShieldAlert,
+  Check,
 } from "lucide-react";
 import { formatBytes, openInExplorer } from "../types";
 
@@ -24,6 +30,7 @@ interface BloatwareEntry {
   version: string;
   installLocation: string;
   sizeMb: number | null;
+  icon?: string | null;
   tags: string[];
   behaviors: string[];
   suggestion: string;
@@ -45,6 +52,30 @@ interface ResidueDetail {
   size: number;
 }
 
+/** 强力卸载预览：将清除的内容清单 */
+interface ForcePlan {
+  name: string;
+  installDir: string;
+  dirDeletable: boolean;
+  services: string[];
+  tasks: string[];
+  regPath: string;
+}
+
+type UninStatus = "confirm" | "auth" | "running" | "done" | "fail";
+/** 卸载/停止任务（驱动进度弹窗） */
+interface UninJob {
+  entry: BloatwareEntry;
+  mode: "normal" | "force" | "stop";
+  status: UninStatus;
+  step: number;
+  detail: string;
+  plan?: ForcePlan;
+}
+const NORMAL_STEPS = ["准备", "授权", "卸载中", "验证"];
+const FORCE_STEPS = ["准备", "授权", "清后台", "删文件", "验证"];
+const STOP_STEPS = ["准备", "授权", "停后台", "完成"];
+
 type Phase = "loading" | "ready";
 
 const TAG_STYLE: Record<string, { bg: string; fg: string }> = {
@@ -65,9 +96,9 @@ export default function BloatwareCheck() {
   const [scan, setScan] = useState<BloatwareScan | null>(null);
   const [error, setError] = useState("");
 
-  const [confirmTarget, setConfirmTarget] = useState<BloatwareEntry | null>(null);
-  const [busyId, setBusyId] = useState("");
   const [msg, setMsg] = useState("");
+  // 卸载任务（进度弹窗）：confirm → running → done/fail
+  const [job, setJob] = useState<UninJob | null>(null);
 
   const [residue, setResidue] = useState<{ name: string; detail: ResidueDetail } | null>(null);
   const [cleaningResidue, setCleaningResidue] = useState(false);
@@ -75,12 +106,15 @@ export default function BloatwareCheck() {
   // 折叠区展开状态
   const [showTrusted, setShowTrusted] = useState(false);
   const [showDismissed, setShowDismissed] = useState(false);
+  // 视图模式：false=只看需关注（默认，快）；true=全部已装软件（按需重扫）
+  const [showAll, setShowAll] = useState(false);
 
-  async function load() {
+  async function load(all: boolean) {
     setPhase("loading");
     setError("");
     try {
-      setScan(await invoke<BloatwareScan>("scan_bloatware"));
+      setScan(await invoke<BloatwareScan>("scan_bloatware", { includeAll: all }));
+      setShowAll(all);
     } catch (e) {
       setError(String(e));
     }
@@ -88,42 +122,141 @@ export default function BloatwareCheck() {
   }
 
   useEffect(() => {
-    load();
+    load(false);
   }, []);
 
   /** 记录/取消"不再提醒" */
   async function setIgnored(e: BloatwareEntry, ignored: boolean) {
     try {
       await invoke("bloatware_set_ignored", { key: e.key, ignored });
-      await load();
+      await load(showAll);
     } catch (err) {
       setMsg(String(err));
     }
   }
 
-  async function doUninstall(entry: BloatwareEntry) {
-    setConfirmTarget(null);
-    setBusyId(entry.id);
+  /** 打开「停止后台运行」确认弹窗（mode=stop）；提权停服务+进程，二次确认+进度均在弹窗内 */
+  async function stopSoftware(e: BloatwareEntry) {
     setMsg("");
+    setJob({ entry: e, mode: "stop", status: "confirm", step: 0, detail: "正在读取将处理的内容…" });
     try {
-      await invoke("uninstall_software", { id: entry.id });
-      setMsg(`已卸载「${entry.name}」。`);
-      if (entry.installLocation) {
+      const plan = await invoke<ForcePlan>("bloatware_force_preview", { id: e.id });
+      setJob((j) => (j && j.entry.id === e.id ? { ...j, plan, detail: "" } : j));
+    } catch {
+      setJob((j) => (j && j.entry.id === e.id ? { ...j, detail: "" } : j));
+    }
+  }
+
+  /** 打开普通卸载（方法A）确认弹窗，并拉取将处理的清单（服务/进程） */
+  async function startUninstall(e: BloatwareEntry) {
+    setMsg("");
+    setJob({ entry: e, mode: "normal", status: "confirm", step: 0, detail: "正在读取将处理的内容…" });
+    try {
+      const plan = await invoke<ForcePlan>("bloatware_force_preview", { id: e.id });
+      setJob((j) => (j && j.entry.id === e.id ? { ...j, plan, detail: "" } : j));
+    } catch {
+      setJob((j) => (j && j.entry.id === e.id ? { ...j, detail: "" } : j));
+    }
+  }
+
+  /** 打开强力卸载（方法C）确认弹窗，并异步拉取将清除内容预览 */
+  async function startForce(e: BloatwareEntry) {
+    setMsg("");
+    setJob({ entry: e, mode: "force", status: "confirm", step: 0, detail: "正在读取将清除的内容…" });
+    try {
+      const plan = await invoke<ForcePlan>("bloatware_force_preview", { id: e.id });
+      setJob((j) => (j && j.entry.id === e.id ? { ...j, plan, detail: "" } : j));
+    } catch (err) {
+      setJob((j) => (j && j.entry.id === e.id ? { ...j, status: "fail", detail: String(err) } : j));
+    }
+  }
+
+  /** 执行卸载/停止：置顶 → 授权（等你在系统窗点“是”）→ 授权通过后才进入执行 → 验证 */
+  async function runJob() {
+    const j = job;
+    if (!j) return;
+    const steps = j.mode === "force" ? FORCE_STEPS : j.mode === "stop" ? STOP_STEPS : NORMAL_STEPS;
+    try {
+      await invoke("set_always_on_top", { on: true });
+    } catch {
+      /* 置顶失败不阻断 */
+    }
+    setJob({ ...j, status: "running", step: 1, detail: "请在弹出的系统授权窗口点「是」，点了我们就立刻开始…" });
+
+    const cmd = j.mode === "force" ? "force_uninstall_software" : j.mode === "stop" ? "stop_software" : "uninstall_software";
+    const args = j.mode === "stop" ? { installLocation: j.entry.installLocation } : { id: j.entry.id };
+    const p = invoke(cmd, args);
+
+    // 轮询：只有当提权脚本真正开始执行（你已点“是”）后，才推进到“执行中”
+    let advanced = false;
+    const poll = setInterval(async () => {
+      if (advanced) return;
+      try {
+        if (await invoke<boolean>("op_started")) {
+          advanced = true;
+          setJob((cur) => (cur ? { ...cur, step: 2, detail: "正在处理，请稍等，马上就好…" } : cur));
+        }
+      } catch {
+        /* 忽略轮询错误 */
+      }
+    }, 250);
+
+    try {
+      await p;
+      clearInterval(poll);
+      setJob((cur) => (cur ? { ...cur, step: steps.length - 1 } : cur));
+      if (j.mode === "stop") {
+        setScan((prev) =>
+          prev
+            ? {
+                ...prev,
+                entries: prev.entries.map((x) =>
+                  x.key === j.entry.key
+                    ? {
+                        ...x,
+                        residentMemMb: 0,
+                        tags: x.tags.filter((t) => t !== "后台常驻"),
+                        behaviors: x.behaviors.filter((b) => !b.includes("后台进程")),
+                      }
+                    : x,
+                ),
+              }
+            : prev,
+        );
+        setJob((cur) =>
+          cur ? { ...cur, status: "done", step: steps.length, detail: `已停止「${j.entry.name}」的后台服务与进程。` } : cur,
+        );
+        return;
+      }
+      if (j.mode === "normal" && j.entry.installLocation) {
         try {
           const detail = await invoke<ResidueDetail | null>("scan_residue", {
-            installLocation: entry.installLocation,
+            installLocation: j.entry.installLocation,
           });
-          if (detail) setResidue({ name: entry.name, detail });
+          if (detail) setResidue({ name: j.entry.name, detail });
         } catch {
           /* 残留探测失败不打扰 */
         }
       }
-      await load();
-    } catch (e) {
-      setMsg(String(e));
-    } finally {
-      setBusyId("");
+      setJob((cur) =>
+        cur ? { ...cur, status: "done", step: steps.length, detail: `「${j.entry.name}」已成功卸载。` } : cur,
+      );
+    } catch (err) {
+      clearInterval(poll);
+      setJob((cur) => (cur ? { ...cur, status: "fail", detail: String(err) } : cur));
     }
+  }
+
+  /** 关闭进度弹窗：取消置顶；卸载完成则刷新列表（停止后台不刷新，保留条目） */
+  async function closeJob() {
+    try {
+      await invoke("set_always_on_top", { on: false });
+    } catch {
+      /* 忽略 */
+    }
+    const j = job;
+    setJob(null);
+    if (j?.status === "done" && j.mode !== "stop") await load(showAll);
   }
 
   async function doCleanResidue() {
@@ -156,6 +289,11 @@ export default function BloatwareCheck() {
     return (
       <div key={e.id} className="rounded-2xl bg-[var(--color-surface)] px-4 py-3 shadow-[var(--shadow-card)]">
         <div className="flex flex-wrap items-center gap-2">
+          {e.icon ? (
+            <img src={e.icon} alt="" className="h-5 w-5 shrink-0 rounded-sm" />
+          ) : (
+            <Box size={18} className="shrink-0 text-[var(--color-text-secondary)] opacity-40" />
+          )}
           <span className="text-sm font-semibold">{e.name}</span>
           {e.publisher && (
             <span className="text-xs text-[var(--color-text-secondary)]">{e.publisher}</span>
@@ -194,14 +332,40 @@ export default function BloatwareCheck() {
               打开位置
             </button>
           )}
+          {e.residentMemMb > 0 && (
+            <button
+              onClick={() => stopSoftware(e)}
+              className="flex items-center gap-1.5 rounded-lg border border-[#FDE68A] bg-[#FFFBEB] px-3 py-1.5 text-xs font-medium text-[#92400E] transition-colors hover:bg-[#FEF3C7]"
+            >
+              <Power size={13} />
+              停止后台运行
+            </button>
+          )}
           {e.uninstallable && (
             <button
-              disabled={busyId === e.id}
-              onClick={() => setConfirmTarget(e)}
-              className="flex items-center gap-1.5 rounded-lg bg-[var(--color-primary)] px-3.5 py-1.5 text-xs font-medium text-white transition-colors hover:bg-[var(--color-primary-dark)] disabled:opacity-50"
+              onClick={() => startUninstall(e)}
+              className="flex items-center gap-1.5 rounded-lg bg-[var(--color-primary)] px-3.5 py-1.5 text-xs font-medium text-white transition-colors hover:bg-[var(--color-primary-dark)]"
             >
-              {busyId === e.id ? <Loader2 size={13} className="animate-spin" /> : <Trash2 size={13} />}
-              {busyId === e.id ? "卸载中…" : "一键卸载"}
+              <Trash2 size={13} />
+              一键卸载
+            </button>
+          )}
+          {!!e.installLocation && (
+            <button
+              onClick={() => startForce(e)}
+              className="flex items-center gap-1.5 rounded-lg border border-[#FCA5A5] px-3 py-1.5 text-xs font-medium text-[#B91C1C] transition-colors hover:bg-[#FEF2F2]"
+            >
+              <Flame size={13} />
+              强力卸载
+            </button>
+          )}
+          {!e.uninstallable && !e.installLocation && (
+            <button
+              onClick={() => invoke("open_apps_settings")}
+              className="flex items-center gap-1.5 rounded-lg border border-[var(--color-line)] px-3 py-1.5 text-xs font-medium text-[var(--color-text-secondary)] transition-colors hover:border-[var(--color-primary)] hover:text-[var(--color-primary-dark)]"
+            >
+              <Trash2 size={13} />
+              去系统卸载
             </button>
           )}
           {group === "dismissed" ? (
@@ -226,6 +390,359 @@ export default function BloatwareCheck() {
     );
   }
 
+  /** 明细清单的一行（标签 + 条目列表） */
+  function planRow(label: string, items: string[], empty: string) {
+    return (
+      <div className="rounded-xl bg-[var(--color-bg)] px-4 py-2.5">
+        <div className="mb-1 text-xs font-semibold text-[var(--color-text-secondary)]">{label}</div>
+        {items.length > 0 ? (
+          <ul className="space-y-0.5">
+            {items.map((it, i) => (
+              <li key={i} className="break-all text-[13px] text-[var(--color-text-main)]">{it}</li>
+            ))}
+          </ul>
+        ) : (
+          <div className="text-[13px] text-[var(--color-text-secondary)] opacity-70">{empty}</div>
+        )}
+      </div>
+    );
+  }
+
+  /** 16:9 居中圆角卸载/停止进度弹窗（confirm / running / done / fail） */
+  function jobModal() {
+    if (!job) return null;
+    const isForce = job.mode === "force";
+    const isStop = job.mode === "stop";
+    const steps = isForce ? FORCE_STEPS : isStop ? STOP_STEPS : NORMAL_STEPS;
+    const headerTitle = isForce ? "强力卸载（高级）" : isStop ? "停止后台运行" : "卸载软件";
+    const actionWord = isForce ? "强力卸载" : isStop ? "停止后台运行" : "卸载";
+    const accent = isForce ? "#B91C1C" : isStop ? "#B45309" : "var(--color-primary-dark)";
+    // 完成后告知用户「后果」——它现在处于什么状态、之后会怎样
+    const doneNote = isStop
+      ? "它现在不再占用内存运行了。下次开机、或你手动打开它时，它可能会再次启动——如果想让它彻底别再自启，可以直接把它卸载掉。"
+      : isForce
+        ? "它的安装文件夹、后台服务、定时任务和注册表记录都已尽力清除干净。个别正被占用的文件，可能要重启电脑后才会彻底消失。"
+        : "它已经从你的电脑上移除了。如果安装文件夹里还留下了一些文件，我们接着会问你要不要顺手清理。";
+    // 确认页：每步 = 标题(可空,避免与框重复) + 明细框 + 是否并排
+    const svc = job.plan?.services ?? [];
+    const tsk = job.plan?.tasks ?? [];
+    const reg = job.plan?.regPath ? [job.plan.regPath] : [];
+    const dir = job.plan?.dirDeletable && job.plan.installDir ? [job.plan.installDir] : [];
+    const dirEmpty = job.plan?.installDir ? "（不在常规安装区，为安全起见不删除）" : "（未定位到安装文件夹）";
+    const resident = job.entry.residentMemMb > 0 ? [`当前约 ${job.entry.residentMemMb} MB，将一并结束`] : [];
+    type Row = { label: string; items: string[]; empty: string };
+    type Step = { title: string | null; rows: Row[]; side?: boolean };
+    const confirmSteps: Step[] = isStop
+      ? [
+          { title: "关掉它注册在后台的服务", rows: [{ label: "将停止的服务", items: svc, empty: "（无）" }] },
+          { title: "结束它正在运行的后台进程，让它别再占内存", rows: [{ label: "后台进程", items: resident, empty: "（当前无）" }] },
+        ]
+      : isForce
+        ? [
+            {
+              title: "强制关闭并删除它的后台服务、定时任务和进程",
+              side: true,
+              rows: [
+                { label: "服务", items: svc, empty: "（无）" },
+                { label: "计划任务", items: tsk, empty: "（无）" },
+                { label: "后台进程", items: resident, empty: "（当前无）" },
+              ],
+            },
+            { title: null, rows: [{ label: "卸载方式", items: ["用软件自带的卸载程序帮你卸掉"], empty: "" }] },
+            {
+              title: "删掉安装文件夹和相关注册表记录，清得更彻底",
+              side: true,
+              rows: [
+                { label: "安装文件夹", items: dir, empty: dirEmpty },
+                { label: "注册表记录", items: reg, empty: "（无）" },
+              ],
+            },
+          ]
+        : [
+            {
+              title: "先关掉它在后台偷偷运行的服务和进程，免得挡住卸载",
+              side: true,
+              rows: [
+                { label: "将停止的服务", items: svc, empty: "（无）" },
+                { label: "后台进程", items: resident, empty: "（当前无）" },
+              ],
+            },
+            { title: null, rows: [{ label: "卸载方式", items: ["用软件自带的卸载程序帮你卸掉，不直接删文件"], empty: "" }] },
+            { title: "检查有没有卸干净，还能顺手清掉残留的文件夹", rows: [] },
+          ];
+    return (
+      <motion.div
+        key="jobmodal"
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        exit={{ opacity: 0 }}
+        className="absolute inset-0 z-40 flex items-center justify-center bg-black/40 p-6"
+      >
+        <motion.div
+          initial={{ scale: 0.95, y: 12 }}
+          animate={{ scale: 1, y: 0 }}
+          exit={{ scale: 0.95, y: 12 }}
+          className="flex max-h-[86vh] w-[min(92%,660px)] flex-col overflow-hidden rounded-2xl bg-[var(--color-surface)] shadow-[var(--shadow-card-hover)]"
+        >
+          {/* 头部 */}
+          <div className="flex items-center gap-3 px-7 pt-6 pb-4">
+            {isForce ? (
+              <Flame size={24} className="text-[#B91C1C]" />
+            ) : isStop ? (
+              <Power size={24} className="text-[#B45309]" />
+            ) : (
+              <Trash2 size={24} className="text-[var(--color-primary)]" />
+            )}
+            <div className="min-w-0">
+              <div className="text-lg font-semibold">{headerTitle}</div>
+              <div className="truncate text-sm text-[var(--color-text-secondary)]">{job.entry.name}</div>
+            </div>
+            {(job.status === "done" || job.status === "fail") && (
+              <button onClick={closeJob} className="ml-auto rounded-lg p-1.5 text-[var(--color-text-secondary)] hover:bg-[var(--color-bg)]">
+                <X size={20} />
+              </button>
+            )}
+          </div>
+
+          {/* 主体 */}
+          <div className="flex-1 overflow-auto px-7 py-2">
+            {job.status === "confirm" && (
+              <div className="mx-auto flex w-full max-w-[500px] flex-col gap-4 pb-1">
+                {/* 主标题：软件图标 + 即将XX + 名称（居中放大，为最主要内容） */}
+                <div className="flex flex-col items-center gap-2 pt-2 text-center">
+                  {job.entry.icon ? (
+                    <img src={job.entry.icon} alt="" className="h-12 w-12 rounded-xl" />
+                  ) : (
+                    <Box size={40} className="text-[var(--color-text-secondary)] opacity-40" />
+                  )}
+                  <div className="text-sm text-[var(--color-text-secondary)]">即将{actionWord}</div>
+                  <div className="text-2xl font-bold" style={{ color: accent }}>{job.entry.name}</div>
+                </div>
+
+                {isForce && (
+                  <div className="flex items-center justify-center gap-1.5 text-sm font-semibold text-[#B91C1C]">
+                    <ShieldAlert size={16} />
+                    第 3 步会删除文件，且不可撤销
+                  </div>
+                )}
+
+                {/* 我们将做什么 —— 每步序号 + 对应明细框 */}
+                <div>
+                  <div className="mb-2 text-sm font-semibold">我们将做什么</div>
+                  {!job.plan ? (
+                    <div className="flex items-center gap-2 text-sm text-[var(--color-text-secondary)]">
+                      <Loader2 size={16} className="animate-spin" />
+                      {job.detail || "正在读取将处理的内容…"}
+                    </div>
+                  ) : (
+                    <div className="space-y-3">
+                      {confirmSteps.map((st, i) => (
+                        <div key={i} className="flex gap-2.5">
+                          <span
+                            className="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-xs font-bold text-white"
+                            style={{ background: accent }}
+                          >
+                            {i + 1}
+                          </span>
+                          <div className="flex-1 space-y-1.5">
+                            {st.title && (
+                              <div className="pt-0.5 text-sm font-medium leading-relaxed text-[var(--color-text-main)]">{st.title}</div>
+                            )}
+                            {st.rows.length > 0 && (
+                              <div className={st.side && st.rows.length > 1 ? "grid grid-cols-2 gap-2" : "space-y-1.5"}>
+                                {st.rows.map((r, j) => (
+                                  <div key={j}>{planRow(r.label, r.items, r.empty)}</div>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {job.status === "auth" && (
+              <div className="mx-auto flex h-full max-w-[440px] flex-col items-center justify-center gap-4 py-8 text-center">
+                <div
+                  className="flex h-14 w-14 items-center justify-center rounded-full"
+                  style={{ background: isForce ? "#FEF2F2" : "var(--color-primary-soft)" }}
+                >
+                  <ShieldAlert size={28} style={{ color: accent }} />
+                </div>
+                <div className="text-lg font-bold" style={{ color: accent }}>
+                  确定要{actionWord}「{job.entry.name}」吗？
+                </div>
+                <div className="text-[15px] leading-relaxed text-[var(--color-text-secondary)]">
+                  点「我知道了，继续」后，屏幕会弹出一个<b className="text-[var(--color-text-main)]">系统授权小窗</b>——点「是」就行。剩下的全交给我们，你不用再动手。
+                </div>
+              </div>
+            )}
+
+            {(job.status === "running" || job.status === "done" || job.status === "fail") && (
+              <div className="flex flex-col gap-6 py-5">
+                {/* 横向步骤条：一 — 二 — 三 — 四 排在一条线上 */}
+                <div className="flex items-start">
+                  {steps.map((s, i) => {
+                    const done = job.step > i;
+                    const current = job.step === i && job.status === "running";
+                    const active = done || current;
+                    return (
+                      <div key={i} className="flex flex-1 flex-col items-center">
+                        <div className="flex w-full items-center">
+                          <div
+                            className="h-0.5 flex-1"
+                            style={{ background: i === 0 ? "transparent" : job.step >= i ? accent : "var(--color-line)" }}
+                          />
+                          <div
+                            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-sm font-bold transition-colors"
+                            style={
+                              active
+                                ? { background: accent, color: "#fff" }
+                                : { background: "var(--color-bg)", color: "var(--color-text-secondary)" }
+                            }
+                          >
+                            {done ? <Check size={18} /> : i + 1}
+                          </div>
+                          <div
+                            className="h-0.5 flex-1"
+                            style={{
+                              background:
+                                i === steps.length - 1 ? "transparent" : job.step > i ? accent : "var(--color-line)",
+                            }}
+                          />
+                        </div>
+                        <div
+                          className={
+                            "mt-2 text-center text-xs leading-tight " +
+                            (current ? "font-semibold text-[var(--color-text-main)]" : "text-[var(--color-text-secondary)]")
+                          }
+                        >
+                          {s}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+
+                {/* 状态详情 */}
+                <div className="text-center text-[15px]">
+                  {job.status === "done" && (
+                    <div>
+                      <div className="flex items-center justify-center gap-2 font-semibold text-[var(--color-safe)]">
+                        <CheckCircle2 size={20} />
+                        {job.detail}
+                      </div>
+                      <div className="mx-auto mt-2 max-w-[460px] text-sm leading-relaxed text-[var(--color-text-secondary)]">
+                        {doneNote}
+                      </div>
+                    </div>
+                  )}
+                  {job.status === "running" && <div className="text-[var(--color-text-secondary)]">{job.detail}</div>}
+                  {job.status === "fail" && (
+                    <div className="rounded-xl bg-[#FEF2F2] px-4 py-3 text-left text-sm leading-relaxed text-[#991B1B]">
+                      {job.detail}
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* 底部按钮 */}
+          <div className="px-6 pb-5 pt-2">
+            {job.status === "confirm" && job.mode === "normal" && (
+              <div className="flex items-center gap-3">
+                <button
+                  onClick={() => startForce(job.entry)}
+                  className="mr-auto flex items-center gap-1.5 rounded-xl bg-[#DC2626] px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-[#B91C1C]"
+                >
+                  <Flame size={15} />
+                  改用强力卸载
+                </button>
+                <button onClick={closeJob} className="rounded-xl border border-[var(--color-line)] px-5 py-2.5 text-sm font-medium transition-colors hover:bg-[var(--color-bg)]">
+                  取消
+                </button>
+                <button onClick={() => setJob({ ...job, status: "auth" })} className="rounded-xl bg-[var(--color-primary)] px-6 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-[var(--color-primary-dark)]">
+                  开始卸载
+                </button>
+              </div>
+            )}
+            {job.status === "confirm" && job.mode === "stop" && (
+              <div className="flex items-center justify-end gap-3">
+                <button onClick={closeJob} className="rounded-xl border border-[var(--color-line)] px-5 py-2.5 text-sm font-medium transition-colors hover:bg-[var(--color-bg)]">
+                  取消
+                </button>
+                <button onClick={() => setJob({ ...job, status: "auth" })} className="rounded-xl bg-[#D97706] px-6 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-[#B45309]">
+                  确认停止后台
+                </button>
+              </div>
+            )}
+            {job.status === "confirm" && isForce && (
+              <div className="flex items-center justify-end gap-3">
+                <button onClick={closeJob} className="rounded-xl border border-[var(--color-line)] px-5 py-2.5 text-sm font-medium transition-colors hover:bg-[var(--color-bg)]">
+                  取消
+                </button>
+                <button
+                  disabled={!job.plan}
+                  onClick={() => setJob({ ...job, status: "auth" })}
+                  className="rounded-xl bg-[#DC2626] px-6 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-[#B91C1C] disabled:opacity-50"
+                >
+                  我已确认，强力卸载
+                </button>
+              </div>
+            )}
+            {job.status === "auth" && (
+              <div className="flex items-center justify-end gap-3">
+                <button
+                  onClick={() => setJob({ ...job, status: "confirm" })}
+                  className="rounded-xl border border-[var(--color-line)] px-5 py-2.5 text-sm font-medium transition-colors hover:bg-[var(--color-bg)]"
+                >
+                  再想想
+                </button>
+                <button
+                  onClick={runJob}
+                  className="rounded-xl px-6 py-2.5 text-sm font-semibold text-white transition-opacity hover:opacity-90"
+                  style={{ background: accent }}
+                >
+                  我知道了，继续
+                </button>
+              </div>
+            )}
+            {job.status === "running" && (
+              <div className="text-center text-sm text-[var(--color-text-secondary)]">正在处理，请稍等，马上就好…</div>
+            )}
+            {job.status === "done" && (
+              <div className="flex justify-end">
+                <button onClick={closeJob} className="rounded-xl bg-[var(--color-primary)] px-6 py-2.5 text-sm font-medium text-white transition-colors hover:bg-[var(--color-primary-dark)]">
+                  返回列表
+                </button>
+              </div>
+            )}
+            {job.status === "fail" && (
+              <div className="flex items-center justify-end gap-3">
+                {job.mode === "normal" && (
+                  <button
+                    onClick={() => startForce(job.entry)}
+                    className="mr-auto flex items-center gap-1.5 rounded-xl bg-[#DC2626] px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-[#B91C1C]"
+                  >
+                    <Flame size={15} />
+                    改用强力卸载
+                  </button>
+                )}
+                <button onClick={closeJob} className="rounded-xl border border-[var(--color-line)] px-5 py-2.5 text-sm font-medium transition-colors hover:bg-[var(--color-bg)]">
+                  关闭
+                </button>
+              </div>
+            )}
+          </div>
+        </motion.div>
+      </motion.div>
+    );
+  }
+
   return (
     <div className="flex h-full flex-col">
       <header className="flex items-start justify-between px-8 pt-6 pb-2">
@@ -236,13 +753,35 @@ export default function BloatwareCheck() {
           </p>
         </div>
         {phase === "ready" && (
-          <button
-            onClick={load}
-            className="flex items-center gap-1.5 rounded-xl border border-[var(--color-line)] bg-[var(--color-surface)] px-3.5 py-2 text-xs font-medium text-[var(--color-text-secondary)] transition-colors hover:border-[var(--color-primary)] hover:text-[var(--color-primary-dark)]"
-          >
-            <RotateCcw size={14} />
-            重新扫描
-          </button>
+          <div className="flex items-center gap-2">
+            <div className="flex rounded-xl border border-[var(--color-line)] p-0.5 text-xs font-medium">
+              <button
+                onClick={() => { if (showAll) load(false); }}
+                className={[
+                  "rounded-lg px-3 py-1.5 transition-colors",
+                  !showAll ? "bg-[var(--color-primary-soft)] text-[var(--color-primary-dark)]" : "text-[var(--color-text-secondary)]",
+                ].join(" ")}
+              >
+                需关注
+              </button>
+              <button
+                onClick={() => { if (!showAll) load(true); }}
+                className={[
+                  "rounded-lg px-3 py-1.5 transition-colors",
+                  showAll ? "bg-[var(--color-primary-soft)] text-[var(--color-primary-dark)]" : "text-[var(--color-text-secondary)]",
+                ].join(" ")}
+              >
+                全部软件
+              </button>
+            </div>
+            <button
+              onClick={() => load(showAll)}
+              className="flex items-center gap-1.5 rounded-xl border border-[var(--color-line)] bg-[var(--color-surface)] px-3.5 py-2 text-xs font-medium text-[var(--color-text-secondary)] transition-colors hover:border-[var(--color-primary)] hover:text-[var(--color-primary-dark)]"
+            >
+              <RotateCcw size={14} />
+              重新扫描
+            </button>
+          </div>
         )}
       </header>
 
@@ -266,8 +805,13 @@ export default function BloatwareCheck() {
 
           {/* 人话结论 */}
           <div className="mb-5 rounded-2xl bg-[var(--color-primary-soft)] px-5 py-3.5 text-sm leading-relaxed">
-            {active.length === 0 ? (
-              "没有需要重点关注的软件，挺清爽。常用/系统软件已自动折叠在下方。"
+            {showAll ? (
+              <>
+                已列出<b>全部 {active.length}</b> 个软件（常用/系统与已忽略的已折叠在下方）。均为客观陈述、
+                <b>不代表软件有害</b>；可按需打开位置或卸载——<b>绝不会替你自动删除任何东西</b>。
+              </>
+            ) : active.length === 0 ? (
+              "没有需要重点关注的软件，挺清爽。切到右上角「全部软件」可管理所有已装软件。"
             ) : (
               <>
                 为你列出了 <b>{active.length}</b>{" "}
@@ -296,7 +840,9 @@ export default function BloatwareCheck() {
           {/* 需重点关注 */}
           {active.length > 0 && (
             <>
-              <div className="mb-2 text-sm font-semibold">需要关注的软件（按负担排序）</div>
+              <div className="mb-2 text-sm font-semibold">
+                {showAll ? "全部软件（常用/系统已折叠在下方）" : "需要关注的软件（按负担排序）"}
+              </div>
               <div className="space-y-2">{active.map((e) => card(e, "active"))}</div>
             </>
           )}
@@ -339,49 +885,8 @@ export default function BloatwareCheck() {
         </div>
       )}
 
-      {/* 卸载二次确认弹窗 */}
-      <AnimatePresence>
-        {confirmTarget && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="absolute inset-0 z-30 flex items-center justify-center bg-black/30 p-6"
-            onClick={() => setConfirmTarget(null)}
-          >
-            <motion.div
-              initial={{ scale: 0.94, y: 10 }}
-              animate={{ scale: 1, y: 0 }}
-              exit={{ scale: 0.94, y: 10 }}
-              className="w-full max-w-md rounded-2xl bg-[var(--color-surface)] p-6 shadow-[var(--shadow-card-hover)]"
-              onClick={(ev) => ev.stopPropagation()}
-            >
-              <div className="text-base font-semibold">卸载前，确认一下</div>
-              <div className="mt-2 text-sm leading-relaxed text-[var(--color-text-secondary)]">
-                即将运行 <b className="text-[var(--color-text-main)]">{confirmTarget.name}</b>{" "}
-                自带的官方卸载程序。过程中可能会弹出该软件自己的卸载窗口，请按提示完成。
-              </div>
-              <div className="mt-3 rounded-xl bg-[var(--color-bg)] px-3.5 py-2.5 text-xs leading-relaxed text-[var(--color-text-secondary)]">
-                我们不会替你删除任何文件，只是帮你调起它官方的卸载流程；卸载后可选择清理残留目录。
-              </div>
-              <div className="mt-4 flex gap-3">
-                <button
-                  onClick={() => setConfirmTarget(null)}
-                  className="flex-1 rounded-xl border border-[var(--color-line)] py-2.5 text-sm font-medium transition-colors hover:bg-[var(--color-bg)]"
-                >
-                  再想想
-                </button>
-                <button
-                  onClick={() => doUninstall(confirmTarget)}
-                  className="flex-1 rounded-xl bg-[var(--color-primary)] py-2.5 text-sm font-medium text-white transition-colors hover:bg-[var(--color-primary-dark)]"
-                >
-                  确认卸载
-                </button>
-              </div>
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+      {/* 卸载进度弹窗（16:9 居中圆角，全程只在此交互，卸载期间主窗口置顶） */}
+      <AnimatePresence>{jobModal()}</AnimatePresence>
 
       {/* 卸载后残留清理提示 */}
       <AnimatePresence>

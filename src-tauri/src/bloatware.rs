@@ -66,6 +66,8 @@ pub struct BloatwareEntry {
     pub version: String,
     pub install_location: String,
     pub size_mb: Option<f64>,
+    /// 软件图标（PNG data URL，带透明通道）；提取失败为 None，前端用占位
+    pub icon: Option<String>,
     /// 中性行为标签：开机自启 / 后台常驻 / 占用较大
     pub tags: Vec<String>,
     /// 客观行为陈述（事实，不评价好坏）
@@ -190,6 +192,62 @@ fn autostart_count_for(install_location: &str, starts: &[String]) -> u32 {
     starts.iter().filter(|cmd| cmd.contains(&loc)).count() as u32
 }
 
+/// 枚举所有 Windows 服务的 ImagePath（小写），作为持久自启信号之一。
+fn service_commands() -> Vec<String> {
+    let mut out = Vec::new();
+    if let Ok(services) = RegKey::predef(HKEY_LOCAL_MACHINE).open_subkey(r"SYSTEM\CurrentControlSet\Services") {
+        for name in services.enum_keys().flatten() {
+            if let Ok(k) = services.open_subkey(&name) {
+                let img = read_str(&k, "ImagePath");
+                if !img.is_empty() {
+                    out.push(img.to_lowercase());
+                }
+            }
+        }
+    }
+    out
+}
+
+/// 解码计划任务 XML（多为 UTF-16LE BOM）。
+fn decode_task(bytes: &[u8]) -> String {
+    if bytes.len() >= 2 && bytes[0] == 0xFF && bytes[1] == 0xFE {
+        encoding_rs::UTF_16LE.decode(bytes).0.into_owned()
+    } else {
+        String::from_utf8_lossy(bytes).into_owned()
+    }
+}
+
+/// 枚举计划任务的 <Command> 执行路径（小写），作为持久自启信号之一。
+fn scheduled_task_commands() -> Vec<String> {
+    let root = std::path::PathBuf::from(std::env::var("SystemRoot").unwrap_or_else(|_| "C:\\Windows".into()))
+        .join("System32")
+        .join("Tasks");
+    let mut out = Vec::new();
+    fn walk(dir: &Path, out: &mut Vec<String>) {
+        let Ok(rd) = std::fs::read_dir(dir) else { return };
+        for e in rd.flatten() {
+            let p = e.path();
+            if p.is_dir() {
+                walk(&p, out);
+            } else if let Ok(bytes) = std::fs::read(&p) {
+                let low = decode_task(&bytes).to_lowercase();
+                let mut idx = 0;
+                while let Some(s) = low[idx..].find("<command>") {
+                    let start = idx + s + "<command>".len();
+                    let Some(e2) = low[start..].find("</command>") else { break };
+                    let cmd = low[start..start + e2].trim().trim_matches('"').to_string();
+                    if !cmd.is_empty() {
+                        out.push(cmd);
+                    }
+                    idx = start + e2;
+                }
+            }
+        }
+    }
+    walk(&root, &mut out);
+    out
+}
+
 // ---------- 注册表读取（补齐 collector 未读的字段） ----------
 
 struct InstalledApp {
@@ -200,6 +258,7 @@ struct InstalledApp {
     install_location: String,
     size_mb: Option<f64>,
     uninstall_string: String,
+    display_icon: String,
 }
 
 fn read_str(k: &RegKey, name: &str) -> String {
@@ -237,6 +296,7 @@ fn list_installed() -> Vec<InstalledApp> {
                     let s = read_str(&k, "QuietUninstallString");
                     if s.is_empty() { read_str(&k, "UninstallString") } else { s }
                 },
+                display_icon: read_str(&k, "DisplayIcon"),
             });
         }
     }
@@ -266,15 +326,77 @@ fn browser_notes() -> Vec<String> {
     notes
 }
 
+// ---------- 软件图标来源解析（提取实现见 crate::icon） ----------
+
+/// 从卸载命令里取出 exe 路径（去引号/参数）。
+fn exe_of(cmd: &str) -> String {
+    let c = cmd.trim();
+    if let Some(rest) = c.strip_prefix('"') {
+        if let Some(end) = rest.find('"') {
+            return rest[..end].to_string();
+        }
+    }
+    c.split_whitespace().next().unwrap_or("").to_string()
+}
+
+/// 在安装目录顶层挑一个"主程序 exe"（跳过卸载器/更新器，取体积最大的）。
+fn main_exe_in(dir: &str) -> Option<String> {
+    if dir.is_empty() {
+        return None;
+    }
+    let mut best: Option<(u64, String)> = None;
+    for e in std::fs::read_dir(dir).ok()?.flatten() {
+        let p = e.path();
+        if !p.extension().map(|x| x.eq_ignore_ascii_case("exe")).unwrap_or(false) {
+            continue;
+        }
+        let name = p.file_name().unwrap_or_default().to_string_lossy().to_lowercase();
+        if ["unins", "uninst", "update", "setup", "crash", "helper", "report"]
+            .iter()
+            .any(|k| name.contains(k))
+        {
+            continue;
+        }
+        let sz = e.metadata().map(|m| m.len()).unwrap_or(0);
+        if best.as_ref().map(|(b, _)| sz > *b).unwrap_or(true) {
+            best = Some((sz, p.to_string_lossy().to_string()));
+        }
+    }
+    best.map(|(_, p)| p)
+}
+
+/// 解析图标来源文件：DisplayIcon → 卸载器 exe → 安装目录主 exe（三级回退，尽量抠到图标）。
+fn resolve_icon_path(display_icon: &str, uninstall: &str, install_location: &str) -> Option<String> {
+    let mut s = display_icon.trim().trim_matches('"').to_string();
+    if let Some(idx) = s.rfind(',') {
+        let tail = s[idx + 1..].trim();
+        if !tail.is_empty() && tail.trim_start_matches('-').chars().all(|c| c.is_ascii_digit()) {
+            s = s[..idx].to_string();
+        }
+    }
+    let s = s.trim().trim_matches('"').to_string();
+    if !s.is_empty() && Path::new(&s).exists() {
+        return Some(s);
+    }
+    let exe = exe_of(uninstall);
+    if !exe.is_empty() && !exe.to_lowercase().contains("msiexec") && Path::new(&exe).exists() {
+        return Some(exe);
+    }
+    main_exe_in(install_location)
+}
+
 // ---------- 扫描 ----------
 
-pub fn scan(ignored: &HashSet<String>) -> BloatwareScan {
+pub fn scan(ignored: &HashSet<String>, include_all: bool) -> BloatwareScan {
     let procs = running_processes();
-    // 自启命令一次性枚举（小写），供所有软件比对，避免每个软件都全量枚举一次
-    let starts: Vec<String> = crate::startup::list_items()
+    // 自启命令一次性枚举（小写）：Run键/启动文件夹 + 服务 ImagePath + 计划任务 Command。
+    // 服务/计划任务是"持久信号"——软件当时跑不跑都能被发现，保证体检结果一致可信。
+    let mut starts: Vec<String> = crate::startup::list_items()
         .into_iter()
         .map(|it| it.command.to_lowercase())
         .collect();
+    starts.extend(service_commands());
+    starts.extend(scheduled_task_commands());
 
     let mut entries: Vec<BloatwareEntry> = Vec::new();
 
@@ -283,8 +405,8 @@ pub fn scan(ignored: &HashSet<String>) -> BloatwareScan {
         let resident = resident_mem_mb(&app.install_location, &procs);
         let large = app.size_mb.map(|m| m >= LARGE_MB).unwrap_or(false);
 
-        // 只列出有值得关注行为的软件（安静的小软件不打扰）
-        if autostart_count == 0 && resident == 0 && !large {
+        // 默认只列有值得关注行为的软件；include_all 时列出全部已装软件
+        if !include_all && autostart_count == 0 && resident == 0 && !large {
             continue;
         }
 
@@ -306,6 +428,18 @@ pub fn scan(ignored: &HashSet<String>) -> BloatwareScan {
         }
 
         let key = stable_key(&app.name, &app.publisher);
+        let icon_src = resolve_icon_path(&app.display_icon, &app.uninstall_string, &app.install_location);
+        let icon = icon_src.as_deref().and_then(crate::icon::from_file);
+        // 打开位置：优先 InstallLocation，缺失则用图标来源文件所在目录兜底
+        let open_dir = if !app.install_location.trim().is_empty() {
+            app.install_location.clone()
+        } else {
+            icon_src
+                .as_deref()
+                .and_then(|p| Path::new(p).parent())
+                .map(|d| d.to_string_lossy().to_string())
+                .unwrap_or_default()
+        };
         entries.push(BloatwareEntry {
             id: app.id,
             trusted: is_trusted(&app.name, &app.publisher),
@@ -314,8 +448,9 @@ pub fn scan(ignored: &HashSet<String>) -> BloatwareScan {
             name: app.name,
             publisher: app.publisher,
             version: app.version,
-            install_location: app.install_location,
+            install_location: open_dir,
             size_mb: app.size_mb,
+            icon,
             tags,
             behaviors,
             suggestion: "如果你不常用它，卸载可减少开机负担、释放空间；常用则保留即可。".to_string(),
@@ -371,25 +506,273 @@ fn still_installed(id: &str) -> bool {
         .unwrap_or(false)
 }
 
-/// 卸载：运行该软件自带的官方卸载程序并等待完成；以"注册表项是否消失"判定成败。
+/// 规整卸载命令：给"未加引号但含空格的 exe 路径"补引号，避免 cmd 在空格处截断
+/// （鲁大师等软件的 UninstallString 常不带引号，是"点了没反应"的元凶）。
+fn normalize_cmd(cmd: &str) -> String {
+    let c = cmd.trim();
+    if c.starts_with('"') {
+        return c.to_string();
+    }
+    if let Some(pos) = c.to_lowercase().find(".exe") {
+        let end = pos + 4;
+        let (path, args) = c.split_at(end);
+        if path.contains(' ') {
+            return format!("\"{}\"{}", path, args);
+        }
+    }
+    c.to_string()
+}
+
+/// 据 id 读取该软件的安装目录（用于停止后台运行）。
+fn install_loc_of(id: &str) -> String {
+    let Some((tag, sub)) = id.split_once(SEP) else { return String::new() };
+    let Some((_, hive, path)) = HIVES.iter().find(|(t, _, _)| *t == tag) else { return String::new() };
+    RegKey::predef(*hive)
+        .open_subkey(path)
+        .ok()
+        .and_then(|key| key.open_subkey(sub).ok())
+        .map(|k| read_str(&k, "InstallLocation"))
+        .unwrap_or_default()
+}
+
+/// 停止某安装目录下的相关服务与进程（**提权**执行，破服务常驻/自我保护）。
+pub fn stop_software(install_location: &str) -> Result<(), String> {
+    if install_location.trim().is_empty() {
+        return Ok(());
+    }
+    let script = format!("$ErrorActionPreference='SilentlyContinue'\n{}", ps_stop_block(install_location));
+    run_elevated_ps(&script)
+}
+
+/// 静默参数（方法A）：MSI→/qn /norestart；其余追加 NSIS(/S)+Inno(/VERYSILENT...) 常见静默开关
+/// （互不冲突，卸载器会忽略不认识的）。厂商自研卸载器可能都不认——那时走「强力卸载」。
+fn silent_uninstall_cmd(cmd: &str) -> String {
+    let base = normalize_cmd(cmd);
+    let low = base.to_lowercase();
+    if low.contains("msiexec") {
+        let mut s = base;
+        if !low.contains("/qn") && !low.contains("/quiet") {
+            s.push_str(" /qn");
+        }
+        if !low.contains("/norestart") {
+            s.push_str(" /norestart");
+        }
+        s
+    } else {
+        format!("{} /S /VERYSILENT /SUPPRESSMSGBOXES /NORESTART", base)
+    }
+}
+
+/// 把卸载命令写入 GBK 批处理（正确处理中文路径），返回路径。
+fn write_uninstall_bat(cmd: &str) -> Result<std::path::PathBuf, String> {
+    let bat = std::env::temp_dir().join("diskbutler-uninstall.bat");
+    let content = format!("@echo off\r\n{}\r\n", cmd);
+    let (bytes, _, _) = encoding_rs::GBK.encode(&content);
+    std::fs::write(&bat, &bytes).map_err(|e| format!("准备卸载失败：{}", e))?;
+    Ok(bat)
+}
+
+/// 进度标记文件：提权授权通过、脚本真正开始执行后才会被创建，供前端轮询判断"已授权"。
+fn op_marker() -> std::path::PathBuf {
+    std::env::temp_dir().join("diskbutler-op-started.flag")
+}
+
+/// 提权操作是否已真正开始（用户已在 UAC 点"是"）。
+pub fn op_started() -> bool {
+    op_marker().exists()
+}
+
+fn run_elevated_ps(script: &str) -> Result<(), String> {
+    let marker = op_marker();
+    let _ = std::fs::remove_file(&marker);
+    let ps1 = std::env::temp_dir().join("diskbutler-op.ps1");
+    // 首行创建标记文件——它只会在 UAC 授权通过、脚本真正开始执行后产生
+    let full = format!(
+        "New-Item -ItemType File -Force -Path '{}' | Out-Null\n{}",
+        op_marker().to_string_lossy().replace('\'', "''"),
+        script
+    );
+    let mut bytes = vec![0xEFu8, 0xBB, 0xBF];
+    bytes.extend_from_slice(full.as_bytes());
+    std::fs::write(&ps1, &bytes).map_err(|e| format!("准备脚本失败：{}", e))?;
+    let outer = format!(
+        "Start-Process powershell -Verb RunAs -Wait -ArgumentList '-NoProfile','-ExecutionPolicy','Bypass','-File','{}'",
+        ps1.display()
+    );
+    let r = std::process::Command::new("powershell")
+        .args(["-NoProfile", "-Command", &outer])
+        .status();
+    let _ = std::fs::remove_file(&ps1);
+    let _ = std::fs::remove_file(&marker);
+    r.map(|_| ()).map_err(|e| format!("提权失败：{}", e))
+}
+
+/// PowerShell 单引号转义。
+fn ps_quote(s: &str) -> String {
+    s.replace('\'', "''")
+}
+
+/// 停止安装目录下相关服务、结束进程的 PS 片段（提权环境执行）。
+fn ps_stop_block(loc: &str) -> String {
+    if loc.trim().is_empty() {
+        return String::new();
+    }
+    format!(
+        "$loc='{}'\nGet-CimInstance Win32_Service | ? {{ $_.PathName -and $_.PathName.ToLower().Contains($loc.ToLower()) }} | % {{ Stop-Service $_.Name -Force -EA SilentlyContinue }}\nGet-Process | ? {{ $_.Path -and $_.Path.ToLower().StartsWith($loc.ToLower()) }} | Stop-Process -Force -EA SilentlyContinue\nStart-Sleep -Milliseconds 300\n",
+        ps_quote(loc)
+    )
+}
+
+/// 方法A卸载：单次提权脚本 = 停服务 + 杀进程 + 静默运行官方卸载器。用户只授权一次。
 pub fn uninstall(id: &str) -> Result<(), String> {
-    use std::os::windows::process::CommandExt;
-    const CREATE_NO_WINDOW: u32 = 0x0800_0000;
-
     let (_name, cmd) = uninstall_string_of(id).ok_or_else(|| "找不到该软件的卸载程序".to_string())?;
-
-    // 通过 cmd /C 原样执行卸载命令串（自身含引号，交给 cmd 解析）；
-    // 卸载器如需管理员会自行弹 UAC。等待其结束。
-    let status = std::process::Command::new("cmd")
-        .arg("/C")
-        .raw_arg(&cmd)
-        .creation_flags(CREATE_NO_WINDOW)
-        .status()
-        .map_err(|e| format!("启动卸载程序失败：{}", e))?;
-    let _ = status;
-
+    let loc = install_loc_of(id);
+    let bat = write_uninstall_bat(&silent_uninstall_cmd(&cmd))?;
+    let bat_path = bat.to_string_lossy().to_string();
+    let script = format!(
+        "$ErrorActionPreference='SilentlyContinue'\n{}& cmd.exe /c '{}'\n",
+        ps_stop_block(&loc),
+        ps_quote(&bat_path)
+    );
+    run_elevated_ps(&script)?;
+    let _ = std::fs::remove_file(&bat);
     if still_installed(id) {
-        Err("卸载未完成（可能已取消，或该软件卸载后需重启）。可稍后重新扫描确认。".to_string())
+        Err("卸载未完成（可能取消了授权，或该软件不支持静默卸载）。可试试「强力卸载」。".to_string())
+    } else {
+        Ok(())
+    }
+}
+
+// ---------- 强力卸载（方法C：自己停/删服务、任务、目录、注册表） ----------
+
+/// 强力卸载预览：将删除的内容清单，供前端红色二次确认。
+#[derive(serde::Serialize)]
+pub struct ForcePlan {
+    pub name: String,
+    pub install_dir: String,
+    pub dir_deletable: bool,
+    pub services: Vec<String>,
+    pub tasks: Vec<String>,
+    pub reg_path: String,
+}
+
+/// ImagePath 位于安装目录下的服务名。
+fn services_under(loc: &str) -> Vec<String> {
+    let mut out = Vec::new();
+    if loc.trim().is_empty() {
+        return out;
+    }
+    let l = loc.trim_end_matches('\\').to_lowercase();
+    if let Ok(services) = RegKey::predef(HKEY_LOCAL_MACHINE).open_subkey(r"SYSTEM\CurrentControlSet\Services") {
+        for name in services.enum_keys().flatten() {
+            if let Ok(k) = services.open_subkey(&name) {
+                if read_str(&k, "ImagePath").to_lowercase().contains(&l) {
+                    out.push(name);
+                }
+            }
+        }
+    }
+    out
+}
+
+/// 执行命令位于安装目录下的计划任务名（\路径\名）。
+fn tasks_under(loc: &str) -> Vec<String> {
+    if loc.trim().is_empty() {
+        return Vec::new();
+    }
+    let l = loc.trim_end_matches('\\').to_lowercase();
+    let root = std::path::PathBuf::from(std::env::var("SystemRoot").unwrap_or_else(|_| "C:\\Windows".into()))
+        .join("System32")
+        .join("Tasks");
+    let mut out = Vec::new();
+    fn walk(dir: &Path, root: &Path, l: &str, out: &mut Vec<String>) {
+        let Ok(rd) = std::fs::read_dir(dir) else { return };
+        for e in rd.flatten() {
+            let p = e.path();
+            if p.is_dir() {
+                walk(&p, root, l, out);
+            } else if let Ok(bytes) = std::fs::read(&p) {
+                if decode_task(&bytes).to_lowercase().contains(l) {
+                    if let Ok(rel) = p.strip_prefix(root) {
+                        out.push(format!("\\{}", rel.to_string_lossy()));
+                    }
+                }
+            }
+        }
+    }
+    walk(&root, &root, &l, &mut out);
+    out
+}
+
+/// 安装目录是否可安全删除（存在、是目录、位于常规安装根下、非盘根）。
+fn dir_safe_to_delete(dir: &str) -> bool {
+    if dir.trim().is_empty() {
+        return false;
+    }
+    let path = Path::new(dir);
+    if !path.is_dir() {
+        return false;
+    }
+    let Ok(canon) = path.canonicalize() else { return false };
+    install_roots().iter().any(|root| {
+        root.canonicalize().map(|rc| canon.starts_with(&rc) && canon != rc).unwrap_or(false)
+    })
+}
+
+/// 注册表卸载项的 PowerShell 路径（用于删除）。
+fn reg_ps_path(id: &str) -> String {
+    let Some((tag, sub)) = id.split_once(SEP) else { return String::new() };
+    let (prefix, base) = match tag {
+        "hklm64" => ("HKLM:", r"SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall"),
+        "hklm32" => ("HKLM:", r"SOFTWARE\WOW6432Node\Microsoft\Windows\CurrentVersion\Uninstall"),
+        "hkcu" => ("HKCU:", r"SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall"),
+        _ => return String::new(),
+    };
+    format!("{}\\{}\\{}", prefix, base, sub)
+}
+
+/// 强力卸载预览：列出将删除的目录/服务/计划任务/注册表项。
+pub fn force_preview(id: &str) -> ForcePlan {
+    let name = uninstall_string_of(id).map(|(n, _)| n).unwrap_or_default();
+    let dir = install_loc_of(id);
+    ForcePlan {
+        name,
+        dir_deletable: dir_safe_to_delete(&dir),
+        services: services_under(&dir),
+        tasks: tasks_under(&dir),
+        reg_path: reg_ps_path(id),
+        install_dir: dir,
+    }
+}
+
+/// 强力卸载执行：单次提权脚本——停/删服务→删计划任务→杀进程→(先尝试官方静默卸载)→删目录→删注册表项。
+pub fn force_uninstall(id: &str) -> Result<(), String> {
+    let loc = install_loc_of(id);
+    let reg = reg_ps_path(id);
+    let bat_line = if let Some((_, cmd)) = uninstall_string_of(id) {
+        let bat = write_uninstall_bat(&silent_uninstall_cmd(&cmd))?;
+        let bat_path = bat.to_string_lossy().to_string();
+        format!("& cmd.exe /c '{}'\nStart-Sleep -Milliseconds 500\n", ps_quote(&bat_path))
+    } else {
+        String::new()
+    };
+    let mut s = String::from("$ErrorActionPreference='SilentlyContinue'\n");
+    if !loc.trim().is_empty() {
+        s.push_str(&format!("$loc='{}'\n", ps_quote(&loc)));
+        s.push_str("Get-CimInstance Win32_Service | ? { $_.PathName -and $_.PathName.ToLower().Contains($loc.ToLower()) } | % { Stop-Service $_.Name -Force -EA SilentlyContinue; sc.exe delete $_.Name | Out-Null }\n");
+        s.push_str("Get-ScheduledTask | ? { (($_.Actions | % { $_.Execute }) -join ' ') -match [Regex]::Escape($loc) } | % { Unregister-ScheduledTask -TaskName $_.TaskName -TaskPath $_.TaskPath -Confirm:$false }\n");
+        s.push_str("Get-Process | ? { $_.Path -and $_.Path.ToLower().StartsWith($loc.ToLower()) } | Stop-Process -Force -EA SilentlyContinue\nStart-Sleep -Milliseconds 300\n");
+    }
+    s.push_str(&bat_line);
+    if dir_safe_to_delete(&loc) {
+        s.push_str("if (Test-Path -LiteralPath $loc) { Remove-Item -LiteralPath $loc -Recurse -Force -EA SilentlyContinue }\n");
+    }
+    if !reg.is_empty() {
+        s.push_str(&format!("Remove-Item -LiteralPath '{}' -Recurse -Force -EA SilentlyContinue\n", ps_quote(&reg)));
+    }
+    run_elevated_ps(&s)?;
+    if still_installed(id) {
+        Err("强力卸载可能未完全清除（部分文件被占用或需重启）。重启后可再扫描确认。".to_string())
     } else {
         Ok(())
     }
@@ -525,5 +908,21 @@ mod tests {
         let (tag, sub) = id.split_once(SEP).unwrap();
         assert_eq!(tag, "hklm64");
         assert_eq!(sub, "{GUID-1234}");
+    }
+
+    #[test]
+    fn exe_of_handles_quoted_and_msi() {
+        assert_eq!(exe_of("\"C:\\Program Files\\Foo\\uninst.exe\" /S"), "C:\\Program Files\\Foo\\uninst.exe");
+        assert_eq!(exe_of("MsiExec.exe /X{ABC}"), "MsiExec.exe");
+    }
+
+    #[test]
+    fn normalize_cmd_quotes_unquoted_spaced_exe() {
+        assert_eq!(
+            normalize_cmd(r"C:\Program Files\Foo\uninst.exe /S"),
+            "\"C:\\Program Files\\Foo\\uninst.exe\" /S"
+        );
+        assert_eq!(normalize_cmd("\"C:\\Program Files\\Foo\\u.exe\""), "\"C:\\Program Files\\Foo\\u.exe\"");
+        assert_eq!(normalize_cmd("MsiExec.exe /X{ABC}"), "MsiExec.exe /X{ABC}");
     }
 }

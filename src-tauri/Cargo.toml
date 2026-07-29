@@ -36,6 +36,8 @@ windows-sys = { version = "0.59", features = [
     "Win32_Security",
     "Win32_Security_Authorization",
     "Win32_Storage_FileSystem",
+    "Win32_UI_WindowsAndMessaging",
+    "Win32_Graphics_Gdi",
 ] }
 winreg = "0.52"
 encoding_rs = "0.8"
@@ -43,6 +45,8 @@ encoding_rs = "0.8"
 ntfs-reader = "0.4"
 windows-service = "0.8"
 rayon = "1"
+# 软件体检：图标提取后编码为 PNG（仅启用 png 编码器，控制体积）
+image = { version = "0.25", default-features = false, features = ["png"] }
 
 [profile.dev]
 # 加快扫描相关依赖的运行速度；关闭调试信息以降低编译内存峰值（16GB 内存机器必需）
