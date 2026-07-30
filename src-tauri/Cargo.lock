@@ -800,7 +800,7 @@ dependencies = [
 
 [[package]]
 name = "disk-butler"
-version = "0.7.2"
+version = "0.7.3"
 dependencies = [
  "encoding_rs",
  "image",
