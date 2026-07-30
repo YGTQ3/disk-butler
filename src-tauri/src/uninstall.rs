@@ -251,28 +251,30 @@ pub fn list_installed() -> Vec<InstalledApp> {
         }
     }
 
-    apps.extend(list_uwp());
     apps.sort_by(|a, b| a.name.to_lowercase().cmp(&b.name.to_lowercase()));
     apps
 }
 
 /// 枚举可卸载的 UWP/商店应用（Get-AppxPackage），解析友好名与包内 logo。
 /// 过滤框架包/系统包/不可卸载项；DisplayName 为 ms-resource 时退回包名末段。
-fn list_uwp() -> Vec<InstalledApp> {
+pub fn list_uwp() -> Vec<InstalledApp> {
     use std::os::windows::process::CommandExt;
     let script = r#"[Console]::OutputEncoding=[System.Text.Encoding]::UTF8
 $ErrorActionPreference='SilentlyContinue'
 $apps = Get-AppxPackage | Where-Object { -not $_.IsFramework -and -not $_.NonRemovable -and $_.SignatureKind -ne 'System' }
 $list = foreach ($p in $apps) {
   $dn=''; $logo=''; $pub=''
-  try {
-    $m = Get-AppxPackageManifest -Package $p.PackageFullName
-    $dn = [string]$m.Package.Properties.DisplayName
-    $pub = [string]$m.Package.Properties.PublisherDisplayName
-    $logo = [string]$m.Package.Properties.Logo
-    $vdn = [string]$m.Package.Applications.Application.VisualElements.DisplayName
-    if (($dn -eq '' -or $dn -like 'ms-resource:*') -and $vdn -and $vdn -notlike 'ms-resource:*') { $dn = $vdn }
-  } catch {}
+  $mf = Join-Path $p.InstallLocation 'AppxManifest.xml'
+  if ($p.InstallLocation -and (Test-Path -LiteralPath $mf)) {
+    try {
+      [xml]$x = Get-Content -LiteralPath $mf -Raw -Encoding UTF8
+      $dn = [string]$x.Package.Properties.DisplayName
+      $pub = [string]$x.Package.Properties.PublisherDisplayName
+      $logo = [string]$x.Package.Properties.Logo
+      $vdn = [string]$x.Package.Applications.Application.VisualElements.DisplayName
+      if (($dn -eq '' -or $dn -like 'ms-resource:*') -and $vdn -and $vdn -notlike 'ms-resource:*') { $dn = $vdn }
+    } catch {}
+  }
   if (-not $dn -or $dn -like 'ms-resource:*') { $dn = ($p.Name -split '\.')[-1] }
   $logoPath=''
   if ($p.InstallLocation -and $logo) {

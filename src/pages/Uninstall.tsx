@@ -52,9 +52,23 @@ export default function Uninstall() {
   const requestedIcons = useRef<Set<string>>(new Set());
 
   async function load(): Promise<InstalledApp[]> {
-    const list = await invoke<InstalledApp[]>("list_installed_apps");
-    setApps(list);
-    return list;
+    // Win32（注册表）瞬时返回，先渲染；UWP 较慢，随后合并
+    const win32 = await invoke<InstalledApp[]>("list_installed_apps");
+    setApps(win32);
+    let uwp: InstalledApp[] = [];
+    try {
+      uwp = await invoke<InstalledApp[]>("list_uwp_apps");
+    } catch {
+      /* UWP 枚举失败不影响主列表 */
+    }
+    const merged =
+      uwp.length === 0
+        ? win32
+        : [...win32, ...uwp].sort((a, b) =>
+            a.name.toLowerCase().localeCompare(b.name.toLowerCase()),
+          );
+    setApps(merged);
+    return merged;
   }
 
   /** 轮询等待指定软件从列表消失（很多卸载器子进程异步执行，进程返回时注册表键还在）。 */
@@ -69,8 +83,25 @@ export default function Uninstall() {
   }
 
   useEffect(() => {
-    load()
-      .then(() => setPhase("ready"))
+    // 首屏做到“打开即显示”：Win32（注册表枚举，瞬时）先出并置为 ready，
+    // UWP（Get-AppxPackage 较慢）后台异步追加，避免开屏等待。
+    invoke<InstalledApp[]>("list_installed_apps")
+      .then((win32) => {
+        setApps(win32);
+        setPhase("ready");
+        invoke<InstalledApp[]>("list_uwp_apps")
+          .then((uwp) => {
+            if (uwp.length === 0) return;
+            setApps((prev) => {
+              const ids = new Set(prev.map((a) => a.id));
+              const add = uwp.filter((u) => !ids.has(u.id));
+              return [...prev, ...add].sort((a, b) =>
+                a.name.toLowerCase().localeCompare(b.name.toLowerCase()),
+              );
+            });
+          })
+          .catch(() => {});
+      })
       .catch((e) => {
         setError(String(e));
         setPhase("ready");

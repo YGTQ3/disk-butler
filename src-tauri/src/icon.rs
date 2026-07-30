@@ -14,6 +14,10 @@ fn try_icon_file(path: &str, idx: i32) -> Option<(u32, u32, Vec<u8>)> {
     if p.is_empty() || !Path::new(&p).exists() {
         return None;
     }
+    // 首选 PrivateExtractIcons：按固定尺寸(64)栅格化，对现代/大尺寸/PNG压缩图标最稳（如微信 Weixin.exe）
+    if let Some(r) = extract_via_private(&p, idx, 64) {
+        return Some(r);
+    }
     if let Some(r) = extract_icon_rgba(&p, idx) {
         return Some(r);
     }
@@ -317,6 +321,39 @@ fn main_exe_in(dir: &str) -> Option<String> {
         }
     }
     best.map(|(_, p)| p.to_string_lossy().to_string())
+}
+
+/// user32 导出的 PrivateExtractIconsW（windows-sys 未在 Shell 模块暴露，自行声明）。
+#[link(name = "user32")]
+extern "system" {
+    fn PrivateExtractIconsW(
+        szfilename: *const u16,
+        niconindex: i32,
+        cxicon: i32,
+        cyicon: i32,
+        phicon: *mut *mut core::ffi::c_void,
+        piconid: *mut u32,
+        nicons: u32,
+        flags: u32,
+    ) -> u32;
+}
+
+/// 用 PrivateExtractIconsW 按指定像素尺寸栅格化取图标（对现代/PNG压缩/大尺寸图标最可靠）。
+fn extract_via_private(path: &str, index: i32, size: i32) -> Option<(u32, u32, Vec<u8>)> {
+    use windows_sys::Win32::UI::WindowsAndMessaging::DestroyIcon;
+    let wide: Vec<u16> = path.encode_utf16().chain(std::iter::once(0)).collect();
+    let idx = if index < 0 { 0 } else { index };
+    unsafe {
+        let mut hicon: *mut core::ffi::c_void = std::ptr::null_mut();
+        let mut id: u32 = 0;
+        let n = PrivateExtractIconsW(wide.as_ptr(), idx, size, size, &mut hicon, &mut id, 1, 0);
+        if n == 0 || n == u32::MAX || hicon.is_null() {
+            return None;
+        }
+        let out = hicon_to_rgba(hicon as _);
+        DestroyIcon(hicon as _);
+        out
+    }
 }
 
 /// 用 ExtractIconExW 按索引取图标。

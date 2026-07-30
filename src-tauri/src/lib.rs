@@ -171,6 +171,14 @@ async fn list_installed_apps() -> Result<Vec<InstalledApp>, String> {
         .map_err(|e| format!("枚举已装软件失败：{}", e))
 }
 
+/// 枚举 UWP/商店应用（较慢，前端在 Win32 列表渲染后异步追加，保证“打开即显示”）。
+#[tauri::command]
+async fn list_uwp_apps() -> Result<Vec<InstalledApp>, String> {
+    tauri::async_runtime::spawn_blocking(uninstall::list_uwp)
+        .await
+        .map_err(|e| format!("枚举商店应用失败：{}", e))
+}
+
 /// 调用软件自带卸载器（向导模式），阻塞等待其结束，返回退出码。
 #[tauri::command]
 async fn run_app_uninstaller(id: String) -> Result<i32, String> {
@@ -260,6 +268,7 @@ pub fn run() {
             scan_service_available,
             repair_scan_service,
             list_installed_apps,
+            list_uwp_apps,
             run_app_uninstaller,
             scan_app_leftovers,
             remove_app_leftovers,
