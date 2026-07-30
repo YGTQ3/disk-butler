@@ -35,6 +35,7 @@ interface BloatwareEntry {
   behaviors: string[];
   suggestion: string;
   trusted: boolean;
+  security: boolean;
   dismissed: boolean;
   uninstallable: boolean;
   autostartCount: number;
@@ -99,6 +100,8 @@ export default function BloatwareCheck() {
   const [msg, setMsg] = useState("");
   // 卸载任务（进度弹窗）：confirm → running → done/fail
   const [job, setJob] = useState<UninJob | null>(null);
+  // 安全软件卸载引导弹窗（有自我保护，无法静默卸载，只能引导用户走官方流程）
+  const [guide, setGuide] = useState<BloatwareEntry | null>(null);
 
   const [residue, setResidue] = useState<{ name: string; detail: ResidueDetail } | null>(null);
   const [cleaningResidue, setCleaningResidue] = useState(false);
@@ -280,8 +283,9 @@ export default function BloatwareCheck() {
   }
 
   const entries = scan?.entries ?? [];
-  const active = entries.filter((e) => !e.trusted && !e.dismissed);
-  const trusted = entries.filter((e) => e.trusted && !e.dismissed);
+  const security = entries.filter((e) => e.security && !e.dismissed);
+  const active = entries.filter((e) => !e.security && !e.trusted && !e.dismissed);
+  const trusted = entries.filter((e) => e.trusted && !e.security && !e.dismissed);
   const dismissed = entries.filter((e) => e.dismissed);
 
   /** 单个软件卡片。group 决定右下角的附加按钮。 */
@@ -332,7 +336,7 @@ export default function BloatwareCheck() {
               打开位置
             </button>
           )}
-          {e.residentMemMb > 0 && (
+          {!e.security && e.residentMemMb > 0 && (
             <button
               onClick={() => stopSoftware(e)}
               className="flex items-center gap-1.5 rounded-lg border border-[#FDE68A] bg-[#FFFBEB] px-3 py-1.5 text-xs font-medium text-[#92400E] transition-colors hover:bg-[#FEF3C7]"
@@ -341,32 +345,44 @@ export default function BloatwareCheck() {
               停止后台运行
             </button>
           )}
-          {e.uninstallable && (
+          {e.security ? (
             <button
-              onClick={() => startUninstall(e)}
+              onClick={() => setGuide(e)}
               className="flex items-center gap-1.5 rounded-lg bg-[var(--color-primary)] px-3.5 py-1.5 text-xs font-medium text-white transition-colors hover:bg-[var(--color-primary-dark)]"
             >
-              <Trash2 size={13} />
-              一键卸载
+              <ShieldAlert size={13} />
+              卸载（按步骤）
             </button>
-          )}
-          {!!e.installLocation && (
-            <button
-              onClick={() => startForce(e)}
-              className="flex items-center gap-1.5 rounded-lg border border-[#FCA5A5] px-3 py-1.5 text-xs font-medium text-[#B91C1C] transition-colors hover:bg-[#FEF2F2]"
-            >
-              <Flame size={13} />
-              强力卸载
-            </button>
-          )}
-          {!e.uninstallable && !e.installLocation && (
-            <button
-              onClick={() => invoke("open_apps_settings")}
-              className="flex items-center gap-1.5 rounded-lg border border-[var(--color-line)] px-3 py-1.5 text-xs font-medium text-[var(--color-text-secondary)] transition-colors hover:border-[var(--color-primary)] hover:text-[var(--color-primary-dark)]"
-            >
-              <Trash2 size={13} />
-              去系统卸载
-            </button>
+          ) : (
+            <>
+              {e.uninstallable && (
+                <button
+                  onClick={() => startUninstall(e)}
+                  className="flex items-center gap-1.5 rounded-lg bg-[var(--color-primary)] px-3.5 py-1.5 text-xs font-medium text-white transition-colors hover:bg-[var(--color-primary-dark)]"
+                >
+                  <Trash2 size={13} />
+                  一键卸载
+                </button>
+              )}
+              {!!e.installLocation && (
+                <button
+                  onClick={() => startForce(e)}
+                  className="flex items-center gap-1.5 rounded-lg border border-[#FCA5A5] px-3 py-1.5 text-xs font-medium text-[#B91C1C] transition-colors hover:bg-[#FEF2F2]"
+                >
+                  <Flame size={13} />
+                  强力卸载
+                </button>
+              )}
+              {!e.uninstallable && !e.installLocation && (
+                <button
+                  onClick={() => invoke("open_apps_settings")}
+                  className="flex items-center gap-1.5 rounded-lg border border-[var(--color-line)] px-3 py-1.5 text-xs font-medium text-[var(--color-text-secondary)] transition-colors hover:border-[var(--color-primary)] hover:text-[var(--color-primary-dark)]"
+                >
+                  <Trash2 size={13} />
+                  去系统卸载
+                </button>
+              )}
+            </>
           )}
           {group === "dismissed" ? (
             <button
@@ -589,34 +605,43 @@ export default function BloatwareCheck() {
                     const done = job.step > i;
                     const current = job.step === i && job.status === "running";
                     const active = done || current;
+                    const running = job.status === "running";
+                    // 连接线：左半段(前一步→本步)已达则填充；右半段(本步→下一步)已过则填充
+                    const leftFilled = job.step >= i;
+                    const rightFilled = job.step > i;
+                    const seg = (filled: boolean, hide: boolean) => (
+                      <div className="relative h-1.5 flex-1 overflow-hidden rounded-full" style={{ background: hide ? "transparent" : filled ? accent : "var(--color-line)" }}>
+                        {filled && !hide && running && <span className="step-shine" />}
+                      </div>
+                    );
                     return (
                       <div key={i} className="flex flex-1 flex-col items-center">
                         <div className="flex w-full items-center">
-                          <div
-                            className="h-0.5 flex-1"
-                            style={{ background: i === 0 ? "transparent" : job.step >= i ? accent : "var(--color-line)" }}
-                          />
-                          <div
-                            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-sm font-bold transition-colors"
-                            style={
-                              active
-                                ? { background: accent, color: "#fff" }
-                                : { background: "var(--color-bg)", color: "var(--color-text-secondary)" }
-                            }
-                          >
-                            {done ? <Check size={18} /> : i + 1}
+                          {seg(leftFilled, i === 0)}
+                          <div className="relative z-10 -mx-1 shrink-0">
+                            {/* 当前阶段：外圈转圈 */}
+                            {current && (
+                              <span
+                                className="absolute -inset-1.5 animate-spin rounded-full border-2 border-transparent"
+                                style={{ borderTopColor: accent, borderRightColor: accent }}
+                              />
+                            )}
+                            <div
+                              className="flex h-10 w-10 items-center justify-center rounded-full text-sm font-bold transition-colors"
+                              style={
+                                active
+                                  ? { background: accent, color: "#fff" }
+                                  : { background: "var(--color-bg)", color: "var(--color-text-secondary)" }
+                              }
+                            >
+                              {done ? <Check size={18} /> : i + 1}
+                            </div>
                           </div>
-                          <div
-                            className="h-0.5 flex-1"
-                            style={{
-                              background:
-                                i === steps.length - 1 ? "transparent" : job.step > i ? accent : "var(--color-line)",
-                            }}
-                          />
+                          {seg(rightFilled, i === steps.length - 1)}
                         </div>
                         <div
                           className={
-                            "mt-2 text-center text-xs leading-tight " +
+                            "mt-2.5 text-center text-xs leading-tight " +
                             (current ? "font-semibold text-[var(--color-text-main)]" : "text-[var(--color-text-secondary)]")
                           }
                         >
@@ -837,6 +862,32 @@ export default function BloatwareCheck() {
             </div>
           )}
 
+          {/* 多杀软共存提醒 */}
+          {security.length >= 2 && (
+            <div className="mb-4 rounded-2xl border border-[#FCA5A5] bg-[#FEF2F2] p-4 shadow-[var(--shadow-card)]">
+              <div className="flex items-center gap-2 text-sm font-semibold text-[#B91C1C]">
+                <ShieldAlert size={16} />
+                检测到 {security.length} 款安全 / 杀毒软件同时安装
+              </div>
+              <div className="mt-1.5 text-xs leading-relaxed text-[#991B1B]">
+                多个杀毒软件共存通常会<b>互相冲突</b>：抢占系统进程、拖慢开机与日常运行、占用大量内存，甚至互相误判查杀。
+                <b>建议只保留 1 款</b>就够了，其余可以卸载；保留 0 款也行——Windows 自带的 Defender 已提供基础防护。
+              </div>
+            </div>
+          )}
+
+          {/* 安全软件 / 杀毒软件（单独归类） */}
+          {security.length > 0 && (
+            <>
+              <div className="mb-2 flex items-center gap-1.5 text-sm font-semibold">
+                <ShieldAlert size={15} className="text-[var(--color-primary-dark)]" />
+                安全软件 / 杀毒软件（{security.length}）
+              </div>
+              <div className="space-y-2">{security.map((e) => card(e, "active"))}</div>
+              <div className="mb-5" />
+            </>
+          )}
+
           {/* 需重点关注 */}
           {active.length > 0 && (
             <>
@@ -887,6 +938,83 @@ export default function BloatwareCheck() {
 
       {/* 卸载进度弹窗（16:9 居中圆角，全程只在此交互，卸载期间主窗口置顶） */}
       <AnimatePresence>{jobModal()}</AnimatePresence>
+
+      {/* 安全软件卸载引导弹窗（自我保护无法静默卸载，引导用户走官方流程） */}
+      <AnimatePresence>
+        {guide && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="absolute inset-0 z-40 flex items-center justify-center bg-black/40 p-6"
+            onClick={() => setGuide(null)}
+          >
+            <motion.div
+              initial={{ scale: 0.95, y: 12 }}
+              animate={{ scale: 1, y: 0 }}
+              exit={{ scale: 0.95, y: 12 }}
+              className="flex max-h-[86vh] w-[min(92%,620px)] flex-col overflow-hidden rounded-2xl bg-[var(--color-surface)] shadow-[var(--shadow-card-hover)]"
+              onClick={(ev) => ev.stopPropagation()}
+            >
+              <div className="flex items-center gap-3 px-7 pt-6 pb-3">
+                <ShieldAlert size={24} className="text-[var(--color-primary-dark)]" />
+                <div className="min-w-0">
+                  <div className="text-lg font-semibold">卸载安全软件</div>
+                  <div className="truncate text-sm text-[var(--color-text-secondary)]">{guide.name}</div>
+                </div>
+                <button onClick={() => setGuide(null)} className="ml-auto rounded-lg p-1.5 text-[var(--color-text-secondary)] hover:bg-[var(--color-bg)]">
+                  <X size={20} />
+                </button>
+              </div>
+
+              <div className="flex-1 overflow-auto px-7 py-2">
+                <div className="rounded-xl bg-[#FEF2F2] px-4 py-3 text-sm leading-relaxed text-[#991B1B]">
+                  <b>{guide.name}</b> 是安全 / 杀毒软件，带<b>内核级自我保护</b>——任何第三方（包括我们）都<b>无法替你静默停止或卸载</b>。这是杀软防止被恶意程序卸载的正常防护，<b>不是故障</b>。所以要你亲自在它自己的流程里完成。
+                </div>
+
+                <div className="mt-4 mb-2 text-sm font-semibold">按这几步做</div>
+                <ol className="space-y-3">
+                  {[
+                    "点下面「打开它自带的卸载程序」，会弹出它自己的卸载界面（可能需要授权、可能有挽留或广告页，属正常）。",
+                    "按它的提示一步步走完；如果它要求先「关闭自我保护 / 退出防护」，先照做再继续卸载。",
+                    "若卸载被拦截或失败：重启电脑 → 开机时进入 Windows「安全模式」（自我保护不加载）→ 再卸载一次通常就能成功。",
+                    "卸载完回到这里点右上角「重新扫描」，确认它是否已消失。",
+                  ].map((s, i) => (
+                    <li key={i} className="flex items-start gap-2.5 text-sm leading-relaxed">
+                      <span className="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-[var(--color-primary-dark)] text-xs font-bold text-white">
+                        {i + 1}
+                      </span>
+                      <span>{s}</span>
+                    </li>
+                  ))}
+                </ol>
+
+                <div className="mt-4 rounded-xl bg-[var(--color-bg)] px-4 py-3 text-[13px] leading-relaxed text-[var(--color-text-secondary)]">
+                  提醒：卸载杀毒软件会降低电脑防护。若你打算不再装同类软件，Windows 自带的 Defender 会自动接管基础防护；若装了多款，建议只留 1 款。
+                </div>
+              </div>
+
+              <div className="flex items-center justify-end gap-3 px-6 pb-5 pt-2">
+                <button
+                  onClick={() => setGuide(null)}
+                  className="rounded-xl border border-[var(--color-line)] px-5 py-2.5 text-sm font-medium transition-colors hover:bg-[var(--color-bg)]"
+                >
+                  关闭
+                </button>
+                <button
+                  onClick={() => {
+                    invoke("open_official_uninstaller", { id: guide.id }).catch((e) => setMsg(String(e)));
+                    setGuide(null);
+                  }}
+                  className="rounded-xl bg-[var(--color-primary)] px-6 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-[var(--color-primary-dark)]"
+                >
+                  打开它自带的卸载程序
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* 卸载后残留清理提示 */}
       <AnimatePresence>

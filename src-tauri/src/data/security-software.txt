@@ -1,0 +1,45 @@
+# 安全软件 / 杀毒软件识别清单（关键词，匹配软件名或发行商，小写子串匹配）
+# 命中即归入「安全软件 / 杀毒软件」分类：多款共存会提示冲突；卸载走诚实引导（自我保护无法静默卸载）。
+# 一行一条，# 开头为注释。故意用较具体的词，避免"安全"这类过宽词误伤。
+
+# —— 国产 ——
+安全卫士
+360杀毒
+360安全
+奇虎
+qihoo
+电脑管家
+金山毒霸
+毒霸
+kingsoft antivirus
+火绒
+huorong
+瑞星
+rising antivirus
+2345安全卫士
+百度杀毒
+百度卫士
+可牛杀毒
+
+# —— 国际 ——
+卡巴斯基
+kaspersky
+诺顿
+norton
+symantec endpoint
+mcafee
+迈克菲
+avast
+avg antivirus
+avira
+小红伞
+bitdefender
+eset
+nod32
+trend micro
+趋势科技
+malwarebytes
+f-secure
+sophos
+comodo
+webroot

@@ -76,3 +76,24 @@ body,
     transform: translateX(400%);
   }
 }
+
+/* 步骤条：已填充连接线上流动的光影高亮 */
+@keyframes step-shimmer {
+  0% {
+    transform: translateX(-130%);
+  }
+  100% {
+    transform: translateX(230%);
+  }
+}
+.step-shine {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgba(255, 255, 255, 0.75) 50%,
+    transparent 100%
+  );
+  animation: step-shimmer 1.5s linear infinite;
+}

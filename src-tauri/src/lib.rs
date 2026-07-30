@@ -250,6 +250,14 @@ fn op_started() -> bool {
     bloatware::op_started()
 }
 
+/// 前台打开软件自带的官方卸载程序（安全软件等自我保护软件走引导，不提权/不静默）。
+#[tauri::command]
+async fn open_official_uninstaller(id: String) -> Result<(), String> {
+    tauri::async_runtime::spawn_blocking(move || bloatware::open_official_uninstaller(&id))
+        .await
+        .map_err(|e| format!("打开失败：{}", e))?
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
@@ -282,7 +290,8 @@ pub fn run() {
             bloatware_force_preview,
             force_uninstall_software,
             set_always_on_top,
-            op_started
+            op_started,
+            open_official_uninstaller
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

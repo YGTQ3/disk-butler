@@ -36,6 +36,8 @@ const HIVES: [(&str, winreg::HKEY, &str); 3] = [
 /// 命中发行商或软件名即视为常用/系统，折叠降噪；只影响默认显示，不影响卸载能力。
 const TRUSTED_PUBLISHERS_RAW: &str = include_str!("data/trusted-publishers.txt");
 const TRUSTED_NAMES_RAW: &str = include_str!("data/trusted-names.txt");
+/// 安全软件/杀毒软件识别清单（关键词，匹配名称或发行商）：命中单独归类 + 卸载走诚实引导。
+const SECURITY_RAW: &str = include_str!("data/security-software.txt");
 
 /// 解析清单文本：按行 trim、跳过空行与 # 注释、统一小写。
 fn parse_list(raw: &str) -> Vec<String> {
@@ -50,6 +52,19 @@ fn parse_list(raw: &str) -> Vec<String> {
 fn trusted_lists() -> &'static (Vec<String>, Vec<String>) {
     static LISTS: OnceLock<(Vec<String>, Vec<String>)> = OnceLock::new();
     LISTS.get_or_init(|| (parse_list(TRUSTED_PUBLISHERS_RAW), parse_list(TRUSTED_NAMES_RAW)))
+}
+
+/// 安全软件关键词表（首次解析后缓存）。
+fn security_list() -> &'static Vec<String> {
+    static LIST: OnceLock<Vec<String>> = OnceLock::new();
+    LIST.get_or_init(|| parse_list(SECURITY_RAW))
+}
+
+/// 是否为安全软件/杀毒软件（关键词命中名称或发行商）。
+fn is_security(name: &str, publisher: &str) -> bool {
+    let n = name.to_lowercase();
+    let p = publisher.to_lowercase();
+    security_list().iter().any(|k| n.contains(k.as_str()) || (!p.is_empty() && p.contains(k.as_str())))
 }
 
 // ---------- 数据结构 ----------
@@ -76,6 +91,8 @@ pub struct BloatwareEntry {
     pub suggestion: String,
     /// 命中内置受信任/系统白名单（前端降权折叠为"常用/系统"）
     pub trusted: bool,
+    /// 是否安全软件/杀毒软件（前端单独归类 + 卸载走诚实引导）
+    pub security: bool,
     /// 用户已手动"不再提醒"（前端折叠为"已忽略"，可恢复）
     pub dismissed: bool,
     /// 是否可一键卸载（有 UninstallString）
@@ -404,9 +421,10 @@ pub fn scan(ignored: &HashSet<String>, include_all: bool) -> BloatwareScan {
         let autostart_count = autostart_count_for(&app.install_location, &starts);
         let resident = resident_mem_mb(&app.install_location, &procs);
         let large = app.size_mb.map(|m| m >= LARGE_MB).unwrap_or(false);
+        let security = is_security(&app.name, &app.publisher);
 
-        // 默认只列有值得关注行为的软件；include_all 时列出全部已装软件
-        if !include_all && autostart_count == 0 && resident == 0 && !large {
+        // 默认只列有值得关注行为的软件；安全软件即使当时无行为也列出（单独归类）；include_all 时全列
+        if !include_all && !security && autostart_count == 0 && resident == 0 && !large {
             continue;
         }
 
@@ -443,6 +461,7 @@ pub fn scan(ignored: &HashSet<String>, include_all: bool) -> BloatwareScan {
         entries.push(BloatwareEntry {
             id: app.id,
             trusted: is_trusted(&app.name, &app.publisher),
+            security,
             dismissed: ignored.contains(&key),
             key,
             name: app.name,
@@ -644,6 +663,21 @@ pub fn uninstall(id: &str) -> Result<(), String> {
 }
 
 // ---------- 强力卸载（方法C：自己停/删服务、任务、目录、注册表） ----------
+
+/// 前台打开软件自带的官方卸载程序（不提权、不静默、不置顶）——用于安全软件等
+/// 有内核级自我保护、必须由用户在其自带流程里亲自走完的情况。卸载器会自行按需弹 UAC。
+pub fn open_official_uninstaller(id: &str) -> Result<(), String> {
+    use std::os::windows::process::CommandExt;
+    const CREATE_NO_WINDOW: u32 = 0x0800_0000;
+    let (_name, cmd) = uninstall_string_of(id).ok_or_else(|| "找不到该软件的卸载程序".to_string())?;
+    std::process::Command::new("cmd")
+        .arg("/C")
+        .raw_arg(normalize_cmd(&cmd))
+        .creation_flags(CREATE_NO_WINDOW)
+        .spawn()
+        .map(|_| ())
+        .map_err(|e| format!("打开卸载程序失败：{}", e))
+}
 
 /// 强力卸载预览：将删除的内容清单，供前端红色二次确认。
 #[derive(serde::Serialize)]
