@@ -1,13 +1,14 @@
 import { useState } from "react";
-import { HardDrive, Sparkles, Rocket, Cpu, Trash2, ShieldCheck, HeartHandshake } from "lucide-react";
+import { HardDrive, Sparkles, Rocket, Cpu, Trash2, Zap, ShieldCheck, HeartHandshake } from "lucide-react";
 import DiskInsight from "./pages/DiskInsight";
 import Cleanup from "./pages/Cleanup";
 import Startup from "./pages/Startup";
 import MemoryCheck from "./pages/MemoryCheck";
 import Uninstall from "./pages/Uninstall";
+import ForceDelete from "./pages/ForceDelete";
 import ContributeModal from "./components/ContributeModal";
 
-type PageId = "insight" | "clean" | "uninstall" | "startup" | "memory";
+type PageId = "insight" | "clean" | "uninstall" | "forcedelete" | "startup" | "memory";
 
 interface NavItem {
   id: PageId;
@@ -20,6 +21,7 @@ const NAV_ITEMS: NavItem[] = [
   { id: "insight", label: "磁盘透视", icon: <HardDrive size={20} />, ready: true },
   { id: "clean", label: "一键清理", icon: <Sparkles size={20} />, ready: true },
   { id: "uninstall", label: "软件卸载", icon: <Trash2 size={20} />, ready: true },
+  { id: "forcedelete", label: "强力删除", icon: <Zap size={20} />, ready: true },
   { id: "startup", label: "启动管理", icon: <Rocket size={20} />, ready: true },
   { id: "memory", label: "内存体检", icon: <Cpu size={20} />, ready: true },
 ];
@@ -116,6 +118,11 @@ function App() {
         {visited.has("uninstall") && (
           <div className={page === "uninstall" ? "h-full" : "hidden"}>
             <Uninstall />
+          </div>
+        )}
+        {visited.has("forcedelete") && (
+          <div className={page === "forcedelete" ? "h-full" : "hidden"}>
+            <ForceDelete active={page === "forcedelete"} />
           </div>
         )}
         {visited.has("startup") && (

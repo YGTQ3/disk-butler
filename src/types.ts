@@ -268,3 +268,13 @@ export interface RemoveResult {
   ok: boolean;
   error: string | null;
 }
+
+// ---------- 强力删除（Restart Manager 定位占用进程） ----------
+
+/** 占用某文件/文件夹的进程（与 Rust force_delete::LockingProcess 对应） */
+export interface LockingProcess {
+  pid: number;
+  name: string;
+  /** 系统关键进程：禁止终止 */
+  isCritical: boolean;
+}

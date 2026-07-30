@@ -13,8 +13,10 @@ import {
   AlertTriangle,
   CheckCircle2,
   XCircle,
+  Zap,
 } from "lucide-react";
 import { InstalledApp, LeftoverItem, RemoveResult, formatBytes } from "../types";
+import ForceDeleteModal from "../components/ForceDeleteModal";
 
 type Phase = "loading" | "ready";
 
@@ -42,6 +44,8 @@ export default function Uninstall() {
   const [leftoverChecked, setLeftoverChecked] = useState<Set<string>>(new Set());
   const [removing, setRemoving] = useState(false);
   const [removeResults, setRemoveResults] = useState<RemoveResult[] | null>(null);
+  /** 强力删除弹窗目标路径（残留删除失败时，关闭占用进程后再删） */
+  const [forceTarget, setForceTarget] = useState<string | null>(null);
 
   /** 图标缓存：按 app.id（回退会用到 installLocation，不能只按 iconPath 缓存） */
   const [icons, setIcons] = useState<Record<string, string>>({});
@@ -407,7 +411,7 @@ export default function Uninstall() {
               {/* 残留列表 */}
               <div className="flex-1 overflow-y-auto px-6 py-4">
                 {removeResults ? (
-                  <ResultList results={removeResults} />
+                  <ResultList results={removeResults} onForceDelete={setForceTarget} />
                 ) : leftover.items.length === 0 ? (
                   <div className="py-8 text-center text-sm text-[var(--color-text-secondary)]">
                     很干净，没有发现明显残留 🎉
@@ -458,6 +462,21 @@ export default function Uninstall() {
               </div>
             </motion.div>
           </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* 强力删除弹窗：残留删除失败被占用时，关闭占用进程后再删 */}
+      <AnimatePresence>
+        {forceTarget && (
+          <ForceDeleteModal
+            path={forceTarget}
+            onClose={() => setForceTarget(null)}
+            onDeleted={(p) =>
+              setRemoveResults((prev) =>
+                prev ? prev.map((r) => (r.path === p ? { ...r, ok: true, error: null } : r)) : prev,
+              )
+            }
+          />
         )}
       </AnimatePresence>
     </div>
@@ -526,7 +545,13 @@ function LeftoverGroup({
 }
 
 /** 删除结果列表 */
-function ResultList({ results }: { results: RemoveResult[] }) {
+function ResultList({
+  results,
+  onForceDelete,
+}: {
+  results: RemoveResult[];
+  onForceDelete: (path: string) => void;
+}) {
   const ok = results.filter((r) => r.ok).length;
   const fail = results.length - ok;
   return (
@@ -555,6 +580,15 @@ function ResultList({ results }: { results: RemoveResult[] }) {
             </span>
             {!r.ok && r.error && (
               <span className="shrink-0 text-[11px] text-[var(--color-caution)]">{r.error}</span>
+            )}
+            {!r.ok && !/^(HKEY|HKCU|HKLM|HKCR|HKU)/i.test(r.path) && (
+              <button
+                onClick={() => onForceDelete(r.path)}
+                className="flex shrink-0 items-center gap-1 rounded-lg border border-[var(--color-caution)] px-2 py-1 text-[11px] text-[var(--color-caution)] transition-colors hover:bg-[var(--color-caution)] hover:text-white"
+              >
+                <Zap size={11} />
+                强力删除
+              </button>
             )}
           </div>
         ))}

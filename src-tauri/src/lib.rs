@@ -1,6 +1,7 @@
 mod cache;
 mod cleanup;
 mod collector;
+mod force_delete;
 mod icon;
 pub mod knowledge;
 mod memory;
@@ -14,6 +15,7 @@ mod uninstall;
 
 use cache::ScanCache;
 use cleanup::{CleanupReport, CleanupScan, DeepAnalyzeReport, DeepCleanReport};
+use force_delete::LockingProcess;
 use memory::MemoryReport;
 use scan::{DriveInfo, TreeNode};
 use startup::StartupItem;
@@ -215,6 +217,26 @@ async fn app_icon(
     .flatten()
 }
 
+/// 查找占用指定文件/文件夹的进程（Restart Manager，资源监视器同款）。
+#[tauri::command]
+async fn find_file_lockers(path: String) -> Vec<LockingProcess> {
+    tauri::async_runtime::spawn_blocking(move || force_delete::find_lockers(&path))
+        .await
+        .unwrap_or_default()
+}
+
+/// 强力删除：先尝试关句柄解锁，仍占用则结束整个占用应用后删除（to_recycle=true 进回收站可恢复）。
+#[tauri::command]
+async fn force_delete_path(
+    path: String,
+    pids: Vec<u32>,
+    to_recycle: bool,
+) -> Result<(), String> {
+    tauri::async_runtime::spawn_blocking(move || force_delete::force_delete(&path, pids, to_recycle))
+        .await
+        .map_err(|e| format!("强力删除任务失败：{}", e))?
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
@@ -241,7 +263,9 @@ pub fn run() {
             run_app_uninstaller,
             scan_app_leftovers,
             remove_app_leftovers,
-            app_icon
+            app_icon,
+            find_file_lockers,
+            force_delete_path
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
