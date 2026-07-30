@@ -1,7 +1,10 @@
-//! 从 exe / ico / lnk 提取图标为 PNG data URL（带透明通道），供软件体检、启动管理等复用。
+//! 从 exe / ico / lnk 提取图标为 PNG data URL（带透明通道），供软件体检、启动管理、内存体检等复用。
 //! 流程：GDI 抠 HICON → GetDIBits 取像素 → BGRA→RGBA → image 编 PNG → base64 data URL。
+//! 结果按路径进程内缓存（同一 exe 图标基本不变），刷新时命中缓存、免重复抠图。
 
+use std::collections::HashMap;
 use std::path::Path;
+use std::sync::{Mutex, OnceLock};
 
 /// 标准 base64 编码（自实现，避免额外依赖）。
 pub fn base64(data: &[u8]) -> String {
@@ -95,13 +98,31 @@ fn extract_png(path: &str) -> Option<Vec<u8>> {
 }
 
 /// 提取指定文件（exe/ico/lnk）的图标为 PNG data URL；文件不存在或提取失败返回 None。
+/// 结果按路径缓存（含 None）——同一进程内重复刷新直接命中，不再重复抠图。
 pub fn from_file(path: &str) -> Option<String> {
-    if path.is_empty() || !Path::new(path).exists() {
+    if path.is_empty() {
         return None;
     }
-    let png = extract_png(path)?;
-    Some(format!("data:image/png;base64,{}", base64(&png)))
+    let key = path.to_lowercase();
+    let cache = CACHE.get_or_init(|| Mutex::new(HashMap::new()));
+    if let Ok(map) = cache.lock() {
+        if let Some(hit) = map.get(&key) {
+            return hit.clone();
+        }
+    }
+    let result = if Path::new(path).exists() {
+        extract_png(path).map(|png| format!("data:image/png;base64,{}", base64(&png)))
+    } else {
+        None
+    };
+    if let Ok(mut map) = cache.lock() {
+        map.insert(key, result.clone());
+    }
+    result
 }
+
+/// 图标缓存：路径(小写) → data URL 或 None。
+static CACHE: OnceLock<Mutex<HashMap<String, Option<String>>>> = OnceLock::new();
 
 #[cfg(test)]
 mod tests {

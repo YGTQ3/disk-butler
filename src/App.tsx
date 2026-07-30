@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { HardDrive, Sparkles, Rocket, Cpu, ShieldCheck, ShieldAlert, HeartHandshake } from "lucide-react";
+import { HardDrive, Sparkles, Rocket, Cpu, ShieldCheck, HeartHandshake } from "lucide-react";
 import DiskInsight from "./pages/DiskInsight";
 import Cleanup from "./pages/Cleanup";
 import Startup from "./pages/Startup";
@@ -21,7 +21,8 @@ const NAV_ITEMS: NavItem[] = [
   { id: "clean", label: "一键清理", icon: <Sparkles size={20} />, ready: true },
   { id: "startup", label: "启动管理", icon: <Rocket size={20} />, ready: true },
   { id: "memory", label: "内存体检", icon: <Cpu size={20} />, ready: true },
-  { id: "bloatware", label: "软件体检", icon: <ShieldAlert size={20} />, ready: true },
+  // 「软件体检」功能仍在完善，暂时隐藏入口（代码保留，随时可恢复此条目）
+  // { id: "bloatware", label: "软件体检", icon: <ShieldAlert size={20} />, ready: true },
 ];
 
 function App() {

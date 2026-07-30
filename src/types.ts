@@ -163,6 +163,7 @@ export interface ProcessGroup {
   kind: "closable" | "system" | "unknown";
   count: number;
   memory: number;
+  icon?: string | null;
 }
 
 export interface MemoryReport {

@@ -23,6 +23,8 @@ pub struct ProcessGroup {
     pub kind: String,
     pub count: u32,
     pub memory: u64,
+    /// 程序图标（PNG data URL），提取失败为 None，前端用占位
+    pub icon: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -244,14 +246,23 @@ pub fn report() -> MemoryReport {
         swap_used: sys.used_swap(),
     };
 
-    // 按进程名分组聚合
+    // 按进程名分组聚合；同时记录每组一个代表性 exe 路径（供抠图标）
     let mut map: std::collections::HashMap<String, (u32, u64)> = std::collections::HashMap::new();
+    let mut paths: std::collections::HashMap<String, String> = std::collections::HashMap::new();
     for proc in sys.processes().values() {
         let name = proc.name().to_string_lossy().to_string();
         let key = name.trim_end_matches(".exe").to_string();
-        let entry = map.entry(key).or_insert((0, 0));
+        let entry = map.entry(key.clone()).or_insert((0, 0));
         entry.0 += 1;
         entry.1 += proc.memory();
+        if !paths.contains_key(&key) {
+            if let Some(p) = proc.exe() {
+                let s = p.to_string_lossy().to_string();
+                if !s.is_empty() {
+                    paths.insert(key, s);
+                }
+            }
+        }
     }
 
     let mut groups: Vec<ProcessGroup> = map
@@ -269,12 +280,20 @@ pub fn report() -> MemoryReport {
                 name,
                 count,
                 memory,
+                icon: None,
             }
         })
         .collect();
 
     groups.sort_by(|a, b| b.memory.cmp(&a.memory));
     groups.truncate(20);
+
+    // 仅对排行前 20 抠图标（GDI 提取有开销，无需对全部进程做）
+    for g in &mut groups {
+        if let Some(p) = paths.get(&g.name) {
+            g.icon = crate::icon::from_file(p);
+        }
+    }
 
     MemoryReport { overview, groups }
 }

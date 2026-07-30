@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
-import { Loader2, RotateCcw, Cpu, MemoryStick, AlertTriangle } from "lucide-react";
+import { Loader2, RotateCcw, Cpu, MemoryStick, AlertTriangle, Box } from "lucide-react";
 import { MemoryReport, PagefileCheck, formatBytes } from "../types";
 
 type Phase = "loading" | "ready";
@@ -193,6 +193,11 @@ export default function MemoryCheck() {
                   className="rounded-2xl bg-[var(--color-surface)] px-4 py-3 shadow-[var(--shadow-card)]"
                 >
                   <div className="flex items-center gap-2">
+                    {g.icon ? (
+                      <img src={g.icon} alt="" className="h-5 w-5 shrink-0 rounded-sm" />
+                    ) : (
+                      <Box size={18} className="shrink-0 text-[var(--color-text-secondary)] opacity-40" />
+                    )}
                     <span className="text-sm font-semibold">{g.friendlyName}</span>
                     {g.friendlyName !== g.name && (
                       <span className="text-xs text-[var(--color-text-secondary)]">{g.name}</span>
