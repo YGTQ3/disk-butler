@@ -573,57 +573,53 @@ export default function Cleanup() {
                   </div>
                 )}
 
-                {/* 分析结果：预计可释放 + 用户决定是否清理 */}
+                {/* 分析结果：左明细 + 右绿色底「预计可释放」大字 + 清理按钮（与系统深度清理同款） */}
                 {sysPhase === "analyzed" && sysAnalyze && (
-                  <div className="mt-3 rounded-xl bg-[var(--color-bg)] p-3.5">
-                    <div className="flex items-end justify-between gap-3">
-                      <div className="space-y-1 text-xs text-[var(--color-text-secondary)]">
-                        <div>
-                          系统临时文件（Windows\Temp）：
-                          <b className="text-[var(--color-text-main)]">{formatBytes(sysAnalyze.tempBytes)}</b>
+                  <div className="mt-3 flex gap-3">
+                    {/* 左：各项当前大小明细（数字加粗更黑，一眼看清） */}
+                    <div className="min-w-0 flex-1 rounded-xl bg-[var(--color-bg)] p-3.5">
+                      <div className="mb-2 text-xs font-medium">📊 各项当前大小</div>
+                      <div className="space-y-1.5 text-xs text-[var(--color-text-secondary)]">
+                        <div className="flex items-center justify-between gap-2">
+                          <span>系统临时文件（Windows\Temp）</span>
+                          <b className="shrink-0 text-sm text-[var(--color-text-main)]">
+                            {formatBytes(sysAnalyze.tempBytes)}
+                          </b>
                         </div>
-                        <div>
-                          更新下载缓存（SoftwareDistribution\Download）：
-                          <b className="text-[var(--color-text-main)]">{formatBytes(sysAnalyze.updateCacheBytes)}</b>
-                          {sysAnalyze.updatePending && (
-                            <span className="ml-1 text-[var(--color-keep)]">· 有挂起更新，将跳过不清</span>
-                          )}
+                        <div className="flex items-center justify-between gap-2">
+                          <span>更新下载缓存（SoftwareDistribution\Download）</span>
+                          <b className="shrink-0 text-sm text-[var(--color-text-main)]">
+                            {formatBytes(sysAnalyze.updateCacheBytes)}
+                          </b>
                         </div>
+                        {sysAnalyze.updatePending && (
+                          <div className="text-[var(--color-keep)]">· 检测到挂起更新，清理时将跳过更新缓存</div>
+                        )}
                       </div>
-                      <div className="shrink-0 text-right">
-                        <div className="text-[11px] text-[var(--color-text-secondary)]">预计可释放</div>
-                        <div className="text-2xl font-bold text-[var(--color-primary-dark)]">
+                    </div>
+                    {/* 右：绿色底预计释放 + 清理按钮 */}
+                    <div className="flex w-56 shrink-0 flex-col items-center justify-center gap-3 rounded-xl bg-[var(--color-primary-soft)] p-4 text-center">
+                      <div>
+                        <div className="text-xs text-[var(--color-text-secondary)]">预计可释放</div>
+                        <div className="mt-0.5 text-2xl font-bold text-[var(--color-primary-dark)]">
                           {formatBytes(
                             sysAnalyze.tempBytes +
                               (sysAnalyze.updatePending ? 0 : sysAnalyze.updateCacheBytes)
                           )}
                         </div>
                       </div>
-                    </div>
-
-                    {sysAnalyze.tempBytes +
-                      (sysAnalyze.updatePending ? 0 : sysAnalyze.updateCacheBytes) <
-                    50 * 1024 * 1024 ? (
-                      <div className="mt-3 rounded-lg bg-[var(--color-primary-soft)] px-3 py-2 text-xs text-[var(--color-text-secondary)]">
-                        目前可释放不多（不到 50 MB），系统还算干净，可以先不清、等攒多了再来。
-                      </div>
-                    ) : null}
-
-                    <div className="mt-3 flex gap-2">
+                      {sysAnalyze.tempBytes +
+                        (sysAnalyze.updatePending ? 0 : sysAnalyze.updateCacheBytes) <
+                      50 * 1024 * 1024 ? (
+                        <div className="text-xs text-[var(--color-text-secondary)]">
+                          目前不多，可以先不清、等攒多了再来
+                        </div>
+                      ) : null}
                       <button
                         onClick={() => setSysPhase("confirm")}
-                        className="rounded-xl bg-[var(--color-primary)] px-4 py-2 text-xs font-semibold text-white transition-colors hover:bg-[var(--color-primary-dark)]"
+                        className="w-full rounded-xl bg-[var(--color-primary)] py-2.5 text-sm font-semibold text-white transition-colors hover:bg-[var(--color-primary-dark)]"
                       >
-                        确认清理（需再次授权）
-                      </button>
-                      <button
-                        onClick={() => {
-                          setSysPhase("idle");
-                          setSysAnalyze(null);
-                        }}
-                        className="rounded-xl border border-[var(--color-line)] px-4 py-2 text-xs font-medium text-[var(--color-text-secondary)] transition-colors hover:text-[var(--color-text-main)]"
-                      >
-                        先不清
+                        确认清理…
                       </button>
                     </div>
                   </div>
@@ -652,12 +648,12 @@ export default function Cleanup() {
                   </div>
                 )}
 
-                {(sysPhase === "idle" || sysPhase === "done") && (
+                {(sysPhase === "idle" || sysPhase === "analyzed" || sysPhase === "done") && (
                   <button
                     onClick={() => setSysPhase("intro")}
                     className="mt-3 rounded-xl border border-[var(--color-line)] px-4 py-2 text-xs font-medium transition-colors hover:border-[var(--color-primary)] hover:text-[var(--color-primary-dark)]"
                   >
-                    {sysPhase === "done" ? "重新分析" : "分析（只读，需管理员）"}
+                    {sysPhase === "idle" ? "分析（只读，需管理员）" : "重新分析"}
                   </button>
                 )}
               </div>
