@@ -1143,7 +1143,17 @@ pub fn analyze_system_clean() -> Result<SystemAnalyzeReport, String> {
     use std::os::windows::process::CommandExt;
     const CREATE_NO_WINDOW: u32 = 0x0800_0000;
 
-    let log = std::env::temp_dir().join("diskbutler-sysclean-size.txt");
+    // 用不可预测的随机文件名（pid+纳秒），避免固定 %TEMP% 路径被同账户进程预置 junction
+    // 劫持提权写入（承接 docs/17 的 TOCTOU 加固原则；DEV-STANDARDS §二.8）
+    let uniq = format!(
+        "{}-{}",
+        std::process::id(),
+        std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map(|d| d.as_nanos())
+            .unwrap_or(0)
+    );
+    let log = std::env::temp_dir().join(format!("diskbutler-sysclean-{}.txt", uniq));
     let _ = std::fs::remove_file(&log);
     let inner = format!(
         "$t=(Get-ChildItem -LiteralPath \"$env:SystemRoot\\Temp\" -Recurse -Force -File -ErrorAction SilentlyContinue | Measure-Object Length -Sum).Sum; \
