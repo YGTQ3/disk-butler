@@ -24,6 +24,7 @@ import {
   CleanupStats,
   DeepCleanReport,
   DeepAnalyzeReport,
+  SystemCleanReport,
   formatBytes,
   openInExplorer,
 } from "../types";
@@ -78,6 +79,25 @@ export default function Cleanup() {
   const [deepError, setDeepError] = useState("");
   /** 深度清理完成后的结果弹窗（关闭后卡片内仍保留一行小结） */
   const [showDeepResult, setShowDeepResult] = useState(false);
+
+  // 高级：系统级清理（Windows\Temp + 更新缓存，单步提权：确认 → 提权执行 → 结果）
+  const [sysPhase, setSysPhase] = useState<"idle" | "confirm" | "running" | "done">("idle");
+  const [sysReport, setSysReport] = useState<SystemCleanReport | null>(null);
+  const [sysError, setSysError] = useState("");
+
+  async function doSystemClean() {
+    setSysPhase("running");
+    setSysError("");
+    try {
+      const r = await invoke<SystemCleanReport>("run_deep_clean_system");
+      setSysReport(r);
+      setSysPhase("done");
+      loadStats();
+    } catch (e) {
+      setSysError(String(e));
+      setSysPhase("idle");
+    }
+  }
 
   // 累计清理统计（本地持久化的成就感数字）
   const [stats, setStats] = useState<CleanupStats | null>(null);
@@ -493,6 +513,91 @@ export default function Cleanup() {
                     className="mt-3 rounded-xl border border-[var(--color-line)] px-4 py-2 text-xs font-medium transition-colors hover:border-[var(--color-primary)] hover:text-[var(--color-primary-dark)]"
                   >
                     {deepPhase === "analyzed" ? "重新分析" : "分析（只读）"}
+                  </button>
+                )}
+              </div>
+            </div>
+
+            {/* 高级 · 系统临时文件 + 更新缓存（单步提权） */}
+            <div className="mb-6">
+              <div className="mb-2 flex items-center gap-2">
+                <span className="flex items-center gap-1.5 text-sm font-semibold">
+                  <Wrench size={15} />
+                  高级 · 系统临时文件 + 更新缓存
+                </span>
+                <span className="text-xs text-[var(--color-text-secondary)]">
+                  普通清理够不到的系统级垃圾
+                </span>
+              </div>
+              <div className="rounded-2xl bg-[var(--color-surface)] p-4 shadow-[var(--shadow-card)]">
+                <div className="flex items-center gap-2">
+                  <span className="text-sm font-semibold">清理 Windows 系统临时文件 + 更新下载缓存</span>
+                  <span className="rounded-full bg-[#FEE2E2] px-2 py-0.5 text-[10px] font-medium text-[#991B1B]">
+                    需要管理员
+                  </span>
+                </div>
+                <div className="mt-1 text-xs leading-relaxed text-[var(--color-text-secondary)]">
+                  清理 <code>C:\Windows\Temp</code>（系统临时文件，受权限保护、普通清理够不到）和 Windows
+                  更新下载缓存（<code>SoftwareDistribution\Download</code>，装完更新残留的安装包）。
+                </div>
+                <div className="mt-0.5 text-xs leading-relaxed">
+                  <span className="text-[var(--color-text-secondary)]">删了会怎样：</span>
+                  没有影响，都会按需自动重建；正在使用的文件自动跳过。若检测到有挂起的 Windows
+                  更新，会自动只清临时文件、跳过更新缓存，避免打断更新。
+                </div>
+
+                {sysPhase === "confirm" && (
+                  <div className="mt-3 rounded-xl bg-[var(--color-bg)] p-3.5">
+                    <div className="text-xs leading-relaxed">
+                      即将请求<b>管理员权限</b>清理系统临时文件与更新下载缓存，会弹出一次 UAC
+                      授权（点“是”）。清理更新缓存时会短暂停止 Windows 更新服务、清完自动恢复。
+                    </div>
+                    <div className="mt-3 flex gap-2">
+                      <button
+                        onClick={doSystemClean}
+                        className="rounded-xl bg-[var(--color-primary)] px-4 py-2 text-xs font-semibold text-white transition-colors hover:bg-[var(--color-primary-dark)]"
+                      >
+                        确认清理（需授权）
+                      </button>
+                      <button
+                        onClick={() => setSysPhase("idle")}
+                        className="rounded-xl border border-[var(--color-line)] px-4 py-2 text-xs font-medium text-[var(--color-text-secondary)] transition-colors hover:text-[var(--color-text-main)]"
+                      >
+                        再想想
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                {sysPhase === "running" && (
+                  <div className="mt-3 flex items-center gap-2 rounded-xl bg-[var(--color-bg)] px-3.5 py-2.5 text-xs text-[var(--color-text-secondary)]">
+                    <Loader2 size={14} className="animate-spin text-[var(--color-primary)]" />
+                    正在清理系统临时文件与更新缓存……授权后稍等片刻，进度窗口会自己关闭，请不要手动关它。
+                  </div>
+                )}
+                {sysPhase === "done" && sysReport && (
+                  <div className="mt-3 rounded-xl bg-[var(--color-primary-soft)] px-3.5 py-2.5 text-xs">
+                    ✅ 系统清理完成，释放 <b>{formatBytes(sysReport.freed)}</b>（C 盘剩余{" "}
+                    {formatBytes(sysReport.freeBefore)} → {formatBytes(sysReport.freeAfter)}）
+                    {sysReport.updateCacheSkipped && (
+                      <span className="mt-1 block text-[var(--color-text-secondary)]">
+                        注：检测到有挂起的 Windows 更新，已跳过更新缓存、只清了临时文件。
+                      </span>
+                    )}
+                  </div>
+                )}
+                {sysError && (
+                  <div className="mt-3 rounded-xl bg-[#FEF3C7] px-3.5 py-2.5 text-xs text-[#92400E]">
+                    {sysError}
+                  </div>
+                )}
+
+                {(sysPhase === "idle" || sysPhase === "done") && (
+                  <button
+                    onClick={() => setSysPhase("confirm")}
+                    className="mt-3 rounded-xl border border-[var(--color-line)] px-4 py-2 text-xs font-medium transition-colors hover:border-[var(--color-primary)] hover:text-[var(--color-primary-dark)]"
+                  >
+                    {sysPhase === "done" ? "再清一次" : "清理（需管理员）"}
                   </button>
                 )}
               </div>

@@ -14,7 +14,7 @@ pub mod svc;
 mod svc_client;
 
 use cache::ScanCache;
-use cleanup::{CleanupReport, CleanupScan, DeepAnalyzeReport, DeepCleanReport};
+use cleanup::{CleanupReport, CleanupScan, DeepAnalyzeReport, DeepCleanReport, SystemCleanReport};
 use memory::MemoryReport;
 use scan::{DriveInfo, TreeNode};
 use startup::StartupItem;
@@ -99,6 +99,18 @@ async fn run_cleanup(app: tauri::AppHandle, ids: Vec<String>) -> Result<CleanupR
 #[tauri::command]
 fn get_cleanup_stats(app: tauri::AppHandle) -> CleanupStats {
     stats::load(&app)
+}
+
+/// 高级：系统级清理（清系统临时目录 + Windows 更新下载缓存，需 UAC 授权，单次提权）。
+#[tauri::command]
+async fn run_deep_clean_system(app: tauri::AppHandle) -> Result<SystemCleanReport, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        let r = cleanup::deep_clean_system()?;
+        stats::record(&app, r.freed);
+        Ok(r)
+    })
+    .await
+    .map_err(|e| format!("系统清理任务失败：{}", e))?
 }
 
 /// 枚举启动项（注册表 Run + 启动文件夹，含建议标签与运行内存）。
@@ -314,6 +326,7 @@ pub fn run() {
         run_cleanup,
         run_deep_analyze,
         run_deep_clean,
+        run_deep_clean_system,
         get_cleanup_stats,
         list_startup_items,
         set_startup_enabled,
@@ -348,6 +361,7 @@ pub fn run() {
         run_cleanup,
         run_deep_analyze,
         run_deep_clean,
+        run_deep_clean_system,
         get_cleanup_stats,
         list_startup_items,
         set_startup_enabled,

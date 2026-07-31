@@ -74,6 +74,15 @@ export interface DeepCleanReport {
   freeAfter: number;
 }
 
+/** 系统级清理报告（Windows\Temp + 更新缓存） */
+export interface SystemCleanReport {
+  freed: number;
+  freeBefore: number;
+  freeAfter: number;
+  /** 因检测到挂起更新/待重启，已跳过 Windows 更新缓存（只清了系统临时目录） */
+  updateCacheSkipped: boolean;
+}
+
 /** 累计清理统计（本地持久化） */
 export interface CleanupStats {
   totalFreed: number;

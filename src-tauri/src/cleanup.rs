@@ -870,6 +870,17 @@ pub struct DeepCleanReport {
     pub free_after: u64,
 }
 
+/// 系统级清理报告（Windows\Temp + 更新缓存）。
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SystemCleanReport {
+    pub freed: u64,
+    pub free_before: u64,
+    pub free_after: u64,
+    /// 因检测到挂起更新/待重启，已跳过 Windows 更新缓存（只清了系统临时目录）
+    pub update_cache_skipped: bool,
+}
+
 /// DISM 只读分析报告：原始关键行 + 微软是否推荐清理
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -1025,6 +1036,96 @@ pub fn deep_clean() -> Result<DeepCleanReport, String> {
     })
 }
 
+// ---------- 高级：系统级清理（Windows\Temp + 更新缓存，需提权） ----------
+
+/// 是否有挂起的 Windows 更新/待重启（清更新缓存前必须为否，避免打断进行中的更新）。
+fn update_pending() -> bool {
+    use winreg::enums::HKEY_LOCAL_MACHINE;
+    use winreg::RegKey;
+    let hklm = RegKey::predef(HKEY_LOCAL_MACHINE);
+    hklm.open_subkey(r"SOFTWARE\Microsoft\Windows\CurrentVersion\Component Based Servicing\RebootPending")
+        .is_ok()
+        || hklm
+            .open_subkey(r"SOFTWARE\Microsoft\Windows\CurrentVersion\WindowsUpdate\Auto Update\RebootRequired")
+            .is_ok()
+}
+
+/// 将脚本编码为 PowerShell -EncodedCommand 参数（UTF-16LE 后 Base64）。
+/// 内联传参，避免向 %TEMP% 落地可被同账户进程篡改的脚本文件（承接卸载流程的 TOCTOU 加固姿势）。
+fn encode_ps_command(script: &str) -> String {
+    let utf16: Vec<u8> = script.encode_utf16().flat_map(|u| u.to_le_bytes()).collect();
+    base64_encode(&utf16)
+}
+
+/// 标准 Base64 编码（无外部依赖，供 -EncodedCommand 内联提权脚本用）。
+fn base64_encode(data: &[u8]) -> String {
+    const T: &[u8; 64] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+    let mut out = String::with_capacity((data.len() + 2) / 3 * 4);
+    for chunk in data.chunks(3) {
+        let b0 = chunk[0] as u32;
+        let b1 = *chunk.get(1).unwrap_or(&0) as u32;
+        let b2 = *chunk.get(2).unwrap_or(&0) as u32;
+        let n = (b0 << 16) | (b1 << 8) | b2;
+        out.push(T[((n >> 18) & 63) as usize] as char);
+        out.push(T[((n >> 12) & 63) as usize] as char);
+        out.push(if chunk.len() > 1 { T[((n >> 6) & 63) as usize] as char } else { '=' });
+        out.push(if chunk.len() > 2 { T[(n & 63) as usize] as char } else { '=' });
+    }
+    out
+}
+
+/// 高级：系统级清理——清系统临时目录 + Windows 更新下载缓存（需 UAC 授权，单次提权）。
+/// 红线：`Windows\Temp` 与 `SoftwareDistribution\Download` 精确路径、删内容不删目录、占用自动跳过；
+/// 有挂起更新时只清临时目录、跳过更新缓存；清更新缓存用 try/finally 停/启 wuauserv 保证服务拉回。
+pub fn deep_clean_system() -> Result<SystemCleanReport, String> {
+    use std::os::windows::process::CommandExt;
+    const CREATE_NO_WINDOW: u32 = 0x0800_0000;
+
+    let free_before = c_drive_free();
+    let pending = update_pending();
+
+    // 提权内联脚本：先清系统 Temp 内容；无挂起更新时才停服务清更新缓存（finally 保证 wuauserv 拉回）
+    let mut inner = String::from(
+        "$ErrorActionPreference='SilentlyContinue'; \
+         Get-ChildItem -LiteralPath \"$env:SystemRoot\\Temp\" -Force | Remove-Item -Recurse -Force -ErrorAction SilentlyContinue;",
+    );
+    if !pending {
+        inner.push_str(
+            " try { Stop-Service wuauserv -Force -ErrorAction SilentlyContinue; \
+             Get-ChildItem -LiteralPath \"$env:SystemRoot\\SoftwareDistribution\\Download\" -Force | Remove-Item -Recurse -Force -ErrorAction SilentlyContinue } \
+             finally { Start-Service wuauserv -ErrorAction SilentlyContinue }",
+        );
+    }
+    let encoded = encode_ps_command(&inner);
+    let ps = format!(
+        r#"$p = Start-Process -Verb RunAs -Wait -PassThru -FilePath powershell.exe -ArgumentList '-NoProfile','-EncodedCommand','{}'; exit $p.ExitCode"#,
+        encoded
+    );
+    let status = std::process::Command::new("powershell")
+        .args(["-NoProfile", "-Command", &ps])
+        .creation_flags(CREATE_NO_WINDOW)
+        .status()
+        .map_err(|e| format!("启动系统清理失败：{}", e))?;
+
+    let code = status.code().unwrap_or(-1);
+    if code != 0 {
+        return Err(if code == 1 {
+            "已取消授权，未执行清理。".to_string()
+        } else {
+            format!("系统清理未完成（退出码 {}），可稍后重试。", code)
+        });
+    }
+
+    let free_after = c_drive_free();
+    Ok(SystemCleanReport {
+        freed: free_after.saturating_sub(free_before),
+        free_before,
+        free_after,
+        update_cache_skipped: pending,
+    })
+}
+
+
 /// 执行清理。只接受白名单 id，路径由本函数重新解析。
 pub fn run(ids: Vec<String>) -> CleanupReport {
     let free_before = c_drive_free();
@@ -1099,6 +1200,28 @@ mod tests {
         ids.sort();
         ids.dedup();
         assert_eq!(ids.len(), n, "candidate id 重复");
+    }
+
+    #[test]
+    fn base64_encode_matches_known_vectors() {
+        // RFC 4648 标准向量，覆盖无补/单补/双补三种情况
+        assert_eq!(base64_encode(b""), "");
+        assert_eq!(base64_encode(b"f"), "Zg==");
+        assert_eq!(base64_encode(b"fo"), "Zm8=");
+        assert_eq!(base64_encode(b"foo"), "Zm9v");
+        assert_eq!(base64_encode(b"foobar"), "Zm9vYmFy");
+    }
+
+    #[test]
+    fn encode_ps_command_is_utf16le_base64() {
+        // -EncodedCommand 期望 UTF-16LE 后 Base64；"A中" => 41 00 2D 4E => "QQAtTg=="
+        assert_eq!(encode_ps_command("A中"), "QQAtTg==");
+    }
+
+    #[test]
+    fn update_pending_does_not_panic() {
+        // 只读注册表探测，任何机器上都不应 panic
+        let _ = update_pending();
     }
 
     #[test]
