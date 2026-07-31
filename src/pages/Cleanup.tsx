@@ -81,13 +81,14 @@ export default function Cleanup() {
   /** 深度清理完成后的结果弹窗（关闭后卡片内仍保留一行小结） */
   const [showDeepResult, setShowDeepResult] = useState(false);
 
-  // 高级：系统级清理（Windows\Temp + 更新缓存）——先分析（只读）→ 展示预计可释放 → 确认 → 清理
+  // 高级：系统级清理（Windows\Temp + 更新缓存）——引导弹窗 → 分析（只读）→ 结果面板 → 确认弹窗 → 清理 → 完成弹窗
   const [sysPhase, setSysPhase] = useState<
-    "idle" | "analyzing" | "analyzed" | "confirm" | "running" | "done"
+    "idle" | "intro" | "analyzing" | "analyzed" | "confirm" | "running" | "done"
   >("idle");
   const [sysAnalyze, setSysAnalyze] = useState<SystemAnalyzeReport | null>(null);
   const [sysReport, setSysReport] = useState<SystemCleanReport | null>(null);
   const [sysError, setSysError] = useState("");
+  const [showSysResult, setShowSysResult] = useState(false);
 
   async function doSystemAnalyze() {
     setSysPhase("analyzing");
@@ -109,6 +110,7 @@ export default function Cleanup() {
       const r = await invoke<SystemCleanReport>("run_deep_clean_system");
       setSysReport(r);
       setSysPhase("done");
+      setShowSysResult(true);
       loadStats();
     } catch (e) {
       setSysError(String(e));
@@ -609,7 +611,7 @@ export default function Cleanup() {
 
                     <div className="mt-3 flex gap-2">
                       <button
-                        onClick={doSystemClean}
+                        onClick={() => setSysPhase("confirm")}
                         className="rounded-xl bg-[var(--color-primary)] px-4 py-2 text-xs font-semibold text-white transition-colors hover:bg-[var(--color-primary-dark)]"
                       >
                         确认清理（需再次授权）
@@ -652,7 +654,7 @@ export default function Cleanup() {
 
                 {(sysPhase === "idle" || sysPhase === "done") && (
                   <button
-                    onClick={doSystemAnalyze}
+                    onClick={() => setSysPhase("intro")}
                     className="mt-3 rounded-xl border border-[var(--color-line)] px-4 py-2 text-xs font-medium transition-colors hover:border-[var(--color-primary)] hover:text-[var(--color-primary-dark)]"
                   >
                     {sysPhase === "done" ? "重新分析" : "分析（只读，需管理员）"}
@@ -1023,6 +1025,245 @@ export default function Cleanup() {
 
                   <button
                     onClick={() => setShowDeepResult(false)}
+                    className="mt-6 w-full rounded-xl bg-[var(--color-primary)] py-3 text-sm font-semibold text-white transition-colors hover:bg-[var(--color-primary-dark)]"
+                  >
+                    好的，收下了
+                  </button>
+                </motion.div>
+              </motion.div>
+            )}
+          </AnimatePresence>
+
+          {/* 系统清理·分析前引导弹窗 */}
+          <AnimatePresence>
+            {sysPhase === "intro" && (
+              <motion.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                className="absolute inset-0 z-30 flex items-center justify-center bg-black/30 p-6"
+                onClick={() => setSysPhase(sysAnalyze ? "analyzed" : "idle")}
+              >
+                <motion.div
+                  initial={{ scale: 0.94, y: 10 }}
+                  animate={{ scale: 1, y: 0 }}
+                  exit={{ scale: 0.94, y: 10 }}
+                  className="w-full max-w-lg rounded-2xl bg-[var(--color-surface)] p-7 shadow-[var(--shadow-card-hover)]"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <div className="text-lg font-semibold">开始分析前，先看这 3 件事</div>
+                  <div className="mt-1 text-xs text-[var(--color-text-secondary)]">
+                    这一步只是“体检”，用来告诉你能清理多少
+                  </div>
+
+                  <div className="mt-5 space-y-3">
+                    <div className="flex items-center gap-3.5 rounded-xl bg-[var(--color-bg)] px-4 py-3">
+                      <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-[var(--color-primary)] text-sm font-bold text-white">
+                        1
+                      </span>
+                      <span className="min-w-0 text-sm">
+                        <span className="font-semibold">弹出系统授权窗口（UAC），请点“是”</span>
+                        <span className="mt-0.5 block text-xs text-[var(--color-text-secondary)]">
+                          系统临时目录受权限保护，需要管理员才能量出真实大小
+                        </span>
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-3.5 rounded-xl bg-[var(--color-bg)] px-4 py-3">
+                      <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-[var(--color-primary)] text-sm font-bold text-white">
+                        2
+                      </span>
+                      <span className="min-w-0 text-sm">
+                        <span className="font-semibold">会出现黑色终端窗口，它会自己关闭</span>
+                        <span className="mt-0.5 block text-xs text-[var(--color-text-secondary)]">
+                          那是量大小的窗口，请不要手动关它
+                        </span>
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-3.5 rounded-xl bg-[var(--color-bg)] px-4 py-3">
+                      <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-[var(--color-primary)] text-sm font-bold text-white">
+                        3
+                      </span>
+                      <span className="min-w-0 text-sm">
+                        <span className="font-semibold">很快，通常几秒到十几秒</span>
+                        <span className="mt-0.5 block text-xs text-[var(--color-text-secondary)]">
+                          期间可以正常使用电脑
+                        </span>
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="mt-4 flex items-center gap-2.5 rounded-xl bg-[var(--color-primary-soft)] px-4 py-3">
+                    <ShieldCheck size={18} className="shrink-0 text-[var(--color-primary-dark)]" />
+                    <span className="text-sm">
+                      <b>只读取信息，不删除、不修改任何东西</b>
+                      <span className="text-[var(--color-text-secondary)]">，分析完由你决定要不要清理</span>
+                    </span>
+                  </div>
+
+                  <div className="mt-6 flex gap-3">
+                    <button
+                      onClick={() => setSysPhase(sysAnalyze ? "analyzed" : "idle")}
+                      className="flex-1 rounded-xl border border-[var(--color-line)] py-3 text-sm font-medium transition-colors hover:bg-[var(--color-bg)]"
+                    >
+                      取消
+                    </button>
+                    <button
+                      onClick={doSystemAnalyze}
+                      className="flex-1 rounded-xl bg-[var(--color-primary)] py-3 text-sm font-semibold text-white transition-colors hover:bg-[var(--color-primary-dark)]"
+                    >
+                      确定开始
+                    </button>
+                  </div>
+                </motion.div>
+              </motion.div>
+            )}
+          </AnimatePresence>
+
+          {/* 系统清理·确认清理弹窗 */}
+          <AnimatePresence>
+            {sysPhase === "confirm" && (
+              <motion.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                className="absolute inset-0 z-30 flex items-center justify-center bg-black/30 p-6"
+                onClick={() => setSysPhase("analyzed")}
+              >
+                <motion.div
+                  initial={{ scale: 0.94, y: 10 }}
+                  animate={{ scale: 1, y: 0 }}
+                  exit={{ scale: 0.94, y: 10 }}
+                  className="w-full max-w-lg rounded-2xl bg-[var(--color-surface)] p-7 shadow-[var(--shadow-card-hover)]"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <div className="flex items-center gap-3">
+                    <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-[var(--color-primary-soft)]">
+                      <Wrench size={22} className="text-[var(--color-primary-dark)]" />
+                    </span>
+                    <span>
+                      <span className="block text-lg font-semibold">确认清理系统临时文件 + 更新缓存？</span>
+                      <span className="block text-xs text-[var(--color-text-secondary)]">
+                        预计可释放{" "}
+                        <b className="text-[var(--color-primary-dark)]">
+                          {sysAnalyze
+                            ? formatBytes(
+                                sysAnalyze.tempBytes +
+                                  (sysAnalyze.updatePending ? 0 : sysAnalyze.updateCacheBytes)
+                              )
+                            : ""}
+                        </b>
+                      </span>
+                    </span>
+                  </div>
+
+                  <div className="mt-5 space-y-3">
+                    <div className="flex items-center gap-3.5 rounded-xl bg-[var(--color-bg)] px-4 py-3">
+                      <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-[var(--color-primary)] text-sm font-bold text-white">
+                        1
+                      </span>
+                      <span className="min-w-0 text-sm">
+                        <span className="font-semibold">弹出系统授权窗口（UAC），请点“是”</span>
+                        <span className="mt-0.5 block text-xs text-[var(--color-text-secondary)]">
+                          之后会出现进度窗口，它会自己关闭，请不要手动关它
+                        </span>
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-3.5 rounded-xl bg-[var(--color-bg)] px-4 py-3">
+                      <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-[var(--color-primary)] text-sm font-bold text-white">
+                        2
+                      </span>
+                      <span className="min-w-0 text-sm">
+                        <span className="font-semibold">会短暂停止 Windows 更新服务，清完自动恢复</span>
+                        <span className="mt-0.5 block text-xs text-[var(--color-text-secondary)]">
+                          用于清理更新下载缓存；有挂起更新时会自动跳过这步、只清临时文件
+                        </span>
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-3.5 rounded-xl bg-[var(--color-bg)] px-4 py-3">
+                      <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-[var(--color-safe)] text-sm font-bold text-white">
+                        ✓
+                      </span>
+                      <span className="min-w-0 text-sm">
+                        <span className="font-semibold">没有影响，都会按需自动重建</span>
+                        <span className="mt-0.5 block text-xs text-[var(--color-text-secondary)]">
+                          正在使用的文件自动跳过；很快，通常几秒到几十秒
+                        </span>
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="mt-6 flex gap-3">
+                    <button
+                      onClick={() => setSysPhase("analyzed")}
+                      className="flex-1 rounded-xl border border-[var(--color-line)] py-3 text-sm font-medium transition-colors hover:bg-[var(--color-bg)]"
+                    >
+                      再想想
+                    </button>
+                    <button
+                      onClick={doSystemClean}
+                      className="flex-1 rounded-xl bg-[var(--color-primary)] py-3 text-sm font-semibold text-white transition-colors hover:bg-[var(--color-primary-dark)]"
+                    >
+                      我已了解，开始清理
+                    </button>
+                  </div>
+                </motion.div>
+              </motion.div>
+            )}
+          </AnimatePresence>
+
+          {/* 系统清理·完成庆祝弹窗 */}
+          <AnimatePresence>
+            {sysPhase === "done" && sysReport && showSysResult && (
+              <motion.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                className="absolute inset-0 z-30 flex items-center justify-center bg-black/30 p-6"
+                onClick={() => setShowSysResult(false)}
+              >
+                <motion.div
+                  initial={{ scale: 0.9, y: 14 }}
+                  animate={{ scale: 1, y: 0 }}
+                  exit={{ scale: 0.94, y: 10 }}
+                  className="w-full max-w-lg rounded-2xl bg-[var(--color-surface)] p-8 text-center shadow-[var(--shadow-card-hover)]"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <motion.div
+                    initial={{ scale: 0.6, opacity: 0 }}
+                    animate={{ scale: 1, opacity: 1 }}
+                    transition={{ delay: 0.1, type: "spring", stiffness: 260 }}
+                    className="mx-auto flex h-20 w-20 items-center justify-center rounded-3xl bg-[var(--color-primary-soft)]"
+                  >
+                    <CheckCircle2 size={44} className="text-[var(--color-primary)]" />
+                  </motion.div>
+
+                  <div className="mt-4 text-lg font-semibold">系统清理完成 🎉</div>
+                  <div className="mt-3 text-xs text-[var(--color-text-secondary)]">本次释放</div>
+                  <div className="text-4xl font-bold text-[var(--color-primary-dark)]">
+                    {formatBytes(sysReport.freed)}
+                  </div>
+                  <div className="mt-2 text-sm text-[var(--color-text-secondary)]">
+                    C 盘剩余空间：{formatBytes(sysReport.freeBefore)} →{" "}
+                    <span className="font-semibold text-[var(--color-primary-dark)]">
+                      {formatBytes(sysReport.freeAfter)}
+                    </span>
+                  </div>
+
+                  {sysReport.updateCacheSkipped && (
+                    <div className="mt-4 rounded-xl bg-[var(--color-bg)] px-4 py-3 text-left text-xs leading-relaxed text-[var(--color-text-secondary)]">
+                      💡 检测到有挂起的 Windows 更新，本次已跳过更新缓存、只清了系统临时文件，避免打断更新。等更新装完再清可释放更多。
+                    </div>
+                  )}
+
+                  {stats && stats.totalRuns > 0 && (
+                    <div className="mt-4 inline-flex items-center gap-1.5 rounded-full bg-[#FEF3C7] px-4 py-1.5 text-xs text-[#B45309]">
+                      <ShieldCheck size={13} />
+                      历史累计已释放 <b>{formatBytes(stats.totalFreed)}</b>
+                    </div>
+                  )}
+
+                  <button
+                    onClick={() => setShowSysResult(false)}
                     className="mt-6 w-full rounded-xl bg-[var(--color-primary)] py-3 text-sm font-semibold text-white transition-colors hover:bg-[var(--color-primary-dark)]"
                   >
                     好的，收下了
