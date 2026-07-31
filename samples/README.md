@@ -21,6 +21,7 @@
 | diskbutler-rule-report-20260728-1640（friend-b 电商办公机） | 2026-07-28 | 完整 | ✅ 已评估入库 | +browser-cache 扩充 360 系三浏览器 +wps-old-versions（注册表锚点）；拒 35 项（评估报告见 .verify\OpenCode实验\）；衍生产出：electron-cache 指纹规则、VERSION-SIBLINGS 探测、孤儿页面文件检测（D盘11GB实战闭环，侦察记录 wps/pagefile-recon-result.txt 留档本目录） |
 | diskbutler-rule-report-20260728-2005（friend-c 游戏家用机 Win11 24H2） | 2026-07-28 | 完整 | ✅ 已评估入库 | +browser-cache 扩充 CentBrowser/Quark +知识库 .minecraft 存档保护；修复采集器 PERSONAL 误报（精确匹配目录名，不再误伤 ai.opencode.desktop 等包名）；QQ 边界见观察名单 |
 | diskbutler-rule-report-20260729-1054（friend-d 教育+AI工作机 Win11 Pro 25H2） | 2026-07-29 | 基础（软件内贡献 collector=app） | 🔍 已登记待评估 | 画像：学而思/ClassIn/GeoGebra/LyX/讯飞E听说 + 重度 AI 工具（LM Studio/Chatbox/ollama/通义/千问/秘塔/爱问云）+ 开发全家桶；装火绒。现有规则可覆盖：Quark 缓存(2.8G)/Playwright(683M)/electron-cache(通义/Chatbox/ollama 等)/wps-cache(kingsoft 2.5G)。新线索见观察名单 |
+| diskbutler-rule-report-20260730-1517（friend-e 电气/嵌入式工程工作站 Win10 Pro 22H2） | 2026-07-30 | 基础（软件内贡献 collector=app） | ✅ 已评估入库 | +wps-cache 扩充 4 路径（office6\log、PDF\Cache、Kingsoft\kupdateUI\cache、wpsoffice\cache，双样本佐证）+doubao-shadercache（存在才收录）；知识库 +7（WPS 边界 4 条、/shadercache 通用、Keil_v5/Arm Packs 二条 Software/Caution）；拒：Keil/Arm 入清理白名单（芯片包删后不自动重建，自检 #2 不过）、元宝 ShaderCache（Tencent 系红线不开例外，知识库通用规则覆盖解释）。Kingsoft VERSION-SIBLINGS 经核为 wps-old-versions 已覆盖。画像与永拒名单验证见观察名单 |
 
 ## 观察名单（见过但未入库，等更多样本佐证）
 
@@ -29,7 +30,10 @@
 - QianwenUpdater：不带连字符后缀，现有 *-updater 规则漏网（48MB，优先级低）；
 - **学而思网校缓存**（friend-d）：`%LOCALAPPDATA%\XesCache_literacy`(493M)、`XesCache_subject`(172M)、`XesStudent_*`(含 cache 子目录)——命名含 Cache、清晰是缓存；但教育软件专用、单机样本，等更多教育机佐证再评估是否入库；
 - **GeoGebra 升级残留**（friend-d）：`%LOCALAPPDATA%\GeoGebra_CAS`(774M) 打了 VERSION-SIBLINGS（多版本并存）——可套 wps-old-versions 的"注册表安装版本锚点"思路做残留清理候选，但需确认 GeoGebra 版本目录命名规律；
-- **WPS 缓存边界扩充**（friend-d）：kingsoft(2.5G) 的 cacheHits 显示 `office6\log`、`PDF\Cache`——现 wps-cache 只清 `office6\cache`，是否加 log/PDF cache 待评估（log 可能有诊断价值，保守）；
+- ~~**WPS 缓存边界扩充**~~ ✅ 已于 2026-07-30 双样本佐证后入库：wps-cache 扩充 office6\log、PDF\Cache、Kingsoft\kupdateUI\cache、wpsoffice\cache（存在才收录）；Kingsoft VERSION-SIBLINGS 经核实为 WPS Office 版本目录并存，wps-old-versions 已覆盖，无需新规则；
+- **Keil/Arm 包缓存**（friend-e）：清理白名单已评估**拒绝**（CMSIS 芯片包删后不自动重建，需 Pack Installer 手动重装，自检 #2 不过）；已入知识库 Software/Caution 解释。剩余待办：若未来完整模式样本证实 `Arm\Packs\.Download`（安装后残留的 .pack 源包）独立存在，可单独评估该子目录为 junk；
+- ~~**豆包/元宝 WebView 缓存**~~ ✅ 部分入库（2026-07-30）：豆包 ShaderCache 入清理白名单（doubao-shadercache，存在才收录）；元宝 EBWebView\ShaderCache 技术上安全但 **Tencent 系永拒红线不开例外**，仅由知识库 `/shadercache` 通用规则解释为可安全清理；两者的 Crashpad 目录未处理，暂缓；
+- **工业软件 ProgramData 数据**（friend-e）：EPLAN(2.5G)/CODESYS(1.9G)/Altium(639M)/SOLIDWORKS Electrical(617M)——大概率含元件库/工程数据，默认不动，仅记录画像；HDDog(880M) 身份待查明后再议。
 - 永久拒绝：Tencent 系（聊天数据同树）、Postman（含 workspace）、Blackmagic/DaVinci（含项目库）、OCS/yuque/Gandownload（PERSONAL 标记）、Package Cache（Windows Installer 缓存，删了会破坏软件修复/卸载）。
 
 ## 外部模型评估实验记录（2026-07-27）

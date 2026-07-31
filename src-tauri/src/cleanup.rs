@@ -568,6 +568,20 @@ fn candidates() -> Vec<Candidate> {
                 paths: jscache,
             });
         }
+
+        // 豆包着色器缓存：布局非标准 Electron 三件套（Cache 与 ShaderCache 不同级），
+        // electron-cache 指纹不命中，按样本 cacheHits 实证点名收录。完全可再生。
+        let doubao_sc = local.join("Doubao").join("User Data").join("ShaderCache");
+        if doubao_sc.exists() {
+            out.push(Candidate {
+                id: "doubao-shadercache",
+                name: "豆包着色器缓存",
+                description: "豆包 AI 应用内置网页内核的显卡着色器缓存（对话记录和账号不在这里）。",
+                impact: "没有影响。下次启动豆包时会自动重新生成。",
+                safety: "safe",
+                paths: vec![doubao_sc],
+            });
+        }
     }
 
     // 用户主目录下的开发/AI 缓存（体积大、重下载成本高，均列为谨慎项）
@@ -654,14 +668,35 @@ fn candidates() -> Vec<Candidate> {
             });
         }
 
-        // WPS 缓存：文档本体与云同步数据不在此目录
+        // WPS 缓存：文档本体与云同步数据不在此目录。
+        // friend-d/friend-e 双样本佐证扩充：office6\log、PDF\Cache 与 LOCALAPPDATA 侧
+        // kupdateUI\cache、wpsoffice\cache（cacheHits 实证，只点名具体子目录，存在才收录）。
+        let mut wps: Vec<PathBuf> = vec![roaming.join("kingsoft").join("office6").join("cache")];
+        for p in [
+            roaming.join("kingsoft").join("office6").join("log"),
+            roaming.join("kingsoft").join("PDF").join("Cache"),
+        ] {
+            if p.exists() {
+                wps.push(p);
+            }
+        }
+        if let Some(local) = &local {
+            for p in [
+                local.join("Kingsoft").join("kupdateUI").join("cache"),
+                local.join("Kingsoft").join("wpsoffice").join("cache"),
+            ] {
+                if p.exists() {
+                    wps.push(p);
+                }
+            }
+        }
         out.push(Candidate {
             id: "wps-cache",
             name: "WPS 缓存",
-            description: "WPS Office 的运行缓存（文档和云同步数据不在这里）。",
+            description: "WPS Office 的运行缓存与日志（文档和云同步数据不在这里）。",
             impact: "没有影响。WPS 会在使用中自动重建。",
             safety: "safe",
-            paths: vec![roaming.join("kingsoft").join("office6").join("cache")],
+            paths: wps,
         });
     }
 
@@ -1139,6 +1174,36 @@ mod tests {
         );
         // 只装了一个版本：没有残留
         assert!(wps_stale_version_dirs(&dirs(&["12.1.0.26895"]), "12.1.0.26895").is_empty());
+    }
+
+    #[test]
+    fn wps_cache_paths_stay_inside_kingsoft_trees() {
+        // 扩充后的 wps-cache 只允许指向 kingsoft/Kingsoft 树内的点名子目录，
+        // 防止未来误把无关路径塞进该项
+        let c = candidates();
+        let wps = c.iter().find(|x| x.id == "wps-cache").expect("wps-cache 应始终存在");
+        assert!(!wps.paths.is_empty());
+        for p in &wps.paths {
+            let s = p.to_string_lossy().to_lowercase().replace('\\', "/");
+            assert!(s.contains("/kingsoft/"), "wps-cache 出现树外路径: {}", s);
+            assert!(
+                s.ends_with("/cache") || s.ends_with("/log"),
+                "wps-cache 只允许点名 cache/log 子目录: {}",
+                s
+            );
+        }
+    }
+
+    #[test]
+    fn doubao_item_only_targets_shadercache() {
+        // 存在才收录：本机没装豆包时该项缺席属正常；一旦出现，路径必须
+        // 精确落在 User Data\ShaderCache，绝不扩大到同级账号/对话数据
+        let c = candidates();
+        if let Some(item) = c.iter().find(|x| x.id == "doubao-shadercache") {
+            assert_eq!(item.paths.len(), 1);
+            let s = item.paths[0].to_string_lossy().to_lowercase().replace('\\', "/");
+            assert!(s.ends_with("doubao/user data/shadercache"), "路径越界: {}", s);
+        }
     }
 
     #[test]

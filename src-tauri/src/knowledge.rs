@@ -292,6 +292,66 @@ const RULES: &[Rule] = &[
         safety: Safety::Safe,
     },
     Rule {
+        needle: "kingsoft/office6/log",
+        category: Category::Cache,
+        friendly_name: "WPS 日志",
+        description: "WPS Office 的运行日志，可安全清理，不影响使用。",
+        safety: Safety::Safe,
+    },
+    Rule {
+        needle: "kingsoft/pdf/cache",
+        category: Category::Cache,
+        friendly_name: "WPS PDF 缓存",
+        description: "WPS PDF 组件的运行缓存，可安全清理，文档不受影响。",
+        safety: Safety::Safe,
+    },
+    Rule {
+        needle: "kingsoft/kupdateui/cache",
+        category: Category::Cache,
+        friendly_name: "WPS 升级组件缓存",
+        description: "WPS 升级程序的界面缓存，可安全清理，会自动重建。",
+        safety: Safety::Safe,
+    },
+    Rule {
+        needle: "kingsoft/wpsoffice/cache",
+        category: Category::Cache,
+        friendly_name: "WPS 程序缓存",
+        description: "WPS Office 程序侧的运行缓存，可安全清理，文档不受影响。",
+        safety: Safety::Safe,
+    },
+    // 通用着色器缓存：任何路径含 /shadercache 的目录都是可再生的显卡编译缓存
+    // （豆包/元宝等 WebView 应用；浏览器自身的先被上方更具体的浏览器规则命中）
+    Rule {
+        needle: "/shadercache",
+        category: Category::Cache,
+        friendly_name: "着色器缓存",
+        description: "程序生成的显卡着色器编译缓存，可安全清理，下次启动会自动重建。",
+        safety: Safety::Safe,
+    },
+    // Keil/Arm 芯片支持包：删除后不会自动重建，需在 Pack Installer 手动重装——
+    // 不进清理白名单，仅在透视页解释（friend-e 样本，嵌入式开发机常见大头）
+    Rule {
+        needle: "appdata/local/keil_v5",
+        category: Category::Software,
+        friendly_name: "Keil MDK 数据 (Keil_v5)",
+        description: "Keil 开发工具的芯片支持包与配置。删除后需在 Pack Installer 重新下载安装，请勿当垃圾清理。",
+        safety: Safety::Caution,
+    },
+    Rule {
+        needle: "appdata/local/arm/packs",
+        category: Category::Software,
+        friendly_name: "Arm CMSIS 芯片支持包",
+        description: "嵌入式开发的芯片支持包（CMSIS Pack）。删除后编译会报错，需重新下载安装，请勿当垃圾清理。",
+        safety: Safety::Caution,
+    },
+    Rule {
+        needle: "appdata/roaming/pcsuite",
+        category: Category::Personal,
+        friendly_name: "vivo 办公套件数据 (pcsuite)",
+        description: "vivo 办公套件同步的云笔记与文档（PDF/PPT/录音等）。云端一般有保留，但删除前请先确认没有只存在本机的文件；软件体检的「残留检查」可引导安全清理。",
+        safety: Safety::Keep,
+    },
+    Rule {
         needle: "weixin",
         category: Category::Cache,
         friendly_name: "微信数据/缓存",
@@ -1019,6 +1079,64 @@ mod tests {
     #[test]
     fn conda_pkgs_is_caution() {
         assert_eq!(classify(r"C:\Users\x\miniconda3\pkgs").safety, Safety::Caution);
+    }
+
+    // ---------- 新增规则：friend-e 样本（WPS 边界 / 着色器缓存 / Keil 包） ----------
+
+    #[test]
+    fn wps_log_and_pdf_cache_are_safe() {
+        let log = classify(r"C:\Users\x\AppData\Roaming\kingsoft\office6\log\wps.log");
+        assert_eq!(log.friendly_name, "WPS 日志");
+        assert_eq!(log.safety, Safety::Safe);
+        let pdf = classify(r"C:\Users\x\AppData\Roaming\kingsoft\PDF\Cache\f.bin");
+        assert_eq!(pdf.friendly_name, "WPS PDF 缓存");
+        assert_eq!(pdf.safety, Safety::Safe);
+    }
+
+    #[test]
+    fn kingsoft_local_caches_are_safe() {
+        let up = classify(r"C:\Users\x\AppData\Local\Kingsoft\kupdateUI\cache\a.png");
+        assert_eq!(up.friendly_name, "WPS 升级组件缓存");
+        assert_eq!(up.safety, Safety::Safe);
+        let of = classify(r"C:\Users\x\AppData\Local\Kingsoft\wpsoffice\cache\b.dat");
+        assert_eq!(of.friendly_name, "WPS 程序缓存");
+        assert_eq!(of.safety, Safety::Safe);
+    }
+
+    #[test]
+    fn shadercache_generic_rule_hits_webview_apps() {
+        // 豆包与元宝的非标准布局 ShaderCache 都应命中通用规则
+        let db = classify(r"C:\Users\x\AppData\Local\Doubao\User Data\ShaderCache");
+        assert_eq!(db.friendly_name, "着色器缓存");
+        assert_eq!(db.safety, Safety::Safe);
+        let yb = classify(r"C:\Users\x\AppData\Local\com.tencent.yuanbao\EBWebView\ShaderCache");
+        assert_eq!(yb.friendly_name, "着色器缓存");
+        // 浏览器自己的 ShaderCache 应先被更具体的浏览器规则命中，不落到通用规则
+        let ch = classify(r"C:\Users\x\AppData\Local\Google\Chrome\User Data\ShaderCache");
+        assert_ne!(ch.friendly_name, "着色器缓存");
+    }
+
+    #[test]
+    fn pcsuite_is_personal_keep() {
+        // 真机反例：vivo 办公套件的 pcsuite 目录藏 2GB 用户文档（云笔记同步），
+        // 必须 Personal/Keep，绝不能当缓存/残留建议清理
+        let hit = classify(r"C:\Users\x\AppData\Roaming\pcsuite\data\Note\Document\a.pdf");
+        assert_eq!(hit.friendly_name, "vivo 办公套件数据 (pcsuite)");
+        assert_eq!(hit.category, Category::Personal);
+        assert_eq!(hit.safety, Safety::Keep);
+    }
+
+    #[test]
+    fn keil_and_arm_packs_are_caution_software() {
+        let keil = classify(r"C:\Users\x\AppData\Local\Keil_v5\ARM\PACK");
+        assert_eq!(keil.category, Category::Software);
+        assert_eq!(keil.safety, Safety::Caution);
+        let arm = classify(r"C:\Users\x\AppData\Local\Arm\Packs\Keil\STM32F1xx_DFP");
+        assert_eq!(arm.friendly_name, "Arm CMSIS 芯片支持包");
+        assert_eq!(arm.safety, Safety::Caution);
+        // needle 锚定在 arm/packs：不得误伤 Armoury 等 arm 前缀目录
+        let armoury = classify(r"C:\Users\x\AppData\Local\ARMOURY CRATE Service");
+        assert_ne!(armoury.friendly_name, "Arm CMSIS 芯片支持包");
     }
 
     // ---------- 内容启发式 ----------
