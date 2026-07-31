@@ -1,0 +1,30 @@
+# AppData 孤儿残留目录映射知识库（目录名|软件人话名|在装匹配别名,逗号分隔|警示语,可选）
+# 入库标准（宁漏报不误报）：
+#   1. 目录名 = 单一软件专属，无跨软件/厂商复用（Google/Tencent/Kingsoft 等厂商级目录永不入库）；
+#   2. 软件为安装器分发（绿色/便携常客如 Snipaste/Everything 不入库——无注册表条目会被误判孤儿）；
+#   3. 目录内容以缓存/配置为主；含用户资产但云端有同步保留的，须带第 4 字段警示语
+#      （UI 会在条目下方醒目展示，引导用户先打开位置确认再删）；
+#      纯本地用户资产（剪映草稿、Postman workspace、聊天记录类）仍然绝不入库。
+# 别名用于"在装判定"：任一别名命中任何在装软件的名称/发行商/安装路径 → 视为有主，绝不判孤儿。
+# 案例记录（2026-07-30 真机实证）：pcsuite（vivo办公套件）data\Note 有 2GB 云笔记同步文档，
+#   经用户拍板按"云端有保留"入库，但必须带警示语；同类手机助手目录照此办理，警示语不可省。
+Doubao|豆包|doubao,豆包
+iQIYI Video|爱奇艺|iqiyi,爱奇艺
+Zoom|Zoom|zoom
+Notion|Notion|notion
+Figma|Figma|figma
+discord|Discord|discord
+Slack|Slack|slack
+Spotify|Spotify|spotify
+GeoGebra|GeoGebra|geogebra
+GeoGebra_CAS|GeoGebra CAS 计算器|geogebra
+LyX|LyX|lyx
+obsidian|Obsidian|obsidian
+pcsuite|vivo 办公套件|vivo,pcsuite,办公套件|里面有云笔记同步下来的文档和录音，一般 vivo 云端有保留；但如有只存在这台电脑上的文件，删了就找不回来了。建议先点"打开位置"确认没有要留的，再清理。
+# —— 2026-07-31 curated 扩充（安装器分发、目录名单软件专属、AppData 内为缓存/配置，下载内容在别处；已排除厂商级 Youdao、绿色常客 PotPlayer/XMind、含用户资产的目录）——
+CloudMusic|网易云音乐|cloudmusic,网易云
+KuGou|酷狗音乐|kugou,酷狗
+Feishu|飞书|feishu,lark
+Foxit Software|福昕 PDF|foxit,福昕
+Kwai|快手|kwai,快手
+Thunder|迅雷|thunder,迅雷

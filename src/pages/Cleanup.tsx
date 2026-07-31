@@ -15,6 +15,7 @@ import {
   Archive,
   Wrench,
   FolderOpen,
+  Box,
 } from "lucide-react";
 import {
   CleanupItem,
@@ -29,6 +30,18 @@ import {
 
 type Phase = "loading" | "ready" | "confirm" | "cleaning" | "done";
 type DeepPhase = "idle" | "intro" | "analyzing" | "analyzed" | "confirm" | "running" | "done";
+
+/** AppData 孤儿残留（已卸载软件遗留目录） */
+interface OrphanEntry {
+  path: string;
+  appName: string;
+  size: number;
+  /** 非空 = 含云端同步资产等，删前需用户确认（条目下方醒目展示） */
+  note: string;
+}
+interface OrphanScan {
+  confirmed: OrphanEntry[];
+}
 
 const KIND_META = {
   junk: {
@@ -68,6 +81,48 @@ export default function Cleanup() {
 
   // 累计清理统计（本地持久化的成就感数字）
   const [stats, setStats] = useState<CleanupStats | null>(null);
+
+  // AppData 孤儿残留检查（已卸载软件遗留目录，"回头清存量"）
+  const [orphan, setOrphan] = useState<{
+    phase: "loading" | "ready" | "confirm";
+    report?: OrphanScan;
+    checked: Set<string>;
+  } | null>(null);
+  const [cleaningOrphan, setCleaningOrphan] = useState(false);
+  const [orphanMsg, setOrphanMsg] = useState("");
+
+  /** 打开"残留检查"：扫描已卸载软件在 AppData/ProgramData 的遗留目录 */
+  async function startOrphanScan() {
+    setOrphanMsg("");
+    setOrphan({ phase: "loading", checked: new Set() });
+    try {
+      const report = await invoke<OrphanScan>("scan_orphan_dirs");
+      setOrphan({ phase: "ready", report, checked: new Set() });
+    } catch (e) {
+      setOrphan(null);
+      setOrphanMsg(String(e));
+    }
+  }
+
+  /** 清理勾选的孤儿目录（后端会当场重扫白名单校验，前端选中项不被信任） */
+  async function doCleanOrphans() {
+    if (!orphan?.report) return;
+    setCleaningOrphan(true);
+    try {
+      const r = await invoke<{ freed: number; errors: string[] }>("clean_orphan_dirs", {
+        paths: [...orphan.checked],
+      });
+      setOrphanMsg(
+        r.errors.length > 0 ? `残留清理：${r.errors.join("；")}` : `已清理，释放 ${formatBytes(r.freed)}。`,
+      );
+      loadStats();
+    } catch (e) {
+      setOrphanMsg(String(e));
+    } finally {
+      setCleaningOrphan(false);
+      setOrphan(null);
+    }
+  }
 
   async function loadStats() {
     try {
@@ -442,6 +497,34 @@ export default function Cleanup() {
                 )}
               </div>
             </div>
+
+            {/* 高级 · 残留检查（已卸载软件遗留目录） */}
+            <div className="mb-6">
+              <div className="mb-2 flex items-center gap-2">
+                <span className="flex items-center gap-1.5 text-sm font-semibold">
+                  <Box size={15} />
+                  高级 · 残留检查
+                </span>
+                <span className="text-xs text-[var(--color-text-secondary)]">
+                  找出已卸载软件留在电脑上的文件夹
+                </span>
+              </div>
+              <div className="rounded-2xl bg-[var(--color-surface)] p-4 shadow-[var(--shadow-card)]">
+                <div className="text-xs leading-relaxed text-[var(--color-text-secondary)]">
+                  有些软件卸载后，会在 AppData/ProgramData 里留下文件夹没删干净，日积月累占空间。这里帮你比对"已安装软件清单"，**只列出确认是已卸载软件遗留的文件夹**——拿不准归属的一律不列，避免误伤在用的软件。
+                </div>
+                {orphanMsg && (
+                  <div className="mt-3 rounded-xl bg-[var(--color-primary-soft)] px-3.5 py-2.5 text-xs">{orphanMsg}</div>
+                )}
+                <button
+                  onClick={startOrphanScan}
+                  className="mt-3 flex items-center gap-1.5 rounded-xl border border-[var(--color-line)] px-4 py-2 text-xs font-medium transition-colors hover:border-[var(--color-primary)] hover:text-[var(--color-primary-dark)]"
+                >
+                  <Box size={13} />
+                  开始检查（只读）
+                </button>
+              </div>
+            </div>
           </div>
 
           {/* 底部操作条 */}
@@ -781,6 +864,142 @@ export default function Cleanup() {
                   >
                     好的，收下了
                   </button>
+                </motion.div>
+              </motion.div>
+            )}
+          </AnimatePresence>
+
+          {/* AppData 孤儿残留检查弹窗（确证可清 + 未知只列出） */}
+          <AnimatePresence>
+            {orphan && (
+              <motion.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                className="absolute inset-0 z-30 flex items-center justify-center bg-black/30 p-6"
+                onClick={() => !cleaningOrphan && setOrphan(null)}
+              >
+                <motion.div
+                  initial={{ scale: 0.94, y: 10 }}
+                  animate={{ scale: 1, y: 0 }}
+                  exit={{ scale: 0.94, y: 10 }}
+                  className="flex max-h-[85%] w-full max-w-xl flex-col rounded-2xl bg-[var(--color-surface)] p-6 shadow-[var(--shadow-card-hover)]"
+                  onClick={(ev) => ev.stopPropagation()}
+                >
+                  <div className="flex items-center gap-2 text-base font-semibold">
+                    <Box size={18} className="text-[var(--color-primary-dark)]" />
+                    残留检查：已卸载软件留下的文件夹
+                  </div>
+
+                  {orphan.phase === "loading" && (
+                    <div className="flex flex-col items-center gap-3 py-10">
+                      <Loader2 size={28} className="animate-spin text-[var(--color-primary)]" />
+                      <div className="text-sm text-[var(--color-text-secondary)]">正在比对已装软件与 AppData 目录…</div>
+                    </div>
+                  )}
+
+                  {orphan.phase !== "loading" && orphan.report && (
+                    <>
+                      <div className="mt-2 text-sm leading-relaxed text-[var(--color-text-secondary)]">
+                        这些文件夹的主人已经被卸载了，但文件夹还留在电脑上。勾选后可清理；删除前可先"打开位置"看看里面有没有想留的东西。
+                      </div>
+                      <div className="mt-3 min-h-0 flex-1 space-y-3 overflow-y-auto pr-1">
+                        {orphan.report.confirmed.length === 0 && (
+                          <div className="py-8 text-center text-sm text-[var(--color-text-secondary)]">
+                            没有发现已卸载软件的遗留文件夹，很干净 👍
+                          </div>
+                        )}
+                        {orphan.report.confirmed.length > 0 && (
+                          <div>
+                            <div className="mb-1.5 text-xs font-semibold text-[var(--color-text-secondary)]">
+                              可清理（已确认归属，软件已不在）
+                            </div>
+                            <ul className="space-y-1.5">
+                              {orphan.report.confirmed.map((o) => {
+                                const on = orphan.checked.has(o.path);
+                                return (
+                                  <li key={o.path}>
+                                    <label className="flex cursor-pointer items-start gap-2.5 rounded-xl bg-[var(--color-bg)] px-3.5 py-2.5">
+                                      <input
+                                        type="checkbox"
+                                        checked={on}
+                                        onChange={() =>
+                                          setOrphan((cur) => {
+                                            if (!cur) return cur;
+                                            const s = new Set(cur.checked);
+                                            on ? s.delete(o.path) : s.add(o.path);
+                                            return { ...cur, checked: s, phase: "ready" };
+                                          })
+                                        }
+                                        className="mt-0.5"
+                                      />
+                                      <span className="min-w-0 flex-1">
+                                        <span className="text-[13px] font-medium text-[var(--color-text-main)]">
+                                          {o.appName}（已卸载）· {formatBytes(o.size)}
+                                        </span>
+                                        <span className="block break-all text-xs text-[var(--color-text-secondary)]">{o.path}</span>
+                                        {o.note && (
+                                          <span className="mt-1.5 flex items-start gap-1.5 rounded-lg bg-[#FFFBEB] px-2.5 py-1.5 text-xs leading-relaxed text-[#92400E]">
+                                            <AlertTriangle size={13} className="mt-0.5 shrink-0" />
+                                            {o.note}
+                                          </span>
+                                        )}
+                                      </span>
+                                      <button
+                                        onClick={(ev) => {
+                                          ev.preventDefault();
+                                          openInExplorer(o.path, true);
+                                        }}
+                                        className="shrink-0 rounded-lg border border-[var(--color-line)] px-2 py-1 text-xs text-[var(--color-text-secondary)] hover:bg-[var(--color-surface)]"
+                                      >
+                                        打开位置
+                                      </button>
+                                    </label>
+                                  </li>
+                                );
+                              })}
+                            </ul>
+                          </div>
+                        )}
+                      </div>
+
+                      {orphan.phase === "confirm" && (
+                        <div className="mt-3 rounded-xl bg-[#FEF2F2] px-4 py-3 text-sm leading-relaxed text-[#991B1B]">
+                          将永久删除勾选的 {orphan.checked.size} 个文件夹（不进回收站）。确定里面没有要留的东西了吗？
+                        </div>
+                      )}
+
+                      <div className="mt-4 flex gap-3">
+                        <button
+                          onClick={() => (orphan.phase === "confirm" ? setOrphan({ ...orphan, phase: "ready" }) : setOrphan(null))}
+                          disabled={cleaningOrphan}
+                          className="flex-1 rounded-xl border border-[var(--color-line)] py-2.5 text-sm font-medium transition-colors hover:bg-[var(--color-bg)] disabled:opacity-50"
+                        >
+                          {orphan.phase === "confirm" ? "再想想" : "关闭"}
+                        </button>
+                        {orphan.report.confirmed.length > 0 && (
+                          <button
+                            disabled={cleaningOrphan || orphan.checked.size === 0}
+                            onClick={() =>
+                              orphan.phase === "confirm" ? doCleanOrphans() : setOrphan({ ...orphan, phase: "confirm" })
+                            }
+                            className={[
+                              "flex-1 rounded-xl py-2.5 text-sm font-medium text-white transition-colors disabled:opacity-50",
+                              orphan.phase === "confirm"
+                                ? "bg-[#DC2626] hover:bg-[#B91C1C]"
+                                : "bg-[var(--color-primary)] hover:bg-[var(--color-primary-dark)]",
+                            ].join(" ")}
+                          >
+                            {cleaningOrphan
+                              ? "清理中…"
+                              : orphan.phase === "confirm"
+                                ? "确认删除"
+                                : `清理所选（${orphan.checked.size}）`}
+                          </button>
+                        )}
+                      </div>
+                    </>
+                  )}
                 </motion.div>
               </motion.div>
             )}

@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+﻿import { useEffect, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { AnimatePresence, motion } from "framer-motion";
 import {
@@ -53,6 +53,12 @@ interface ResidueDetail {
   size: number;
 }
 
+/** 卸载后残留全景报告：文件目录 + 当前用户注册表键 */
+interface ResidueScanReport {
+  dirs: ResidueDetail[];
+  regKeys: string[];
+}
+
 /** 强力卸载预览：将清除的内容清单 */
 interface ForcePlan {
   name: string;
@@ -97,14 +103,26 @@ export default function BloatwareCheck() {
   const [scan, setScan] = useState<BloatwareScan | null>(null);
   const [error, setError] = useState("");
 
-  const [msg, setMsg] = useState("");
+  // 结果/错误通知：一律弹独立窗口，不在页面里内联平铺
+  const [notice, setNotice] = useState<{ kind: "error" | "success"; text: string } | null>(null);
+  // 卸载久未完成时的顶部提示：卸载器向导多为居中弹出，会盖住居中的进度弹窗，
+  // 故把引导另放到页面顶部边缘，确保用户能看到。
+  const [uninHint, setUninHint] = useState(false);
   // 卸载任务（进度弹窗）：confirm → running → done/fail
   const [job, setJob] = useState<UninJob | null>(null);
   // 安全软件卸载引导弹窗（有自我保护，无法静默卸载，只能引导用户走官方流程）
   const [guide, setGuide] = useState<BloatwareEntry | null>(null);
 
-  const [residue, setResidue] = useState<{ name: string; detail: ResidueDetail } | null>(null);
+  // 卸载后残留清单（Geek 式：目录+注册表键，勾选确认后清除）
+  const [residue, setResidue] = useState<{
+    entry: BloatwareEntry;
+    report: ResidueScanReport;
+    checkedDirs: Set<string>;
+    checkedRegs: Set<string>;
+  } | null>(null);
   const [cleaningResidue, setCleaningResidue] = useState(false);
+
+  // AppData 孤儿残留检查已迁至「一键清理」页
 
   // 折叠区展开状态
   const [showTrusted, setShowTrusted] = useState(false);
@@ -134,13 +152,12 @@ export default function BloatwareCheck() {
       await invoke("bloatware_set_ignored", { key: e.key, ignored });
       await load(showAll);
     } catch (err) {
-      setMsg(String(err));
+      setNotice({ kind: "error", text: String(err) });
     }
   }
 
   /** 打开「停止后台运行」确认弹窗（mode=stop）；提权停服务+进程，二次确认+进度均在弹窗内 */
   async function stopSoftware(e: BloatwareEntry) {
-    setMsg("");
     setJob({ entry: e, mode: "stop", status: "confirm", step: 0, detail: "正在读取将处理的内容…" });
     try {
       const plan = await invoke<ForcePlan>("bloatware_force_preview", { id: e.id });
@@ -152,7 +169,6 @@ export default function BloatwareCheck() {
 
   /** 打开普通卸载（方法A）确认弹窗，并拉取将处理的清单（服务/进程） */
   async function startUninstall(e: BloatwareEntry) {
-    setMsg("");
     setJob({ entry: e, mode: "normal", status: "confirm", step: 0, detail: "正在读取将处理的内容…" });
     try {
       const plan = await invoke<ForcePlan>("bloatware_force_preview", { id: e.id });
@@ -164,7 +180,6 @@ export default function BloatwareCheck() {
 
   /** 打开强力卸载（方法C）确认弹窗，并异步拉取将清除内容预览 */
   async function startForce(e: BloatwareEntry) {
-    setMsg("");
     setJob({ entry: e, mode: "force", status: "confirm", step: 0, detail: "正在读取将清除的内容…" });
     try {
       const plan = await invoke<ForcePlan>("bloatware_force_preview", { id: e.id });
@@ -179,11 +194,9 @@ export default function BloatwareCheck() {
     const j = job;
     if (!j) return;
     const steps = j.mode === "force" ? FORCE_STEPS : j.mode === "stop" ? STOP_STEPS : NORMAL_STEPS;
-    try {
-      await invoke("set_always_on_top", { on: true });
-    } catch {
-      /* 置顶失败不阻断 */
-    }
+    // 不再把主窗置顶：能静默卸载的软件根本不弹窗，置顶无意义；不能静默的会弹卸载向导，
+    // 置顶反而会盖住它导致卡死。索性不置顶，让向导窗口正常显示在前台。
+    setUninHint(false);
     setJob({ ...j, status: "running", step: 1, detail: "请在弹出的系统授权窗口点「是」，点了我们就立刻开始…" });
 
     const cmd = j.mode === "force" ? "force_uninstall_software" : j.mode === "stop" ? "stop_software" : "uninstall_software";
@@ -192,12 +205,31 @@ export default function BloatwareCheck() {
 
     // 轮询：只有当提权脚本真正开始执行（你已点“是”）后，才推进到“执行中”
     let advanced = false;
+    let settled = false;
+    // 宽限计时器：不能静默卸载的软件会弹出自己的卸载向导等用户点击。若超时仍未结束，
+    // 判定为“卸载器在等你操作”——更新引导文案说明进度为何停住。后台仍在等待，点完自动继续。
+    let graceTimer: ReturnType<typeof setTimeout> | undefined;
     const poll = setInterval(async () => {
       if (advanced) return;
       try {
         if (await invoke<boolean>("op_started")) {
           advanced = true;
           setJob((cur) => (cur ? { ...cur, step: 2, detail: "正在处理，请稍等，马上就好…" } : cur));
+          if (j.mode !== "stop") {
+            graceTimer = setTimeout(() => {
+              if (settled) return;
+              setUninHint(true);
+              setJob((cur) =>
+                cur && !settled
+                  ? {
+                      ...cur,
+                      detail:
+                        "如果屏幕上弹出了这个软件自己的卸载向导窗口，请在它上面完成操作（点“下一步/卸载/是”）。完成后这里会自动继续，不用管本窗口。",
+                    }
+                  : cur,
+              );
+            }, 7000);
+          }
         }
       } catch {
         /* 忽略轮询错误 */
@@ -206,7 +238,10 @@ export default function BloatwareCheck() {
 
     try {
       await p;
+      settled = true;
       clearInterval(poll);
+      if (graceTimer) clearTimeout(graceTimer);
+      setUninHint(false);
       setJob((cur) => (cur ? { ...cur, step: steps.length - 1 } : cur));
       if (j.mode === "stop") {
         setScan((prev) =>
@@ -231,12 +266,21 @@ export default function BloatwareCheck() {
         );
         return;
       }
-      if (j.mode === "normal" && j.entry.installLocation) {
+      if (j.mode === "normal" || j.mode === "force") {
         try {
-          const detail = await invoke<ResidueDetail | null>("scan_residue", {
+          const report = await invoke<ResidueScanReport>("scan_residue", {
+            name: j.entry.name,
+            publisher: j.entry.publisher,
             installLocation: j.entry.installLocation,
           });
-          if (detail) setResidue({ name: j.entry.name, detail });
+          if (report.dirs.length > 0 || report.regKeys.length > 0) {
+            setResidue({
+              entry: j.entry,
+              report,
+              checkedDirs: new Set(report.dirs.map((d) => d.path)),
+              checkedRegs: new Set(report.regKeys),
+            });
+          }
         } catch {
           /* 残留探测失败不打扰 */
         }
@@ -245,18 +289,17 @@ export default function BloatwareCheck() {
         cur ? { ...cur, status: "done", step: steps.length, detail: `「${j.entry.name}」已成功卸载。` } : cur,
       );
     } catch (err) {
+      settled = true;
       clearInterval(poll);
+      if (graceTimer) clearTimeout(graceTimer);
+      setUninHint(false);
       setJob((cur) => (cur ? { ...cur, status: "fail", detail: String(err) } : cur));
     }
   }
 
-  /** 关闭进度弹窗：取消置顶；卸载完成则刷新列表（停止后台不刷新，保留条目） */
+  /** 关闭进度弹窗：卸载完成则刷新列表（停止后台不刷新，保留条目） */
   async function closeJob() {
-    try {
-      await invoke("set_always_on_top", { on: false });
-    } catch {
-      /* 忽略 */
-    }
+    setUninHint(false);
     const j = job;
     setJob(null);
     if (j?.status === "done" && j.mode !== "stop") await load(showAll);
@@ -267,20 +310,26 @@ export default function BloatwareCheck() {
     setCleaningResidue(true);
     try {
       const r = await invoke<{ freed: number; errors: string[] }>("clean_residue", {
-        paths: [residue.detail.path],
+        name: residue.entry.name,
+        publisher: residue.entry.publisher,
+        installLocation: residue.entry.installLocation,
+        dirs: [...residue.checkedDirs],
+        regKeys: [...residue.checkedRegs],
       });
-      setMsg(
+      setNotice(
         r.errors.length > 0
-          ? `残留清理：${r.errors.join("；")}`
-          : `残留已清理，释放 ${formatBytes(r.freed)}。`,
+          ? { kind: "error", text: `残留清理：${r.errors.join("；")}` }
+          : { kind: "success", text: `残留已清理${r.freed > 0 ? `，释放 ${formatBytes(r.freed)}` : ""}。` },
       );
     } catch (e) {
-      setMsg(String(e));
+      setNotice({ kind: "error", text: String(e) });
     } finally {
       setCleaningResidue(false);
       setResidue(null);
     }
   }
+
+  /** 清理勾选的孤儿目录（已迁至一键清理页，此处移除） */
 
   const entries = scan?.entries ?? [];
   const security = entries.filter((e) => e.security && !e.dismissed);
@@ -437,8 +486,8 @@ export default function BloatwareCheck() {
     const doneNote = isStop
       ? "它现在不再占用内存运行了。下次开机、或你手动打开它时，它可能会再次启动——如果想让它彻底别再自启，可以直接把它卸载掉。"
       : isForce
-        ? "它的安装文件夹、后台服务、定时任务和注册表记录都已尽力清除干净。个别正被占用的文件，可能要重启电脑后才会彻底消失。"
-        : "它已经从你的电脑上移除了。如果安装文件夹里还留下了一些文件，我们接着会问你要不要顺手清理。";
+        ? "它的安装文件夹、后台服务、定时任务和注册表记录都已尽力清除干净。个别正被占用的文件，可能要重启电脑后才会彻底消失。接着我们会再帮你查一遍有没有其他残留的文件夹和设置项。"
+        : "它已经从你的电脑上移除了。接着我们会帮你查一遍有没有残留的文件夹和注册表设置，你可以挑选着一起清掉。";
     // 确认页：每步 = 标题(可空,避免与框重复) + 明细框 + 是否并排
     const svc = job.plan?.services ?? [];
     const tsk = job.plan?.tasks ?? [];
@@ -665,7 +714,9 @@ export default function BloatwareCheck() {
                       </div>
                     </div>
                   )}
-                  {job.status === "running" && <div className="text-[var(--color-text-secondary)]">{job.detail}</div>}
+                  {job.status === "running" && (
+                    <div className="text-sm text-[var(--color-text-secondary)]">正在处理，请稍等，马上就好…</div>
+                  )}
                   {job.status === "fail" && (
                     <div className="rounded-xl bg-[#FEF2F2] px-4 py-3 text-left text-sm leading-relaxed text-[#991B1B]">
                       {job.detail}
@@ -735,9 +786,6 @@ export default function BloatwareCheck() {
                   我知道了，继续
                 </button>
               </div>
-            )}
-            {job.status === "running" && (
-              <div className="text-center text-sm text-[var(--color-text-secondary)]">正在处理，请稍等，马上就好…</div>
             )}
             {job.status === "done" && (
               <div className="flex justify-end">
@@ -823,9 +871,6 @@ export default function BloatwareCheck() {
             <div className="mb-4 rounded-xl bg-[var(--color-surface)] px-4 py-3 text-sm text-[var(--color-caution)] shadow-[var(--shadow-card)]">
               {error}
             </div>
-          )}
-          {msg && (
-            <div className="mb-4 rounded-xl bg-[var(--color-primary-soft)] px-4 py-3 text-sm">{msg}</div>
           )}
 
           {/* 人话结论 */}
@@ -1003,7 +1048,9 @@ export default function BloatwareCheck() {
                 </button>
                 <button
                   onClick={() => {
-                    invoke("open_official_uninstaller", { id: guide.id }).catch((e) => setMsg(String(e)));
+                    invoke("open_official_uninstaller", { id: guide.id }).catch((e) =>
+                      setNotice({ kind: "error", text: String(e) }),
+                    );
                     setGuide(null);
                   }}
                   className="rounded-xl bg-[var(--color-primary)] px-6 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-[var(--color-primary-dark)]"
@@ -1016,7 +1063,7 @@ export default function BloatwareCheck() {
         )}
       </AnimatePresence>
 
-      {/* 卸载后残留清理提示 */}
+      {/* 卸载后残留清理清单（Geek 式：勾选目录/注册表键后清除） */}
       <AnimatePresence>
         {residue && (
           <motion.div
@@ -1030,20 +1077,94 @@ export default function BloatwareCheck() {
               initial={{ scale: 0.94, y: 10 }}
               animate={{ scale: 1, y: 0 }}
               exit={{ scale: 0.94, y: 10 }}
-              className="w-full max-w-md rounded-2xl bg-[var(--color-surface)] p-6 shadow-[var(--shadow-card-hover)]"
+              className="flex max-h-[80%] w-full max-w-lg flex-col rounded-2xl bg-[var(--color-surface)] p-6 shadow-[var(--shadow-card-hover)]"
               onClick={(ev) => ev.stopPropagation()}
             >
               <div className="flex items-center gap-2 text-base font-semibold">
                 <CheckCircle2 size={18} className="text-[var(--color-safe)]" />
-                已卸载，是否顺手清理残留？
+                已卸载，检测到残留，是否顺手清理？
               </div>
               <div className="mt-2 text-sm leading-relaxed text-[var(--color-text-secondary)]">
-                「{residue.name}」卸载后，安装目录还残留约{" "}
-                <b className="text-[var(--color-primary-dark)]">{formatBytes(residue.detail.size)}</b>：
+                「{residue.entry.name}」卸载后，电脑上还留着这些文件夹和设置项。勾选后即可清除，不需要的可以取消勾选。
               </div>
-              <div className="mt-2 break-all rounded-xl bg-[var(--color-bg)] px-3.5 py-2 text-xs text-[var(--color-text-secondary)]">
-                {residue.detail.path}
+
+              <div className="mt-3 min-h-0 flex-1 space-y-3 overflow-y-auto pr-1">
+                {residue.report.dirs.length > 0 && (
+                  <div>
+                    <div className="mb-1.5 text-xs font-semibold text-[var(--color-text-secondary)]">
+                      残留文件夹
+                    </div>
+                    <ul className="space-y-1.5">
+                      {residue.report.dirs.map((d) => {
+                        const on = residue.checkedDirs.has(d.path);
+                        return (
+                          <li key={d.path}>
+                            <label className="flex cursor-pointer items-start gap-2.5 rounded-xl bg-[var(--color-bg)] px-3.5 py-2.5">
+                              <input
+                                type="checkbox"
+                                checked={on}
+                                onChange={() =>
+                                  setResidue((r) => {
+                                    if (!r) return r;
+                                    const s = new Set(r.checkedDirs);
+                                    on ? s.delete(d.path) : s.add(d.path);
+                                    return { ...r, checkedDirs: s };
+                                  })
+                                }
+                                className="mt-0.5"
+                              />
+                              <span className="min-w-0 flex-1">
+                                <span className="block break-all text-[13px] text-[var(--color-text-main)]">
+                                  {d.path}
+                                </span>
+                                <span className="text-xs text-[var(--color-text-secondary)]">
+                                  {formatBytes(d.size)}
+                                </span>
+                              </span>
+                            </label>
+                          </li>
+                        );
+                      })}
+                    </ul>
+                  </div>
+                )}
+
+                {residue.report.regKeys.length > 0 && (
+                  <div>
+                    <div className="mb-1.5 text-xs font-semibold text-[var(--color-text-secondary)]">
+                      残留注册表项（当前用户）
+                    </div>
+                    <ul className="space-y-1.5">
+                      {residue.report.regKeys.map((k) => {
+                        const on = residue.checkedRegs.has(k);
+                        return (
+                          <li key={k}>
+                            <label className="flex cursor-pointer items-start gap-2.5 rounded-xl bg-[var(--color-bg)] px-3.5 py-2.5">
+                              <input
+                                type="checkbox"
+                                checked={on}
+                                onChange={() =>
+                                  setResidue((r) => {
+                                    if (!r) return r;
+                                    const s = new Set(r.checkedRegs);
+                                    on ? s.delete(k) : s.add(k);
+                                    return { ...r, checkedRegs: s };
+                                  })
+                                }
+                                className="mt-0.5"
+                              />
+                              <span className="min-w-0 flex-1 break-all text-[13px] text-[var(--color-text-main)]">
+                                {k}
+                              </span>
+                            </label>
+                          </li>
+                        );
+                      })}
+                    </ul>
+                  </div>
+                )}
               </div>
+
               <div className="mt-4 flex gap-3">
                 <button
                   onClick={() => setResidue(null)}
@@ -1052,11 +1173,77 @@ export default function BloatwareCheck() {
                   先留着
                 </button>
                 <button
-                  disabled={cleaningResidue}
+                  disabled={
+                    cleaningResidue || (residue.checkedDirs.size === 0 && residue.checkedRegs.size === 0)
+                  }
                   onClick={doCleanResidue}
                   className="flex-1 rounded-xl bg-[var(--color-primary)] py-2.5 text-sm font-medium text-white transition-colors hover:bg-[var(--color-primary-dark)] disabled:opacity-50"
                 >
-                  {cleaningResidue ? "清理中…" : "清理残留"}
+                  {cleaningResidue
+                    ? "清理中…"
+                    : `清理所选（${residue.checkedDirs.size + residue.checkedRegs.size}）`}
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* 卸载久未完成的顶部引导：避开居中弹出的卸载向导，固定在页面顶部让用户始终可见 */}
+      <AnimatePresence>
+        {uninHint && job?.status === "running" && (
+          <motion.div
+            initial={{ opacity: 0, y: -16 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -16 }}
+            className="pointer-events-none absolute inset-x-0 top-4 z-[60] flex justify-center px-6"
+          >
+            <div className="pointer-events-auto flex max-w-xl items-start gap-2.5 rounded-xl border border-[#F59E0B] bg-[#FFFBEB] px-4 py-3 shadow-[var(--shadow-card-hover)]">
+              <AlertTriangle size={18} className="mt-0.5 shrink-0 text-[#B45309]" />
+              <div className="text-sm leading-relaxed text-[#92400E]">
+                这个软件弹出了自己的卸载向导窗口（可能挡在屏幕中间）。请在
+                <b>那个窗口</b>上完成操作（点“下一步 / 卸载 / 是”），完成后这里会
+                <b>自动继续</b>，不用管本窗口。
+              </div>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* 结果/错误通知弹窗（问题一律弹窗，不在页面里内联平铺） */}
+      <AnimatePresence>
+        {notice && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="absolute inset-0 z-50 flex items-center justify-center bg-black/40 p-6"
+            onClick={() => setNotice(null)}
+          >
+            <motion.div
+              initial={{ scale: 0.94, y: 10 }}
+              animate={{ scale: 1, y: 0 }}
+              exit={{ scale: 0.94, y: 10 }}
+              className="w-full max-w-md rounded-2xl bg-[var(--color-surface)] p-6 shadow-[var(--shadow-card-hover)]"
+              onClick={(ev) => ev.stopPropagation()}
+            >
+              <div className="flex items-center gap-2 text-base font-semibold">
+                {notice.kind === "error" ? (
+                  <AlertTriangle size={18} className="text-[var(--color-caution)]" />
+                ) : (
+                  <CheckCircle2 size={18} className="text-[var(--color-safe)]" />
+                )}
+                {notice.kind === "error" ? "遇到一点问题" : "完成"}
+              </div>
+              <div className="mt-2 break-words text-sm leading-relaxed text-[var(--color-text-secondary)]">
+                {notice.text}
+              </div>
+              <div className="mt-5 flex justify-end">
+                <button
+                  onClick={() => setNotice(null)}
+                  className="rounded-xl bg-[var(--color-primary)] px-6 py-2.5 text-sm font-medium text-white transition-colors hover:bg-[var(--color-primary-dark)]"
+                >
+                  知道了
                 </button>
               </div>
             </motion.div>

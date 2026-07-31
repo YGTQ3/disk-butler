@@ -179,21 +179,32 @@ async fn uninstall_software(id: String) -> Result<(), String> {
         .map_err(|e| format!("卸载任务失败：{}", e))?
 }
 
-/// 扫描某已卸载软件安装目录的残留（严格路径校验，无则返回 null）。
+/// 卸载后残留全景扫描：安装目录 + 各安装根下同名数据目录 + HKCU 注册表键（严格白名单）。
 #[tauri::command]
-async fn scan_residue(install_location: String) -> Option<bloatware::ResidueDetail> {
-    tauri::async_runtime::spawn_blocking(move || bloatware::scan_residue(&install_location))
+async fn scan_residue(
+    name: String,
+    publisher: String,
+    install_location: String,
+) -> Result<bloatware::ResidueScanReport, String> {
+    tauri::async_runtime::spawn_blocking(move || bloatware::scan_residue(&name, &publisher, &install_location))
         .await
-        .ok()
-        .flatten()
+        .map_err(|e| format!("残留扫描失败：{}", e))
 }
 
-/// 清理残留目录（逐个再次校验路径安全后删除）。
+/// 清理残留（目录+注册表键）：允许集合由后端当场重新推导，前端选中项必须命中才执行。
 #[tauri::command]
-async fn clean_residue(paths: Vec<String>) -> Result<bloatware::ResidueReport, String> {
-    tauri::async_runtime::spawn_blocking(move || bloatware::clean_residue(paths))
-        .await
-        .map_err(|e| format!("清理残留失败：{}", e))
+async fn clean_residue(
+    name: String,
+    publisher: String,
+    install_location: String,
+    dirs: Vec<String>,
+    reg_keys: Vec<String>,
+) -> Result<bloatware::ResidueReport, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        bloatware::clean_residue(&name, &publisher, &install_location, dirs, reg_keys)
+    })
+    .await
+    .map_err(|e| format!("清理残留失败：{}", e))
 }
 
 /// 软件体检白名单：记录/取消用户"不再提醒"某软件（本地持久化）。
@@ -258,6 +269,22 @@ async fn open_official_uninstaller(id: String) -> Result<(), String> {
         .map_err(|e| format!("打开失败：{}", e))?
 }
 
+/// AppData 孤儿残留扫描：已卸载软件的遗留目录（知识库确证可清 + 未知只列出）。
+#[tauri::command]
+async fn scan_orphan_dirs() -> Result<bloatware::OrphanScan, String> {
+    tauri::async_runtime::spawn_blocking(bloatware::scan_orphans)
+        .await
+        .map_err(|e| format!("残留检查失败：{}", e))
+}
+
+/// 清理孤儿残留目录：只接受后端当场重扫确证的白名单路径。
+#[tauri::command]
+async fn clean_orphan_dirs(paths: Vec<String>) -> Result<bloatware::ResidueReport, String> {
+    tauri::async_runtime::spawn_blocking(move || bloatware::clean_orphans(paths))
+        .await
+        .map_err(|e| format!("清理失败：{}", e))
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
@@ -291,7 +318,9 @@ pub fn run() {
             force_uninstall_software,
             set_always_on_top,
             op_started,
-            open_official_uninstaller
+            open_official_uninstaller,
+            scan_orphan_dirs,
+            clean_orphan_dirs
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
