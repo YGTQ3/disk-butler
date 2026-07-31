@@ -611,12 +611,15 @@ fn install_loc_of(id: &str) -> String {
     effective_location(&install, &uninstall, &icon)
 }
 
-/// 停止某安装目录下的相关服务与进程（**提权**执行，破服务常驻/自我保护）。
-pub fn stop_software(install_location: &str) -> Result<(), String> {
-    if install_location.trim().is_empty() {
+/// 停止某软件的相关服务与进程（**提权**执行，破服务常驻/自我保护）。
+/// 安全：按 `id` 由后端重读安装目录（同 uninstall/force_uninstall），不信任前端直传路径，
+/// 避免前端被篡改后传入 `C:\Windows` 等导致以 SYSTEM 停掉大量系统服务/进程（docs/18 · V1）。
+pub fn stop_software(id: &str) -> Result<(), String> {
+    let loc = install_loc_of(id);
+    if loc.trim().is_empty() {
         return Ok(());
     }
-    let script = format!("$ErrorActionPreference='SilentlyContinue'\n{}", ps_stop_block(install_location));
+    let script = format!("$ErrorActionPreference='SilentlyContinue'\n{}", ps_stop_block(&loc));
     run_elevated_ps(&script)
 }
 

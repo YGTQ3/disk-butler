@@ -200,7 +200,8 @@ export default function BloatwareCheck() {
     setJob({ ...j, status: "running", step: 1, detail: "请在弹出的系统授权窗口点「是」，点了我们就立刻开始…" });
 
     const cmd = j.mode === "force" ? "force_uninstall_software" : j.mode === "stop" ? "stop_software" : "uninstall_software";
-    const args = j.mode === "stop" ? { installLocation: j.entry.installLocation } : { id: j.entry.id };
+    // 三种模式统一传 id：后端据 id 重读安装目录/卸载命令，不接收前端直传路径（安全信任边界）
+    const args = { id: j.entry.id };
     const p = invoke(cmd, args);
 
     // 轮询：只有当提权脚本真正开始执行（你已点“是”）后，才推进到“执行中”

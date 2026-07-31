@@ -36,9 +36,11 @@ pub fn repair_service() -> Result<(), String> {
         return Err("找不到扫描服务程序（disk-butler-svc.exe）".to_string());
     }
     // 经 PowerShell 提权运行并等待完成（-Verb RunAs 弹 UAC；-Wait 等安装结束）
+    // 安全：对路径做 PS 单引号转义，防安装目录含单引号时命令语法被破坏（docs/18 · V4）
+    let exe_quoted = exe.display().to_string().replace('\'', "''");
     let ps = format!(
         "Start-Process -FilePath '{}' -ArgumentList 'install' -Verb RunAs -Wait -WindowStyle Hidden",
-        exe.display()
+        exe_quoted
     );
     let _ = std::process::Command::new("powershell")
         .args(["-NoProfile", "-Command", &ps])
