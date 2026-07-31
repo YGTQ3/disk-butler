@@ -1,3 +1,4 @@
+#[cfg(feature_bloatware)]
 mod bloatware;
 mod cache;
 mod cleanup;
@@ -161,6 +162,7 @@ async fn repair_scan_service() -> Result<(), String> {
 }
 
 /// 软件体检：陈述软件的客观行为（开机自启/后台常驻/占用较大），不定性、不点名（只读）。
+#[cfg(feature_bloatware)]
 #[tauri::command]
 async fn scan_bloatware(app: tauri::AppHandle, include_all: bool) -> Result<bloatware::BloatwareScan, String> {
     tauri::async_runtime::spawn_blocking(move || {
@@ -172,6 +174,7 @@ async fn scan_bloatware(app: tauri::AppHandle, include_all: bool) -> Result<bloa
 }
 
 /// 一键卸载：运行指定软件自带的官方卸载程序（后端据 id 重读卸载命令）。
+#[cfg(feature_bloatware)]
 #[tauri::command]
 async fn uninstall_software(id: String) -> Result<(), String> {
     tauri::async_runtime::spawn_blocking(move || bloatware::uninstall(&id))
@@ -180,6 +183,7 @@ async fn uninstall_software(id: String) -> Result<(), String> {
 }
 
 /// 卸载后残留全景扫描：安装目录 + 各安装根下同名数据目录 + HKCU 注册表键（严格白名单）。
+#[cfg(feature_bloatware)]
 #[tauri::command]
 async fn scan_residue(
     name: String,
@@ -192,6 +196,7 @@ async fn scan_residue(
 }
 
 /// 清理残留（目录+注册表键）：允许集合由后端当场重新推导，前端选中项必须命中才执行。
+#[cfg(feature_bloatware)]
 #[tauri::command]
 async fn clean_residue(
     name: String,
@@ -208,6 +213,7 @@ async fn clean_residue(
 }
 
 /// 软件体检白名单：记录/取消用户"不再提醒"某软件（本地持久化）。
+#[cfg(feature_bloatware)]
 #[tauri::command]
 async fn bloatware_set_ignored(app: tauri::AppHandle, key: String, ignored: bool) -> Result<(), String> {
     tauri::async_runtime::spawn_blocking(move || bloatware::set_ignored(&app, key, ignored))
@@ -225,15 +231,17 @@ fn open_apps_settings() -> Result<(), String> {
         .map_err(|e| format!("打开设置失败：{}", e))
 }
 
-/// 停止某软件的后台服务与进程（提权，破占用/自我保护）。
+/// 停止某软件的后台服务与进程（提权，破占用/自我保护）。后端据 id 重读安装目录，不信任前端直传路径。
+#[cfg(feature_bloatware)]
 #[tauri::command]
-async fn stop_software(install_location: String) -> Result<(), String> {
-    tauri::async_runtime::spawn_blocking(move || bloatware::stop_software(&install_location))
+async fn stop_software(id: String) -> Result<(), String> {
+    tauri::async_runtime::spawn_blocking(move || bloatware::stop_software(&id))
         .await
         .map_err(|e| format!("停止失败：{}", e))?
 }
 
 /// 强力卸载预览：列出将删除的安装目录/服务/计划任务/注册表项。
+#[cfg(feature_bloatware)]
 #[tauri::command]
 async fn bloatware_force_preview(id: String) -> Result<bloatware::ForcePlan, String> {
     tauri::async_runtime::spawn_blocking(move || bloatware::force_preview(&id))
@@ -242,6 +250,7 @@ async fn bloatware_force_preview(id: String) -> Result<bloatware::ForcePlan, Str
 }
 
 /// 强力卸载：停/删服务、计划任务、进程、安装目录、注册表项（单次提权）。
+#[cfg(feature_bloatware)]
 #[tauri::command]
 async fn force_uninstall_software(id: String) -> Result<(), String> {
     tauri::async_runtime::spawn_blocking(move || bloatware::force_uninstall(&id))
@@ -256,12 +265,14 @@ fn set_always_on_top(window: tauri::Window, on: bool) -> Result<(), String> {
 }
 
 /// 提权操作是否已真正开始（UAC 已授权）——供前端进度条从"授权"推进到"执行中"。
+#[cfg(feature_bloatware)]
 #[tauri::command]
 fn op_started() -> bool {
     bloatware::op_started()
 }
 
 /// 前台打开软件自带的官方卸载程序（安全软件等自我保护软件走引导，不提权/不静默）。
+#[cfg(feature_bloatware)]
 #[tauri::command]
 async fn open_official_uninstaller(id: String) -> Result<(), String> {
     tauri::async_runtime::spawn_blocking(move || bloatware::open_official_uninstaller(&id))
@@ -270,6 +281,7 @@ async fn open_official_uninstaller(id: String) -> Result<(), String> {
 }
 
 /// AppData 孤儿残留扫描：已卸载软件的遗留目录（知识库确证可清 + 未知只列出）。
+#[cfg(feature_bloatware)]
 #[tauri::command]
 async fn scan_orphan_dirs() -> Result<bloatware::OrphanScan, String> {
     tauri::async_runtime::spawn_blocking(bloatware::scan_orphans)
@@ -278,6 +290,7 @@ async fn scan_orphan_dirs() -> Result<bloatware::OrphanScan, String> {
 }
 
 /// 清理孤儿残留目录：只接受后端当场重扫确证的白名单路径。
+#[cfg(feature_bloatware)]
 #[tauri::command]
 async fn clean_orphan_dirs(paths: Vec<String>) -> Result<bloatware::ResidueReport, String> {
     tauri::async_runtime::spawn_blocking(move || bloatware::clean_orphans(paths))
@@ -287,41 +300,68 @@ async fn clean_orphan_dirs(paths: Vec<String>) -> Result<bloatware::ResidueRepor
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
-    tauri::Builder::default()
-        .plugin(tauri_plugin_opener::init())
-        .invoke_handler(tauri::generate_handler![
-            get_drives,
-            scan_drive,
-            scan_dir,
-            load_scan_cache,
-            list_cleanup_items,
-            run_cleanup,
-            run_deep_analyze,
-            run_deep_clean,
-            get_cleanup_stats,
-            list_startup_items,
-            set_startup_enabled,
-            memory_report,
-            pagefile_check,
-            open_recycle_bin,
-            collect_rules,
-            scan_service_available,
-            repair_scan_service,
-            scan_bloatware,
-            uninstall_software,
-            scan_residue,
-            clean_residue,
-            bloatware_set_ignored,
-            open_apps_settings,
-            stop_software,
-            bloatware_force_preview,
-            force_uninstall_software,
-            set_always_on_top,
-            op_started,
-            open_official_uninstaller,
-            scan_orphan_dirs,
-            clean_orphan_dirs
-        ])
+    let builder = tauri::Builder::default().plugin(tauri_plugin_opener::init());
+
+    // 「软件体检」为未定稿大类功能：其命令仅在编译期开关 feature_bloatware 开启时注册，
+    // 默认（公开包）不注册，与前端 __FEATURE_BLOATWARE__ 门控由同一环境变量驱动。
+    #[cfg(feature_bloatware)]
+    let builder = builder.invoke_handler(tauri::generate_handler![
+        get_drives,
+        scan_drive,
+        scan_dir,
+        load_scan_cache,
+        list_cleanup_items,
+        run_cleanup,
+        run_deep_analyze,
+        run_deep_clean,
+        get_cleanup_stats,
+        list_startup_items,
+        set_startup_enabled,
+        memory_report,
+        pagefile_check,
+        open_recycle_bin,
+        collect_rules,
+        scan_service_available,
+        repair_scan_service,
+        open_apps_settings,
+        set_always_on_top,
+        scan_bloatware,
+        uninstall_software,
+        scan_residue,
+        clean_residue,
+        bloatware_set_ignored,
+        stop_software,
+        bloatware_force_preview,
+        force_uninstall_software,
+        op_started,
+        open_official_uninstaller,
+        scan_orphan_dirs,
+        clean_orphan_dirs
+    ]);
+    #[cfg(not(feature_bloatware))]
+    let builder = builder.invoke_handler(tauri::generate_handler![
+        get_drives,
+        scan_drive,
+        scan_dir,
+        load_scan_cache,
+        list_cleanup_items,
+        run_cleanup,
+        run_deep_analyze,
+        run_deep_clean,
+        get_cleanup_stats,
+        list_startup_items,
+        set_startup_enabled,
+        memory_report,
+        pagefile_check,
+        open_recycle_bin,
+        collect_rules,
+        scan_service_available,
+        repair_scan_service,
+        open_apps_settings,
+        set_always_on_top
+    ]);
+
+    builder
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }

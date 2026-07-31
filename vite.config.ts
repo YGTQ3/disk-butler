@@ -13,6 +13,10 @@ export default defineConfig(async () => ({
   // 版本号从 package.json 注入，避免界面里硬编码忘更新
   define: {
     __APP_VERSION__: JSON.stringify(pkg.version),
+    // 未定稿大类功能的前端门控：与后端 build.rs 的 feature_bloatware 读同一环境变量，
+    // 一个开关同时管前后端，默认关（隐藏入口、不渲染页面）。
+    // @ts-expect-error process is a nodejs global
+    __FEATURE_BLOATWARE__: JSON.stringify(process.env.DISKBUTLER_FEATURE_BLOATWARE === "1"),
   },
 
   // Vite options tailored for Tauri development and only applied in `tauri dev` or `tauri build`
