@@ -83,6 +83,16 @@ export interface SystemCleanReport {
   updateCacheSkipped: boolean;
 }
 
+/** 系统级清理·只读分析结果 */
+export interface SystemAnalyzeReport {
+  /** C:\Windows\Temp 当前大小（字节） */
+  tempBytes: number;
+  /** Windows 更新下载缓存当前大小（字节） */
+  updateCacheBytes: number;
+  /** 是否有挂起的 Windows 更新（有则清理时会跳过更新缓存） */
+  updatePending: boolean;
+}
+
 /** 累计清理统计（本地持久化） */
 export interface CleanupStats {
   totalFreed: number;

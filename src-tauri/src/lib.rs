@@ -1,4 +1,7 @@
-#[cfg(feature_bloatware)]
+// bloatware 模块始终编译：孤儿残留检测(scan/clean_orphans)已搬到「一键清理」属发布功能、依赖本模块；
+// 「软件体检」相关命令仍由 feature_bloatware 门控是否注册（默认不注册=UI 不可达）。
+// feature 关时软件体检那部分函数未被调用，允许 dead_code 以免告警。
+#[cfg_attr(not(feature_bloatware), allow(dead_code))]
 mod bloatware;
 mod cache;
 mod cleanup;
@@ -14,7 +17,7 @@ pub mod svc;
 mod svc_client;
 
 use cache::ScanCache;
-use cleanup::{CleanupReport, CleanupScan, DeepAnalyzeReport, DeepCleanReport, SystemCleanReport};
+use cleanup::{CleanupReport, CleanupScan, DeepAnalyzeReport, DeepCleanReport, SystemAnalyzeReport, SystemCleanReport};
 use memory::MemoryReport;
 use scan::{DriveInfo, TreeNode};
 use startup::StartupItem;
@@ -111,6 +114,14 @@ async fn run_deep_clean_system(app: tauri::AppHandle) -> Result<SystemCleanRepor
     })
     .await
     .map_err(|e| format!("系统清理任务失败：{}", e))?
+}
+
+/// 高级：系统级清理·只读分析（提权量出临时目录 + 更新缓存大小，不做任何更改）。
+#[tauri::command]
+async fn analyze_system_clean() -> Result<SystemAnalyzeReport, String> {
+    tauri::async_runtime::spawn_blocking(cleanup::analyze_system_clean)
+        .await
+        .map_err(|e| format!("分析任务失败：{}", e))?
 }
 
 /// 枚举启动项（注册表 Run + 启动文件夹，含建议标签与运行内存）。
@@ -293,7 +304,6 @@ async fn open_official_uninstaller(id: String) -> Result<(), String> {
 }
 
 /// AppData 孤儿残留扫描：已卸载软件的遗留目录（知识库确证可清 + 未知只列出）。
-#[cfg(feature_bloatware)]
 #[tauri::command]
 async fn scan_orphan_dirs() -> Result<bloatware::OrphanScan, String> {
     tauri::async_runtime::spawn_blocking(bloatware::scan_orphans)
@@ -302,7 +312,6 @@ async fn scan_orphan_dirs() -> Result<bloatware::OrphanScan, String> {
 }
 
 /// 清理孤儿残留目录：只接受后端当场重扫确证的白名单路径。
-#[cfg(feature_bloatware)]
 #[tauri::command]
 async fn clean_orphan_dirs(paths: Vec<String>) -> Result<bloatware::ResidueReport, String> {
     tauri::async_runtime::spawn_blocking(move || bloatware::clean_orphans(paths))
@@ -327,6 +336,7 @@ pub fn run() {
         run_deep_analyze,
         run_deep_clean,
         run_deep_clean_system,
+        analyze_system_clean,
         get_cleanup_stats,
         list_startup_items,
         set_startup_enabled,
@@ -362,6 +372,7 @@ pub fn run() {
         run_deep_analyze,
         run_deep_clean,
         run_deep_clean_system,
+        analyze_system_clean,
         get_cleanup_stats,
         list_startup_items,
         set_startup_enabled,
@@ -372,7 +383,9 @@ pub fn run() {
         scan_service_available,
         repair_scan_service,
         open_apps_settings,
-        set_always_on_top
+        set_always_on_top,
+        scan_orphan_dirs,
+        clean_orphan_dirs
     ]);
 
     builder

@@ -25,6 +25,7 @@ import {
   DeepCleanReport,
   DeepAnalyzeReport,
   SystemCleanReport,
+  SystemAnalyzeReport,
   formatBytes,
   openInExplorer,
 } from "../types";
@@ -80,10 +81,26 @@ export default function Cleanup() {
   /** 深度清理完成后的结果弹窗（关闭后卡片内仍保留一行小结） */
   const [showDeepResult, setShowDeepResult] = useState(false);
 
-  // 高级：系统级清理（Windows\Temp + 更新缓存，单步提权：确认 → 提权执行 → 结果）
-  const [sysPhase, setSysPhase] = useState<"idle" | "confirm" | "running" | "done">("idle");
+  // 高级：系统级清理（Windows\Temp + 更新缓存）——先分析（只读）→ 展示预计可释放 → 确认 → 清理
+  const [sysPhase, setSysPhase] = useState<
+    "idle" | "analyzing" | "analyzed" | "confirm" | "running" | "done"
+  >("idle");
+  const [sysAnalyze, setSysAnalyze] = useState<SystemAnalyzeReport | null>(null);
   const [sysReport, setSysReport] = useState<SystemCleanReport | null>(null);
   const [sysError, setSysError] = useState("");
+
+  async function doSystemAnalyze() {
+    setSysPhase("analyzing");
+    setSysError("");
+    try {
+      const r = await invoke<SystemAnalyzeReport>("analyze_system_clean");
+      setSysAnalyze(r);
+      setSysPhase("analyzed");
+    } catch (e) {
+      setSysError(String(e));
+      setSysPhase("idle");
+    }
+  }
 
   async function doSystemClean() {
     setSysPhase("running");
@@ -95,7 +112,7 @@ export default function Cleanup() {
       loadStats();
     } catch (e) {
       setSysError(String(e));
-      setSysPhase("idle");
+      setSysPhase("analyzed");
     }
   }
 
@@ -546,24 +563,65 @@ export default function Cleanup() {
                   更新，会自动只清临时文件、跳过更新缓存，避免打断更新。
                 </div>
 
-                {sysPhase === "confirm" && (
+                {/* 分析中（只读，需一次授权量出系统 Temp 大小） */}
+                {sysPhase === "analyzing" && (
+                  <div className="mt-3 flex items-center gap-2 rounded-xl bg-[var(--color-bg)] px-3.5 py-2.5 text-xs text-[var(--color-text-secondary)]">
+                    <Loader2 size={14} className="animate-spin text-[var(--color-primary)]" />
+                    正在分析中（只读，不删任何东西）……需要一次管理员授权来量出系统临时目录大小。
+                  </div>
+                )}
+
+                {/* 分析结果：预计可释放 + 用户决定是否清理 */}
+                {sysPhase === "analyzed" && sysAnalyze && (
                   <div className="mt-3 rounded-xl bg-[var(--color-bg)] p-3.5">
-                    <div className="text-xs leading-relaxed">
-                      即将请求<b>管理员权限</b>清理系统临时文件与更新下载缓存，会弹出一次 UAC
-                      授权（点“是”）。清理更新缓存时会短暂停止 Windows 更新服务、清完自动恢复。
+                    <div className="flex items-end justify-between gap-3">
+                      <div className="space-y-1 text-xs text-[var(--color-text-secondary)]">
+                        <div>
+                          系统临时文件（Windows\Temp）：
+                          <b className="text-[var(--color-text-main)]">{formatBytes(sysAnalyze.tempBytes)}</b>
+                        </div>
+                        <div>
+                          更新下载缓存（SoftwareDistribution\Download）：
+                          <b className="text-[var(--color-text-main)]">{formatBytes(sysAnalyze.updateCacheBytes)}</b>
+                          {sysAnalyze.updatePending && (
+                            <span className="ml-1 text-[var(--color-keep)]">· 有挂起更新，将跳过不清</span>
+                          )}
+                        </div>
+                      </div>
+                      <div className="shrink-0 text-right">
+                        <div className="text-[11px] text-[var(--color-text-secondary)]">预计可释放</div>
+                        <div className="text-2xl font-bold text-[var(--color-primary-dark)]">
+                          {formatBytes(
+                            sysAnalyze.tempBytes +
+                              (sysAnalyze.updatePending ? 0 : sysAnalyze.updateCacheBytes)
+                          )}
+                        </div>
+                      </div>
                     </div>
+
+                    {sysAnalyze.tempBytes +
+                      (sysAnalyze.updatePending ? 0 : sysAnalyze.updateCacheBytes) <
+                    50 * 1024 * 1024 ? (
+                      <div className="mt-3 rounded-lg bg-[var(--color-primary-soft)] px-3 py-2 text-xs text-[var(--color-text-secondary)]">
+                        目前可释放不多（不到 50 MB），系统还算干净，可以先不清、等攒多了再来。
+                      </div>
+                    ) : null}
+
                     <div className="mt-3 flex gap-2">
                       <button
                         onClick={doSystemClean}
                         className="rounded-xl bg-[var(--color-primary)] px-4 py-2 text-xs font-semibold text-white transition-colors hover:bg-[var(--color-primary-dark)]"
                       >
-                        确认清理（需授权）
+                        确认清理（需再次授权）
                       </button>
                       <button
-                        onClick={() => setSysPhase("idle")}
+                        onClick={() => {
+                          setSysPhase("idle");
+                          setSysAnalyze(null);
+                        }}
                         className="rounded-xl border border-[var(--color-line)] px-4 py-2 text-xs font-medium text-[var(--color-text-secondary)] transition-colors hover:text-[var(--color-text-main)]"
                       >
-                        再想想
+                        先不清
                       </button>
                     </div>
                   </div>
@@ -594,10 +652,10 @@ export default function Cleanup() {
 
                 {(sysPhase === "idle" || sysPhase === "done") && (
                   <button
-                    onClick={() => setSysPhase("confirm")}
+                    onClick={doSystemAnalyze}
                     className="mt-3 rounded-xl border border-[var(--color-line)] px-4 py-2 text-xs font-medium transition-colors hover:border-[var(--color-primary)] hover:text-[var(--color-primary-dark)]"
                   >
-                    {sysPhase === "done" ? "再清一次" : "清理（需管理员）"}
+                    {sysPhase === "done" ? "重新分析" : "分析（只读，需管理员）"}
                   </button>
                 )}
               </div>

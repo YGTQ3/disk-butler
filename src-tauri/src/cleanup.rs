@@ -881,6 +881,18 @@ pub struct SystemCleanReport {
     pub update_cache_skipped: bool,
 }
 
+/// 系统级清理·只读分析结果：两个目标各自当前大小 + 是否有挂起更新。
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SystemAnalyzeReport {
+    /// C:\Windows\Temp 当前大小
+    pub temp_bytes: u64,
+    /// SoftwareDistribution\Download 更新下载缓存当前大小
+    pub update_cache_bytes: u64,
+    /// 是否有挂起的 Windows 更新（有则清理时会跳过更新缓存）
+    pub update_pending: bool,
+}
+
 /// DISM 只读分析报告：原始关键行 + 微软是否推荐清理
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -1122,6 +1134,52 @@ pub fn deep_clean_system() -> Result<SystemCleanReport, String> {
         free_before,
         free_after,
         update_cache_skipped: pending,
+    })
+}
+
+/// 系统级清理·只读分析：提权量出 Windows\Temp 与更新缓存的当前大小，供用户决定是否值得清。
+/// 与清理分离（先分析→展示→用户确认），风险操作不盲点；Windows\Temp 受 ACL 保护需提权才能量准。
+pub fn analyze_system_clean() -> Result<SystemAnalyzeReport, String> {
+    use std::os::windows::process::CommandExt;
+    const CREATE_NO_WINDOW: u32 = 0x0800_0000;
+
+    let log = std::env::temp_dir().join("diskbutler-sysclean-size.txt");
+    let _ = std::fs::remove_file(&log);
+    let inner = format!(
+        "$t=(Get-ChildItem -LiteralPath \"$env:SystemRoot\\Temp\" -Recurse -Force -File -ErrorAction SilentlyContinue | Measure-Object Length -Sum).Sum; \
+         $d=(Get-ChildItem -LiteralPath \"$env:SystemRoot\\SoftwareDistribution\\Download\" -Recurse -Force -File -ErrorAction SilentlyContinue | Measure-Object Length -Sum).Sum; \
+         \"$([long]$t) $([long]$d)\" | Out-File -LiteralPath '{}' -Encoding ascii",
+        log.to_string_lossy().replace('\'', "''")
+    );
+    let encoded = encode_ps_command(&inner);
+    let ps = format!(
+        r#"$p = Start-Process -Verb RunAs -Wait -PassThru -FilePath powershell.exe -ArgumentList '-NoProfile','-EncodedCommand','{}'; exit $p.ExitCode"#,
+        encoded
+    );
+    let status = std::process::Command::new("powershell")
+        .args(["-NoProfile", "-Command", &ps])
+        .creation_flags(CREATE_NO_WINDOW)
+        .status()
+        .map_err(|e| format!("启动分析失败：{}", e))?;
+
+    let code = status.code().unwrap_or(-1);
+    if code != 0 {
+        return Err(if code == 1 {
+            "已取消授权，未执行分析。".to_string()
+        } else {
+            format!("分析未完成（退出码 {}），可稍后重试。", code)
+        });
+    }
+
+    let text = std::fs::read_to_string(&log).map_err(|e| format!("读取分析结果失败：{}", e))?;
+    let _ = std::fs::remove_file(&log);
+    let mut it = text.split_whitespace();
+    let temp_bytes = it.next().and_then(|s| s.parse::<u64>().ok()).unwrap_or(0);
+    let update_cache_bytes = it.next().and_then(|s| s.parse::<u64>().ok()).unwrap_or(0);
+    Ok(SystemAnalyzeReport {
+        temp_bytes,
+        update_cache_bytes,
+        update_pending: update_pending(),
     })
 }
 
