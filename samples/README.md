@@ -22,6 +22,7 @@
 | diskbutler-rule-report-20260728-2005（friend-c 游戏家用机 Win11 24H2） | 2026-07-28 | 完整 | ✅ 已评估入库 | +browser-cache 扩充 CentBrowser/Quark +知识库 .minecraft 存档保护；修复采集器 PERSONAL 误报（精确匹配目录名，不再误伤 ai.opencode.desktop 等包名）；QQ 边界见观察名单 |
 | diskbutler-rule-report-20260729-1054（friend-d 教育+AI工作机 Win11 Pro 25H2） | 2026-07-29 | 基础（软件内贡献 collector=app） | 🔍 已登记待评估 | 画像：学而思/ClassIn/GeoGebra/LyX/讯飞E听说 + 重度 AI 工具（LM Studio/Chatbox/ollama/通义/千问/秘塔/爱问云）+ 开发全家桶；装火绒。现有规则可覆盖：Quark 缓存(2.8G)/Playwright(683M)/electron-cache(通义/Chatbox/ollama 等)/wps-cache(kingsoft 2.5G)。新线索见观察名单 |
 | diskbutler-rule-report-20260730-1517（friend-e 电气/嵌入式工程工作站 Win10 Pro 22H2） | 2026-07-30 | 基础（软件内贡献 collector=app） | ✅ 已评估入库 | +wps-cache 扩充 4 路径（office6\log、PDF\Cache、Kingsoft\kupdateUI\cache、wpsoffice\cache，双样本佐证）+doubao-shadercache（存在才收录）；知识库 +7（WPS 边界 4 条、/shadercache 通用、Keil_v5/Arm Packs 二条 Software/Caution）；拒：Keil/Arm 入清理白名单（芯片包删后不自动重建，自检 #2 不过）、元宝 ShaderCache（Tencent 系红线不开例外，知识库通用规则覆盖解释）。Kingsoft VERSION-SIBLINGS 经核为 wps-old-versions 已覆盖。画像与永拒名单验证见观察名单 |
+| diskbutler-rule-report-20260801-1259（friend-f 学术/工程工作站 Win11 Home 23H2） | 2026-08-01 | 基础（软件内贡献 collector=app） | ✅ 已评估入库 | +islide-logs(2G)/miktex-cache/originlab-temp/teamviewer-logs/game-logs（Civ VI 等 7 款游戏日志）+gpu-cache 扩充 Steam ShaderCache(311M)；知识库 +13（iSlide/MiKTeX/OriginLab/TeamViewer/6 家游戏厂商 + Zotero/MathWorks Personal/Keep + com.adobe.dunamis Software/Keep）；拒 10 项（Package Cache×3/Tencent/MathWorks/Zotero/Downloaded Installations/com.adobe.dunamis/Python/本软件）。子智能体独立验证发现 2 处已覆盖判断错误（CEF/Steam ShaderCache），已修正。画像与观察名单见下方 |
 
 ## 观察名单（见过但未入库，等更多样本佐证）
 
@@ -34,6 +35,8 @@
 - **Keil/Arm 包缓存**（friend-e）：清理白名单已评估**拒绝**（CMSIS 芯片包删后不自动重建，需 Pack Installer 手动重装，自检 #2 不过）；已入知识库 Software/Caution 解释。剩余待办：若未来完整模式样本证实 `Arm\Packs\.Download`（安装后残留的 .pack 源包）独立存在，可单独评估该子目录为 junk；
 - ~~**豆包/元宝 WebView 缓存**~~ ✅ 部分入库（2026-07-30）：豆包 ShaderCache 入清理白名单（doubao-shadercache，存在才收录）；元宝 EBWebView\ShaderCache 技术上安全但 **Tencent 系永拒红线不开例外**，仅由知识库 `/shadercache` 通用规则解释为可安全清理；两者的 Crashpad 目录未处理，暂缓；
 - **工业软件 ProgramData 数据**（friend-e）：EPLAN(2.5G)/CODESYS(1.9G)/Altium(639M)/SOLIDWORKS Electrical(617M)——大概率含元件库/工程数据，默认不动，仅记录画像；HDDog(880M) 身份待查明后再议。
+- **随机名目录疑似广告软件**（friend-f）：`%LOCALAPPDATA%\r5ym9vr4`(19M)、`qkoimv2w`(19M)、`3y4y5ygn`(11M)、`acvt1dv0`(11M)、`z5ds4udz`(11M)——共 ~71MB。全部带 `User Data\Crashpad + ShaderCache` 结构，8 字符随机字母数字命名，配合"鼠大侠"等可疑软件，高度疑似广告软件/PUP 残留。单机样本，等更多佐证再决定是否入孤儿检测；
+- **华为电脑管家 (PCManager) 数据**（friend-f）：`%ProgramData%\Comms` (1121M) + `%LocalAppData%\PCManager` (25M)。预装推广软件的大量缓存/日志，技术上可清理但属 OEM 软件边界，暂记录画像。
 - 永久拒绝：Tencent 系（聊天数据同树）、Postman（含 workspace）、Blackmagic/DaVinci（含项目库）、OCS/yuque/Gandownload（PERSONAL 标记）、Package Cache（Windows Installer 缓存，删了会破坏软件修复/卸载）。
 
 ## 外部模型评估实验记录（2026-07-27）

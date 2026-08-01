@@ -285,6 +285,13 @@ const RULES: &[Rule] = &[
         safety: Safety::Safe,
     },
     Rule {
+        needle: "com.adobe.dunamis",
+        category: Category::Software,
+        friendly_name: "Adobe 许可证验证组件",
+        description: "Adobe Creative Cloud 的许可证验证服务数据，删除可能导致 Adobe 软件无法启动，请勿清理。",
+        safety: Safety::Keep,
+    },
+    Rule {
         needle: "kingsoft/office6/cache",
         category: Category::Cache,
         friendly_name: "WPS 缓存",
@@ -350,6 +357,84 @@ const RULES: &[Rule] = &[
         friendly_name: "vivo 办公套件数据 (pcsuite)",
         description: "vivo 办公套件同步的云笔记与文档（PDF/PPT/录音等）。云端一般有保留，但删除前请先确认没有只存在本机的文件；软件体检的「残留检查」可引导安全清理。",
         safety: Safety::Keep,
+    },
+    // friend-f 样本（学术/工程工作站）新增规则
+    Rule {
+        needle: "islide",
+        category: Category::Cache,
+        friendly_name: "iSlide PPT 插件日志",
+        description: "iSlide PowerPoint 插件的运行日志，可安全清理，不影响使用。",
+        safety: Safety::Safe,
+    },
+    Rule {
+        needle: "miktex",
+        category: Category::Cache,
+        friendly_name: "MiKTeX 字体与包缓存",
+        description: "LaTeX 排版系统 MiKTeX 的字体缓存和包管理日志，可安全清理，编译文档时会自动重建。",
+        safety: Safety::Safe,
+    },
+    Rule {
+        needle: "originlab",
+        category: Category::Cache,
+        friendly_name: "Origin 数据分析临时文件",
+        description: "OriginLab 数据分析软件的临时文件目录，可安全清理，软件运行时按需重新创建。",
+        safety: Safety::Safe,
+    },
+    Rule {
+        needle: "teamviewer",
+        category: Category::Cache,
+        friendly_name: "TeamViewer 运行日志",
+        description: "TeamViewer 远程协助软件的运行日志，可安全清理，下次连接时会自动写新日志。",
+        safety: Safety::Safe,
+    },
+    Rule {
+        needle: "firaxis games",
+        category: Category::Cache,
+        friendly_name: "文明 VI 游戏日志与缓存",
+        description: "文明 VI 的运行日志、崩溃转储和资源缓存，可安全清理，不影响游戏进度。",
+        safety: Safety::Safe,
+    },
+    Rule {
+        needle: "daedalic entertainment",
+        category: Category::Cache,
+        friendly_name: "Daedalic 游戏缓存",
+        description: "Daedalic 游戏的运行缓存，可安全清理，不影响游戏进度。",
+        safety: Safety::Safe,
+    },
+    Rule {
+        needle: "paradox interactive/launcher",
+        category: Category::Cache,
+        friendly_name: "Paradox 启动器日志与缓存",
+        description: "Paradox 游戏启动器的运行日志和缓存，可安全清理。",
+        safety: Safety::Safe,
+    },
+    Rule {
+        needle: "slaythespire2/logs",
+        category: Category::Cache,
+        friendly_name: "杀戮尖塔 2 运行日志",
+        description: "杀戮尖塔 2 的运行日志，可安全清理，不影响游戏进度。",
+        safety: Safety::Safe,
+    },
+    Rule {
+        needle: "spiritcity/saved/logs",
+        category: Category::Cache,
+        friendly_name: "SpiritCity 运行日志",
+        description: "SpiritCity 游戏的运行日志，可安全清理，不影响游戏存档。",
+        safety: Safety::Safe,
+    },
+    Rule {
+        needle: "pal/saved/logs",
+        category: Category::Cache,
+        friendly_name: "Pal 运行日志",
+        description: "Pal 游戏的运行日志，可安全清理，不影响游戏存档。",
+        safety: Safety::Safe,
+    },
+    Rule {
+        needle: "manorlords/saved/logs",
+        category: Category::Cache,
+        friendly_name: "Manor Lords 运行日志",
+        description: "Manor Lords 游戏的运行日志，可安全清理，不影响游戏存档。",
+        safety: Safety::Safe,
     },
     Rule {
         needle: "weixin",
@@ -501,6 +586,22 @@ const RULES: &[Rule] = &[
         friendly_name: "应用本地数据",
         description: "各软件的本地数据与缓存，多数缓存可清理，但也可能含配置，逐项确认更稳妥。",
         safety: Safety::Caution,
+    },
+    // friend-f 样本新增：学术/工程软件数据（含个人数据，不可当垃圾清理）
+    // 必须排在 appdata/roaming 泛化规则之前
+    Rule {
+        needle: "appdata/roaming/zotero",
+        category: Category::Personal,
+        friendly_name: "Zotero 文献管理数据",
+        description: "Zotero 文献管理器的本地数据库和附件，含未同步的 PDF 和笔记，属于个人数据，请勿当垃圾清理。",
+        safety: Safety::Keep,
+    },
+    Rule {
+        needle: "appdata/roaming/mathworks",
+        category: Category::Personal,
+        friendly_name: "MATLAB 数据 (MathWorks)",
+        description: "MATLAB 的偏好设置、工作区布局和自定义工具栏，属于个人数据，请勿当垃圾清理。",
+        safety: Safety::Keep,
     },
     Rule {
         needle: "appdata/roaming",
@@ -1192,5 +1293,104 @@ mod tests {
         assert_eq!(ext_group(Path::new("e.rs")), 4);
         assert_eq!(ext_group(Path::new("f.tmp")), 5);
         assert_eq!(ext_group(Path::new("noext")), 6);
+    }
+
+    // friend-f 样本（学术/工程工作站）新增规则测试
+    #[test]
+    fn classify_islide_logs_is_safe_cache() {
+        let hit = classify(r"C:\Users\x\AppData\Roaming\iSlide\iSlide Tools\Logs");
+        assert_eq!(hit.category, Category::Cache);
+        assert_eq!(hit.safety, Safety::Safe);
+    }
+
+    #[test]
+    fn classify_miktex_cache_is_safe() {
+        let hit = classify(r"C:\Users\x\AppData\Local\MiKTeX\fontconfig\cache");
+        assert_eq!(hit.category, Category::Cache);
+        assert_eq!(hit.safety, Safety::Safe);
+    }
+
+    #[test]
+    fn classify_originlab_temp_is_safe() {
+        let hit = classify(r"C:\Users\x\AppData\Local\OriginLab\102b\TMP");
+        assert_eq!(hit.category, Category::Cache);
+        assert_eq!(hit.safety, Safety::Safe);
+    }
+
+    #[test]
+    fn classify_teamviewer_logs_is_safe() {
+        let hit = classify(r"C:\Users\x\AppData\Local\TeamViewer\Logs");
+        assert_eq!(hit.category, Category::Cache);
+        assert_eq!(hit.safety, Safety::Safe);
+    }
+
+    #[test]
+    fn classify_civ6_logs_is_safe() {
+        let hit = classify(r"C:\Users\x\AppData\Local\Firaxis Games\Sid Meier's Civilization VI\Logs");
+        assert_eq!(hit.category, Category::Cache);
+        assert_eq!(hit.safety, Safety::Safe);
+    }
+
+    #[test]
+    fn classify_daedalic_cache_is_safe() {
+        let hit = classify(r"C:\Users\x\AppData\Local\Daedalic Entertainment GmbH\ShadowTacticsBladesoftheShogun\Cache");
+        assert_eq!(hit.category, Category::Cache);
+        assert_eq!(hit.safety, Safety::Safe);
+    }
+
+    #[test]
+    fn classify_paradox_launcher_is_safe() {
+        let hit = classify(r"C:\Users\x\AppData\Local\Paradox Interactive\launcher-v2\logs");
+        assert_eq!(hit.category, Category::Cache);
+        assert_eq!(hit.safety, Safety::Safe);
+    }
+
+    #[test]
+    fn classify_slaythespire2_logs_is_safe() {
+        let hit = classify(r"C:\Users\x\AppData\Roaming\SlayTheSpire2\logs");
+        assert_eq!(hit.category, Category::Cache);
+        assert_eq!(hit.safety, Safety::Safe);
+    }
+
+    #[test]
+    fn classify_spiritcity_logs_is_safe() {
+        let hit = classify(r"C:\Users\x\AppData\Local\SpiritCity\Saved\Logs");
+        assert_eq!(hit.category, Category::Cache);
+        assert_eq!(hit.safety, Safety::Safe);
+    }
+
+    #[test]
+    fn classify_pal_logs_is_safe() {
+        let hit = classify(r"C:\Users\x\AppData\Local\Pal\Saved\Logs");
+        assert_eq!(hit.category, Category::Cache);
+        assert_eq!(hit.safety, Safety::Safe);
+    }
+
+    #[test]
+    fn classify_manorlords_logs_is_safe() {
+        let hit = classify(r"C:\Users\x\AppData\Local\ManorLords\Saved\Logs");
+        assert_eq!(hit.category, Category::Cache);
+        assert_eq!(hit.safety, Safety::Safe);
+    }
+
+    #[test]
+    fn classify_zotero_is_personal_keep() {
+        let hit = classify(r"C:\Users\x\AppData\Roaming\Zotero");
+        assert_eq!(hit.category, Category::Personal);
+        assert_eq!(hit.safety, Safety::Keep);
+    }
+
+    #[test]
+    fn classify_mathworks_is_personal_keep() {
+        let hit = classify(r"C:\Users\x\AppData\Roaming\MathWorks");
+        assert_eq!(hit.category, Category::Personal);
+        assert_eq!(hit.safety, Safety::Keep);
+    }
+
+    #[test]
+    fn classify_adobe_dunamis_is_software_keep() {
+        let hit = classify(r"C:\Users\x\AppData\Roaming\com.adobe.dunamis");
+        assert_eq!(hit.category, Category::Software);
+        assert_eq!(hit.safety, Safety::Keep);
     }
 }

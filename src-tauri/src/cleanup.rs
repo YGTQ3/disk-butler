@@ -471,6 +471,7 @@ fn candidates() -> Vec<Candidate> {
             local.join("AMD").join("DxcCache"),
             local.join("AMD").join("GLCache"),
             local.join("AMD").join("Radeonsoftware").join("cache"),
+            local.join("Steam").join("htmlcache").join("ShaderCache"),
         ] {
             if p.exists() {
                 gpu.push(p);
@@ -580,6 +581,66 @@ fn candidates() -> Vec<Candidate> {
                 impact: "没有影响。下次启动豆包时会自动重新生成。",
                 safety: "safe",
                 paths: vec![doubao_sc],
+            });
+        }
+
+        // MiKTeX 字体/包缓存与日志：LaTeX 发行版按需自动重建。
+        // friend-f 样本实证：fontconfig\cache、miktex\cache、miktex\log 三个子目录。
+        let mut miktex: Vec<PathBuf> = Vec::new();
+        for p in [
+            local.join("MiKTeX").join("fontconfig").join("cache"),
+            local.join("MiKTeX").join("miktex").join("cache"),
+            local.join("MiKTeX").join("miktex").join("log"),
+        ] {
+            if p.exists() {
+                miktex.push(p);
+            }
+        }
+        if !miktex.is_empty() {
+            out.push(Candidate {
+                id: "miktex-cache",
+                name: "MiKTeX 字体与包缓存",
+                description: "LaTeX 排版系统 MiKTeX 的字体缓存和包管理日志。",
+                impact: "没有影响。MiKTeX 编译文档时会自动重建字体缓存。",
+                safety: "safe",
+                paths: miktex,
+            });
+        }
+
+        // OriginLab 临时文件：数据分析软件的 TMP 目录，纯临时文件。
+        // friend-f 样本实证：OriginLab\102b\TMP（102b 为 Origin 2025b 版本目录）。
+        let mut origin_tmp: Vec<PathBuf> = Vec::new();
+        if let Ok(read) = std::fs::read_dir(local.join("OriginLab")) {
+            for e in read.flatten() {
+                if e.path().is_dir() {
+                    let tmp = e.path().join("TMP");
+                    if tmp.exists() {
+                        origin_tmp.push(tmp);
+                    }
+                }
+            }
+        }
+        if !origin_tmp.is_empty() {
+            out.push(Candidate {
+                id: "originlab-temp",
+                name: "Origin 数据分析临时文件",
+                description: "OriginLab 数据分析软件的临时文件目录。",
+                impact: "没有影响。软件运行时按需重新创建。",
+                safety: "safe",
+                paths: origin_tmp,
+            });
+        }
+
+        // TeamViewer 运行日志：远控软件的操作记录，官方文档提供"清除日志"按钮。
+        let tv_logs = local.join("TeamViewer").join("Logs");
+        if tv_logs.exists() {
+            out.push(Candidate {
+                id: "teamviewer-logs",
+                name: "TeamViewer 运行日志",
+                description: "TeamViewer 远程协助软件的运行日志。",
+                impact: "没有影响。下次远程连接时会自动写新日志。",
+                safety: "safe",
+                paths: vec![tv_logs],
             });
         }
     }
@@ -698,6 +759,69 @@ fn candidates() -> Vec<Candidate> {
             safety: "safe",
             paths: wps,
         });
+
+        // iSlide PPT 插件运行日志：2GB+ 的纯日志，删了无影响。
+        // friend-f 样本实证：%APPDATA%\iSlide\iSlide Tools\Logs。
+        let islide_logs = roaming.join("iSlide").join("iSlide Tools").join("Logs");
+        if islide_logs.exists() {
+            out.push(Candidate {
+                id: "islide-logs",
+                name: "iSlide PPT 插件日志",
+                description: "iSlide PowerPoint 插件的运行日志。",
+                impact: "没有影响。插件下次运行会自动写新日志。",
+                safety: "safe",
+                paths: vec![islide_logs],
+            });
+        }
+
+        // 游戏运行日志与崩溃转储：纯程序自动生成的调试信息，不影响游戏进度。
+        // friend-f 样本实证：Civ VI / SpiritCity / Pal / ManorLords / SlayTheSpire2 / Paradox launcher 等。
+        // 注意：只点名 Logs/dumps/cache 子目录，不碰 Saved（存档）和 SaveGames。
+        let mut game_logs: Vec<PathBuf> = Vec::new();
+        // Civ VI
+        let civ_base = local.as_ref().map(|l| l.join("Firaxis Games").join("Sid Meier's Civilization VI"));
+        if let Some(civ) = &civ_base {
+            for sub in ["Cache", "dumps", "Logs"] {
+                let p = civ.join(sub);
+                if p.exists() { game_logs.push(p); }
+            }
+        }
+        // 其他游戏（Saved\Logs 模式）
+        if let Some(l) = &local {
+            for name in ["SpiritCity", "Pal", "ManorLords"] {
+                let p = l.join(name).join("Saved").join("Logs");
+                if p.exists() { game_logs.push(p); }
+            }
+        }
+        // Daedalic (Shadow Tactics)
+        if let Some(l) = &local {
+            let p = l.join("Daedalic Entertainment GmbH").join("ShadowTacticsBladesoftheShogun").join("Cache");
+            if p.exists() { game_logs.push(p); }
+        }
+        // Slay the Spire 2 (roaming)
+        {
+            let p = roaming.join("SlayTheSpire2").join("logs");
+            if p.exists() { game_logs.push(p); }
+        }
+        // Paradox Interactive launcher
+        if let Some(l) = &local {
+            let p = l.join("Paradox Interactive").join("launcher-v2").join("logs");
+            if p.exists() { game_logs.push(p); }
+        }
+        {
+            let p = roaming.join("Paradox Interactive").join("launcher-v2").join("cache");
+            if p.exists() { game_logs.push(p); }
+        }
+        if !game_logs.is_empty() {
+            out.push(Candidate {
+                id: "game-logs",
+                name: "游戏运行日志与崩溃转储",
+                description: "各游戏的运行日志和崩溃报告（存档和存档不在这里），仅供排查问题时使用。",
+                impact: "没有影响。游戏下次运行会自动写新日志。",
+                safety: "safe",
+                paths: game_logs,
+            });
+        }
     }
 
     // Electron 通用缓存：Chromium 指纹识别（Cache 与 Code Cache/GPUCache 同级并存才认定），
@@ -738,7 +862,8 @@ pub fn open_recycle_bin() -> Result<(), String> {
 fn kind_of(id: &str) -> &'static str {
     match id {
         "temp" | "updaters" | "crash-reports" | "androidstudio-logs" | "synology-logs"
-        | "wps-old-versions" => "junk",
+        | "wps-old-versions" | "islide-logs" | "originlab-temp" | "teamviewer-logs"
+        | "game-logs" => "junk",
         "idm-dwnldata" | "recycle-bin" => "data",
         _ => "cache",
     }
