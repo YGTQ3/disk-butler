@@ -91,7 +91,8 @@ async fn run_deep_clean(app: tauri::AppHandle) -> Result<DeepCleanReport, String
 async fn run_cleanup(app: tauri::AppHandle, ids: Vec<String>) -> Result<CleanupReport, String> {
     tauri::async_runtime::spawn_blocking(move || {
         let r = cleanup::run(ids);
-        stats::record(&app, r.total_freed);
+        // 记账用实际磁盘变化（而非各项 freed 之和），保证累计数字与用户可观测的 C 盘剩余空间一致
+        stats::record(&app, r.free_after.saturating_sub(r.free_before));
         r
     })
     .await

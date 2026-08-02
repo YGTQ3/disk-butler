@@ -311,7 +311,7 @@ export default function Cleanup() {
             <CheckCircle2 size={40} className="text-[var(--color-primary)]" />
           </motion.div>
           <div className="text-center">
-            <div className="text-2xl font-bold">释放了 {formatBytes(report.totalFreed)}</div>
+            <div className="text-2xl font-bold">释放了 {formatBytes(Math.max(0, report.freeAfter - report.freeBefore))}</div>
             <div className="mt-1 text-sm text-[var(--color-text-secondary)]">
               C 盘剩余空间：{formatBytes(report.freeBefore)} →{" "}
               <span className="font-semibold text-[var(--color-primary-dark)]">

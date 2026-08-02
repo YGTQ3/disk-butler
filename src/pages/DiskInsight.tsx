@@ -2,7 +2,7 @@ import { useEffect, useRef, useState, useLayoutEffect } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { motion } from "framer-motion";
-import { HardDrive, Search, ChevronRight, Loader2, RotateCcw, AlertTriangle, Wrench } from "lucide-react";
+import { HardDrive, Search, ChevronRight, ChevronDown, Loader2, RotateCcw, AlertTriangle, Wrench } from "lucide-react";
 import { DriveInfo, TreeNode, ScanProgress, ScanCache, formatBytes, formatCount, formatAgo } from "../types";
 import CapacityBar from "../components/CapacityBar";
 import TreeMap from "../components/TreeMap";
@@ -219,6 +219,10 @@ export default function DiskInsight({ active = true }: Props) {
             <HardDrive
               size={18}
               className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-[var(--color-text-secondary)]"
+            />
+            <ChevronDown
+              size={14}
+              className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 text-[var(--color-text-secondary)]"
             />
           </div>
 

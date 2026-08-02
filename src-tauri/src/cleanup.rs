@@ -729,6 +729,78 @@ fn candidates() -> Vec<Candidate> {
             });
         }
 
+        // Adobe CameraRaw 缓存：RAW 文件的预览/解马赛克渲染缓存，删除后打开 RAW 自动重建
+        // 本机实证（2026-08-02）：%LOCALAPPDATA%\Adobe\CameraRaw\Cache2 = 284 MB / 144 个 .dat
+        // 注意目录名是 Cache2（新版）或 Cache（旧版），两个都探测
+        if let Some(local) = &local {
+            let mut cr: Vec<PathBuf> = Vec::new();
+            for sub in ["Cache2", "Cache"] {
+                let p = local.join("Adobe").join("CameraRaw").join(sub);
+                if p.exists() {
+                    cr.push(p);
+                }
+            }
+            if !cr.is_empty() {
+                out.push(Candidate {
+                    id: "adobe-cameraraw-cache",
+                    name: "Adobe CameraRaw 缓存",
+                    description: "Photoshop/Lightroom 打开 RAW 文件时生成的预览渲染缓存（不含照片本体、编辑参数、用户预设）。",
+                    impact: "删除后再次打开 RAW 文件时预览会重新生成，首次稍慢。",
+                    safety: "safe",
+                    paths: cr,
+                });
+            }
+        }
+
+        // Adobe 应用杂项缓存：PS 的 GPUCache/字体缓存/日志 + LR 的 Caches
+        // PS 目录带版本号（“Adobe Photoshop 2020”等），需枚举
+        let mut adc: Vec<PathBuf> = Vec::new();
+        if let Ok(read) = std::fs::read_dir(roaming.join("Adobe")) {
+            for e in read.flatten() {
+                let n = e.file_name().to_string_lossy().to_lowercase();
+                if n.starts_with("adobe photoshop") {
+                    let base = e.path();
+                    // 版本目录内的设置子目录名也带版本号，枚举查找
+                    if let Ok(sub_read) = std::fs::read_dir(&base) {
+                        for se in sub_read.flatten() {
+                            let sn = se.file_name().to_string_lossy().to_lowercase();
+                            if sn.contains("settings") {
+                                let wc = se.path().join("web-cache-temp");
+                                if wc.exists() {
+                                    adc.push(wc);
+                                }
+                            }
+                        }
+                    }
+                    let ft = base.join("CT Font Cache");
+                    if ft.exists() {
+                        adc.push(ft);
+                    }
+                    let logs = base.join("Logs");
+                    if logs.exists() {
+                        adc.push(logs);
+                    }
+                }
+            }
+        }
+        // Lightroom CC/Classic 缓存（GPUCache/Code Cache/字体等，纯可再生）
+        if let Some(local) = &local {
+            let lr_cache = local.join("Adobe").join("Lightroom").join("Caches");
+            if lr_cache.exists() {
+                adc.push(lr_cache);
+            }
+        }
+        if !adc.is_empty() {
+            out.push(Candidate {
+                id: "adobe-app-cache",
+                name: "Adobe 应用缓存 (PS/LR)",
+                description: "Photoshop/Lightroom 的 GPU 缓存、字体缓存、日志等可再生数据（不含用户设置、画笔、动作）。",
+                impact: "没有实质影响。重启 Adobe 软件后自动重建，首次启动稍慢。",
+                safety: "safe",
+                paths: adc,
+            });
+        }
+
         // WPS 缓存：文档本体与云同步数据不在此目录。
         // friend-d/friend-e 双样本佐证扩充：office6\log、PDF\Cache 与 LOCALAPPDATA 侧
         // kupdateUI\cache、wpsoffice\cache（cacheHits 实证，只点名具体子目录，存在才收录）。
@@ -1089,7 +1161,11 @@ pub fn deep_analyze() -> Result<DeepAnalyzeReport, String> {
     use std::os::windows::process::CommandExt;
     const CREATE_NO_WINDOW: u32 = 0x0800_0000;
 
-    let log = std::env::temp_dir().join("diskbutler-dism-analyze.log");
+    let nonce = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap_or_default()
+        .subsec_nanos();
+    let log = std::env::temp_dir().join(format!("diskbutler-dism-a{:x}.log", nonce));
     let _ = std::fs::remove_file(&log);
 
     // 用提权的 cmd 重定向输出到日志（cmd 重定向保持原始 ANSI/GBK 编码，便于统一解码）
@@ -1105,6 +1181,7 @@ pub fn deep_analyze() -> Result<DeepAnalyzeReport, String> {
 
     let code = status.code().unwrap_or(-1);
     if code != 0 {
+        let _ = std::fs::remove_file(&log);
         return Err(if code == 1 {
             "已取消授权，未执行分析。".to_string()
         } else {
@@ -1116,6 +1193,7 @@ pub fn deep_analyze() -> Result<DeepAnalyzeReport, String> {
     // 中文系统为 GBK；英文系统的 ASCII 内容用 GBK 解码同样无损
     let (text, _, _) = encoding_rs::GBK.decode(&bytes);
     let report = parse_dism_analyze(&text);
+    let _ = std::fs::remove_file(&log); // 卫生：用完即删，不留残留在 %TEMP%
     if report.lines.is_empty() {
         return Err("分析完成但未能读到报告内容，可稍后重试。".to_string());
     }
@@ -1129,7 +1207,11 @@ pub fn deep_clean() -> Result<DeepCleanReport, String> {
     const CREATE_NO_WINDOW: u32 = 0x0800_0000;
 
     let free_before = c_drive_free();
-    let log = std::env::temp_dir().join("diskbutler-dism-clean.log");
+    let nonce = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap_or_default()
+        .subsec_nanos();
+    let log = std::env::temp_dir().join(format!("diskbutler-dism-c{:x}.log", nonce));
     let _ = std::fs::remove_file(&log);
 
     let ps = format!(
@@ -1158,6 +1240,7 @@ pub fn deep_clean() -> Result<DeepCleanReport, String> {
                     .join(" | ")
             })
             .unwrap_or_default();
+        let _ = std::fs::remove_file(&log);
         return Err(if code == 1 {
             "已取消授权，未执行清理。".to_string()
         } else {
@@ -1165,6 +1248,7 @@ pub fn deep_clean() -> Result<DeepCleanReport, String> {
         });
     }
 
+    let _ = std::fs::remove_file(&log); // 卫生：用完即删
     let free_after = c_drive_free();
     Ok(DeepCleanReport {
         freed: free_after.saturating_sub(free_before),

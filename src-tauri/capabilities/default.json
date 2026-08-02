@@ -8,11 +8,31 @@
     "opener:default",
     {
       "identifier": "opener:allow-open-path",
-      "allow": [{ "path": "**" }]
+      "allow": [
+        { "path": "C:/**" },
+        { "path": "D:/**" },
+        { "path": "E:/**" },
+        { "path": "F:/**" },
+        { "path": "G:/**" },
+        { "path": "H:/**" }
+      ]
     },
     {
       "identifier": "opener:allow-reveal-item-in-dir",
-      "allow": [{ "path": "**" }]
+      "allow": [
+        { "path": "C:/**" },
+        { "path": "D:/**" },
+        { "path": "E:/**" },
+        { "path": "F:/**" },
+        { "path": "G:/**" },
+        { "path": "H:/**" }
+      ]
+    },
+    {
+      "identifier": "opener:allow-open-url",
+      "allow": [
+        { "url": "https://github.com/**" }
+      ]
     }
   ]
 }
