@@ -137,6 +137,8 @@ set CARGO_BUILD_JOBS=2 && npm run tauri build
 [规则采集器](./tools/README.md)（不删东西、不联网、报告可逐行审查），
 把报告发给我们，你电脑上那些小众软件的缓存就能被下一个版本安全地识别。
 
+📮 报告请发到：**ygtq1021@126.com**（软件内「帮它认识更多软件」生成报告后可直接复制邮箱）
+
 ## 📄 许可
 
 MIT License

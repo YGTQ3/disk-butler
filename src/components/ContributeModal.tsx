@@ -10,6 +10,8 @@ import {
   FolderOpen,
   ShieldCheck,
   Mail,
+  Copy,
+  Check,
 } from "lucide-react";
 import { CollectResult, openInExplorer } from "../types";
 
@@ -30,7 +32,9 @@ async function draftEmail(jsonPath: string) {
   try {
     await openUrl(`mailto:${FEEDBACK_EMAIL}?subject=${subject}&body=${body}`);
   } catch (e) {
-    alert(`没能打开邮件客户端：${String(e)}\n\n你也可以手动发邮件到：${FEEDBACK_EMAIL}`);
+    // 没有默认邮件客户端（甚至没有浏览器）时 mailto 会失败或打开空白页——
+    // 降级路径：界面已直显邮箱，提示用户复制后用手机/网页邮箱发
+    alert(`没能打开邮件客户端：${String(e)}\n\n别担心——点上方「复制邮箱」，用手机或网页邮箱发给我们也一样[爱]`);
   }
 }
 
@@ -40,6 +44,18 @@ export default function ContributeModal({ onClose }: { onClose: () => void }) {
   const [fullMode, setFullMode] = useState(false);
   const [result, setResult] = useState<CollectResult | null>(null);
   const [error, setError] = useState("");
+  const [copied, setCopied] = useState(false);
+
+  /** 复制邮箱到剪贴板——不依赖邮件客户端的降级通道（无浏览器/无邮件客户端都能用） */
+  async function copyEmail() {
+    try {
+      await navigator.clipboard.writeText(FEEDBACK_EMAIL);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch (e) {
+      alert(`复制失败：${String(e)}\n\n请手动记下邮箱：${FEEDBACK_EMAIL}`);
+    }
+  }
 
   async function start() {
     setPhase("running");
@@ -97,7 +113,11 @@ export default function ContributeModal({ onClose }: { onClose: () => void }) {
                 · 报告里只有软件名、目录名和大小，
                 <b>没有文件名、没有文件内容、没有你的用户名</b>；
                 <br />
-                · 报告生成后<b>只存在你的电脑上</b>，发不发、发给谁，完全由你决定。
+                · 报告生成后<b>只存在你的电脑上</b>，发不发、发给谁，完全由你决定；
+                <br />
+                · 想帮我们的话，报告发到
+                <b className="text-[var(--color-text-main)]">{FEEDBACK_EMAIL}</b>
+                （生成后会直接给你复制按钮）。
               </div>
 
               {/* 模式选择 */}
@@ -189,6 +209,26 @@ export default function ContributeModal({ onClose }: { onClose: () => void }) {
                   <div>发送时，把桌面上的 <b>.json 文件</b>拖进邮件附件。</div>
                 </div>
               </div>
+              {/* 邮箱直显：没有邮件客户端/浏览器也不慌，复制后手机/网页邮箱都能发 */}
+              {FEEDBACK_EMAIL && (
+                <div className="mt-4 flex items-center justify-between gap-3 rounded-xl border border-[var(--color-line)] bg-[var(--color-bg)] px-4 py-3">
+                  <div className="min-w-0">
+                    <div className="text-[13px] text-[var(--color-text-secondary)]">
+                      我们的邮箱（没装邮件客户端也能发）
+                    </div>
+                    <div className="truncate font-mono text-[15px] font-semibold text-[var(--color-text-main)]">
+                      {FEEDBACK_EMAIL}
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => void copyEmail()}
+                    className="flex shrink-0 items-center gap-1.5 rounded-xl border border-[var(--color-primary)] px-4 py-2 text-sm font-medium text-[var(--color-primary-dark)] hover:bg-[var(--color-primary-soft)]"
+                  >
+                    {copied ? <Check size={15} /> : <Copy size={15} />}
+                    {copied ? "已复制" : "复制邮箱"}
+                  </button>
+                </div>
+              )}
               <div className="mt-4 flex justify-end gap-2.5">
                 <button
                   onClick={onClose}
