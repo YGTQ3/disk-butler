@@ -1674,6 +1674,61 @@ mod tests {
         assert!(!r.lines.iter().any(|l| l.starts_with("版本")));
     }
 
+    fn dism_fixture() -> &'static str {
+        "组件存储的实际大小 : 27.76 GB\n\
+备份和已禁用的功能 : 19.24 GB\n\
+推荐使用组件存储清理 : 是\n"
+    }
+
+    #[test]
+    fn decode_dism_output_handles_utf8_chinese_bytes() {
+        let decoded = decode_dism_output(dism_fixture().as_bytes());
+        let report = parse_dism_analyze(&decoded);
+        assert_eq!(report.recommended, Some(true));
+        assert!((report.backup_gb.unwrap() - 19.24).abs() < 0.01);
+    }
+
+    #[test]
+    fn decode_dism_output_handles_gbk_chinese_bytes() {
+        let (bytes, _, _) = encoding_rs::GBK.encode(dism_fixture());
+        let decoded = decode_dism_output(bytes.as_ref());
+        let report = parse_dism_analyze(&decoded);
+        assert_eq!(report.recommended, Some(true));
+        assert!((report.backup_gb.unwrap() - 19.24).abs() < 0.01);
+    }
+
+    #[test]
+    fn decode_dism_output_handles_utf16le_bom() {
+        let mut bytes = vec![0xFF, 0xFE];
+        bytes.extend(
+            dism_fixture()
+                .encode_utf16()
+                .flat_map(|unit| unit.to_le_bytes()),
+        );
+        let report = parse_dism_analyze(&decode_dism_output(&bytes));
+        assert_eq!(report.recommended, Some(true));
+        assert!((report.backup_gb.unwrap() - 19.24).abs() < 0.01);
+    }
+
+    #[test]
+    fn decode_dism_output_handles_english_bytes() {
+        let sample = "Actual Size of Component Store : 27.76 GB\n\
+Backups and Disabled Features : 19.24 GB\n\
+Component Store Cleanup Recommended : Yes\n";
+        let report = parse_dism_analyze(&decode_dism_output(sample.as_bytes()));
+        assert_eq!(report.recommended, Some(true));
+        assert!((report.backup_gb.unwrap() - 19.24).abs() < 0.01);
+    }
+
+    #[test]
+    fn decode_dism_output_handles_utf8_failure_tail() {
+        let mut bytes = dism_fixture().as_bytes().to_vec();
+        bytes.extend_from_slice(&[0xE4, 0xB8]);
+        let report = parse_dism_analyze(&decode_dism_output(&bytes));
+        assert_eq!(report.recommended, Some(true));
+        assert!((report.backup_gb.unwrap() - 19.24).abs() < 0.01);
+    }
+
     #[test]
     fn parse_dism_analyze_not_recommended() {
         let sample = "推荐使用组件存储清理 : 否\n";
