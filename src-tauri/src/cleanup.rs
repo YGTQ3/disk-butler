@@ -1226,8 +1226,7 @@ pub fn deep_analyze() -> Result<DeepAnalyzeReport, String> {
         let _ = std::fs::remove_file(&log);
         format!("读取分析结果失败：{}", e)
     })?;
-    // 中文系统为 GBK；英文系统的 ASCII 内容用 GBK 解码同样无损
-    let (text, _, _) = encoding_rs::GBK.decode(&bytes);
+    let text = decode_dism_output(&bytes);
     let report = parse_dism_analyze(&text);
     let _ = std::fs::remove_file(&log); // 卫生：用完即删，不留残留在 %TEMP%
     if report.lines.is_empty() {
@@ -1263,11 +1262,11 @@ pub fn deep_clean() -> Result<DeepCleanReport, String> {
     let code = status.code().unwrap_or(-1);
     // 0 = 成功；3010 = 成功但需重启
     if code != 0 && code != 3010 {
-        // 附带日志尾部帮助定位（GBK 解码）
+        // 附带日志尾部帮助定位
         let tail = std::fs::read(&log)
             .ok()
             .map(|b| {
-                let (t, _, _) = encoding_rs::GBK.decode(&b);
+                let t = decode_dism_output(&b);
                 t.lines()
                     .rev()
                     .filter(|l| !l.trim().is_empty() && !l.starts_with('['))
@@ -1791,6 +1790,13 @@ Component Store Cleanup Recommended : Yes\n";
         let (gbk, _, _) = encoding_rs::GBK.decode(sample.as_bytes());
         assert_eq!(dism_report_score(sample), dism_report_score(&gbk));
         assert_eq!(decode_dism_output(sample.as_bytes()), sample);
+    }
+
+    #[test]
+    fn decode_dism_output_preserves_utf8_failure_tail() {
+        let bytes = "错误：组件存储清理未完成（退出码 87）。".as_bytes();
+        let text = decode_dism_output(bytes);
+        assert!(text.contains("组件存储清理未完成"));
     }
 
     #[test]
