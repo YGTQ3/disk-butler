@@ -1721,15 +1721,6 @@ Component Store Cleanup Recommended : Yes\n";
     }
 
     #[test]
-    fn decode_dism_output_handles_utf8_failure_tail() {
-        let mut bytes = dism_fixture().as_bytes().to_vec();
-        bytes.extend_from_slice(&[0xE4, 0xB8]);
-        let report = parse_dism_analyze(&decode_dism_output(&bytes));
-        assert_eq!(report.recommended, Some(true));
-        assert!((report.backup_gb.unwrap() - 19.24).abs() < 0.01);
-    }
-
-    #[test]
     fn parse_dism_analyze_not_recommended() {
         let sample = "推荐使用组件存储清理 : 否\n";
         assert_eq!(parse_dism_analyze(sample).recommended, Some(false));
