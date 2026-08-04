@@ -1156,6 +1156,7 @@ fn parse_dism_analyze(text: &str) -> DeepAnalyzeReport {
 }
 
 fn dism_report_score(text: &str) -> usize {
+    let text = text.to_lowercase();
     [
         "备份和已禁用",
         "组件存储清理",
@@ -1163,7 +1164,7 @@ fn dism_report_score(text: &str) -> usize {
         "component store cleanup",
     ]
     .iter()
-    .filter(|marker| text.to_lowercase().contains(*marker))
+    .filter(|marker| text.contains(*marker))
     .count()
 }
 
@@ -1715,6 +1716,7 @@ mod tests {
     #[test]
     fn decode_dism_output_handles_utf8_chinese_bytes() {
         let decoded = decode_dism_output(dism_fixture().as_bytes());
+        assert_eq!(decoded, dism_fixture());
         let report = parse_dism_analyze(&decoded);
         assert_eq!(report.recommended, Some(true));
         assert!((report.backup_gb.unwrap() - 19.24).abs() < 0.01);
@@ -1724,6 +1726,7 @@ mod tests {
     fn decode_dism_output_handles_gbk_chinese_bytes() {
         let (bytes, _, _) = encoding_rs::GBK.encode(dism_fixture());
         let decoded = decode_dism_output(bytes.as_ref());
+        assert_eq!(decoded, dism_fixture());
         let report = parse_dism_analyze(&decoded);
         assert_eq!(report.recommended, Some(true));
         assert!((report.backup_gb.unwrap() - 19.24).abs() < 0.01);
@@ -1737,9 +1740,29 @@ mod tests {
                 .encode_utf16()
                 .flat_map(|unit| unit.to_le_bytes()),
         );
-        let report = parse_dism_analyze(&decode_dism_output(&bytes));
+        let decoded = decode_dism_output(&bytes);
+        assert_eq!(decoded, dism_fixture());
+        let report = parse_dism_analyze(&decoded);
         assert_eq!(report.recommended, Some(true));
         assert!((report.backup_gb.unwrap() - 19.24).abs() < 0.01);
+    }
+
+    #[test]
+    fn decode_dism_output_handles_utf16be_bom() {
+        let mut bytes = vec![0xFE, 0xFF];
+        bytes.extend(
+            dism_fixture()
+                .encode_utf16()
+                .flat_map(|unit| unit.to_be_bytes()),
+        );
+        assert_eq!(decode_dism_output(&bytes), dism_fixture());
+    }
+
+    #[test]
+    fn decode_dism_output_handles_utf8_bom() {
+        let mut bytes = vec![0xEF, 0xBB, 0xBF];
+        bytes.extend_from_slice(dism_fixture().as_bytes());
+        assert_eq!(decode_dism_output(&bytes), dism_fixture());
     }
 
     #[test]
@@ -1747,9 +1770,27 @@ mod tests {
         let sample = "Actual Size of Component Store : 27.76 GB\n\
 Backups and Disabled Features : 19.24 GB\n\
 Component Store Cleanup Recommended : Yes\n";
-        let report = parse_dism_analyze(&decode_dism_output(sample.as_bytes()));
+        let decoded = decode_dism_output(sample.as_bytes());
+        assert_eq!(decoded, sample);
+        let report = parse_dism_analyze(&decoded);
         assert_eq!(report.recommended, Some(true));
         assert!((report.backup_gb.unwrap() - 19.24).abs() < 0.01);
+    }
+
+    #[test]
+    fn dism_report_score_is_case_insensitive_for_english_markers() {
+        assert_eq!(
+            dism_report_score("BACKUPS AND DISABLED FEATURES\nCOMPONENT STORE CLEANUP"),
+            2
+        );
+    }
+
+    #[test]
+    fn decode_dism_output_prefers_utf8_when_candidate_scores_tie() {
+        let sample = "UTF-8 原文 🦀\n";
+        let (gbk, _, _) = encoding_rs::GBK.decode(sample.as_bytes());
+        assert_eq!(dism_report_score(sample), dism_report_score(&gbk));
+        assert_eq!(decode_dism_output(sample.as_bytes()), sample);
     }
 
     #[test]
