@@ -1189,7 +1189,7 @@ fn decode_dism_output(bytes: &[u8]) -> String {
 }
 
 /// 只读分析：DISM /AnalyzeComponentStore，不做任何更改。
-/// 提权运行并把输出写入临时日志，完成后读回（中文系统日志为 GBK 编码）。
+/// 提权运行并把输出写入临时日志，完成后按 BOM/UTF-8/GBK 识别解码。
 pub fn deep_analyze() -> Result<DeepAnalyzeReport, String> {
     use std::os::windows::process::CommandExt;
     const CREATE_NO_WINDOW: u32 = 0x0800_0000;
@@ -1201,7 +1201,7 @@ pub fn deep_analyze() -> Result<DeepAnalyzeReport, String> {
     let log = std::env::temp_dir().join(format!("diskbutler-dism-a{:x}.log", nonce));
     let _ = std::fs::remove_file(&log);
 
-    // 用提权的 cmd 重定向输出到日志（cmd 重定向保持原始 ANSI/GBK 编码，便于统一解码）
+    // 用提权的 cmd 重定向输出到日志，保留 DISM 原始字节，随后统一解码。
     let ps = format!(
         r#"$p = Start-Process -Verb RunAs -Wait -PassThru -FilePath cmd.exe -ArgumentList '/d','/c','Dism /Online /Cleanup-Image /AnalyzeComponentStore > "{}" 2>&1'; exit $p.ExitCode"#,
         log.display()
