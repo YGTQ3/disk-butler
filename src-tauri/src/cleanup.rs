@@ -1155,6 +1155,38 @@ fn parse_dism_analyze(text: &str) -> DeepAnalyzeReport {
     }
 }
 
+fn dism_report_score(text: &str) -> usize {
+    [
+        "备份和已禁用",
+        "组件存储清理",
+        "backups and disabled",
+        "component store cleanup",
+    ]
+    .iter()
+    .filter(|marker| text.to_lowercase().contains(*marker))
+    .count()
+}
+
+fn decode_dism_output(bytes: &[u8]) -> String {
+    if bytes.starts_with(&[0xFF, 0xFE]) {
+        let (text, _, _) = encoding_rs::UTF_16LE.decode(&bytes[2..]);
+        return text.into_owned();
+    }
+    if bytes.starts_with(&[0xFE, 0xFF]) {
+        let (text, _, _) = encoding_rs::UTF_16BE.decode(&bytes[2..]);
+        return text.into_owned();
+    }
+
+    let bytes = bytes.strip_prefix(&[0xEF, 0xBB, 0xBF]).unwrap_or(bytes);
+    let utf8 = std::str::from_utf8(bytes).ok();
+    let (gbk, _, _) = encoding_rs::GBK.decode(bytes);
+
+    match utf8 {
+        Some(utf8) if dism_report_score(utf8) >= dism_report_score(&gbk) => utf8.to_string(),
+        Some(_) | None => gbk.into_owned(),
+    }
+}
+
 /// 只读分析：DISM /AnalyzeComponentStore，不做任何更改。
 /// 提权运行并把输出写入临时日志，完成后读回（中文系统日志为 GBK 编码）。
 pub fn deep_analyze() -> Result<DeepAnalyzeReport, String> {
