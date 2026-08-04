@@ -1189,7 +1189,10 @@ pub fn deep_analyze() -> Result<DeepAnalyzeReport, String> {
         });
     }
 
-    let bytes = std::fs::read(&log).map_err(|e| format!("读取分析结果失败：{}", e))?;
+    let bytes = std::fs::read(&log).map_err(|e| {
+        let _ = std::fs::remove_file(&log);
+        format!("读取分析结果失败：{}", e)
+    })?;
     // 中文系统为 GBK；英文系统的 ASCII 内容用 GBK 解码同样无损
     let (text, _, _) = encoding_rs::GBK.decode(&bytes);
     let report = parse_dism_analyze(&text);
