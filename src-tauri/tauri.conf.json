@@ -34,7 +34,8 @@
         "installerHooks": "./windows/hooks.nsi",
         "installerIcon": "icons/icon.ico",
         "headerImage": "windows/installer-header.bmp",
-        "sidebarImage": "windows/installer-sidebar.bmp"
+        "sidebarImage": "windows/installer-sidebar.bmp",
+        "installerName": "DiskButler_${version}"
       }
     },
     "icon": [
