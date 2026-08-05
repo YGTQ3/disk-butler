@@ -107,6 +107,15 @@ const RULES: &[Rule] = &[
         description: "系统运行日志，可安全清理，不影响使用。",
         safety: Safety::Safe,
     },
+    // 20260804 样本：C:\Windows\MEMORY.DMP 实测 1GB（崩溃内存转储，仅排查用）
+    // 必须排在 windows 兜底规则之前
+    Rule {
+        needle: "windows/memory.dmp",
+        category: Category::SystemFile,
+        friendly_name: "内存转储文件 (MEMORY.DMP)",
+        description: "系统崩溃时保存的内存快照，只对排查蓝屏问题有用。可手动删除，崩溃后会重新生成，不影响系统运行。",
+        safety: Safety::Keep,
+    },
     Rule {
         needle: "windows",
         category: Category::System,
@@ -580,6 +589,15 @@ const RULES: &[Rule] = &[
         description: "各软件下载的旧版更新包，一般可删除，软件会在需要时重新下载。",
         safety: Safety::Safe,
     },
+    // 20260804 样本 + 用户机实证：通义灵码 2026-05-20 改名 Qoder CN 后，IDE 插件数据目录仍为 .lingma（官方 FAQ）
+    // 含代码索引/补全缓存/聊天记录，社区报告可膨胀至 10GB+；必须排在 appdata/local 泛化规则之前
+    Rule {
+        needle: "/.lingma",
+        category: Category::Cache,
+        friendly_name: "通义灵码/Qoder CN 插件数据",
+        description: "Qoder CN（原通义灵码）IDE 插件的本地数据：代码索引、补全缓存和聊天记录。可能很大（社区报告 10GB+），官方排障时会让手动删除；删除后需重新登录并重建索引。",
+        safety: Safety::Caution,
+    },
     Rule {
         needle: "appdata/local",
         category: Category::Cache,
@@ -608,6 +626,28 @@ const RULES: &[Rule] = &[
         category: Category::Software,
         friendly_name: "应用配置数据",
         description: "软件的配置与账户数据，删除会丢失设置，请谨慎。",
+        safety: Safety::Caution,
+    },
+    // ---------- ProgramData 软件厂商数据（20260804 样本，均只解释不动手） ----------
+    Rule {
+        needle: "topaz labs",
+        category: Category::Software,
+        friendly_name: "Topaz 软件数据 (Gigapixel AI)",
+        description: "Topaz Gigapixel AI 的 AI 模型与程序数据（ProgramData，可达 15GB）。模型删除后需重新下载，请勿手动清理。",
+        safety: Safety::Caution,
+    },
+    Rule {
+        needle: "nvidia app",
+        category: Category::Cache,
+        friendly_name: "NVIDIA App 更新缓存与日志",
+        description: "NVIDIA App 的更新框架缓存与运行日志，可能很大（可达数 GB）。删除后 App 会重新下载更新，不影响显卡驱动。",
+        safety: Safety::Caution,
+    },
+    Rule {
+        needle: "lghub",
+        category: Category::Cache,
+        friendly_name: "罗技 G HUB 缓存",
+        description: "Logitech G HUB 的固件与更新下载缓存。删除后重新下载即可，不影响设备设置。",
         safety: Safety::Caution,
     },
     // ---------- 游戏/开发/AI 生态 ----------
@@ -1391,6 +1431,51 @@ mod tests {
     fn classify_adobe_dunamis_is_software_keep() {
         let hit = classify(r"C:\Users\x\AppData\Roaming\com.adobe.dunamis");
         assert_eq!(hit.category, Category::Software);
+        assert_eq!(hit.safety, Safety::Keep);
+    }
+
+    // 20260804 样本 + 用户机实证新增规则测试
+    #[test]
+    fn classify_lingma_home_is_caution_cache() {
+        // VSC 插件形态：%USERPROFILE%\.lingma
+        let hit = classify(r"C:\Users\x\.lingma\vscode\sharedClientCache");
+        assert_eq!(hit.category, Category::Cache);
+        assert_eq!(hit.safety, Safety::Caution);
+    }
+
+    #[test]
+    fn classify_lingma_localappdata_is_caution_cache() {
+        // Qoder IDE 形态：%LOCALAPPDATA%\.lingma（必须命中 /.lingma 而非 appdata/local 泛化）
+        let hit = classify(r"C:\Users\x\AppData\Local\.lingma\workingSpace");
+        assert_eq!(hit.category, Category::Cache);
+        assert_eq!(hit.safety, Safety::Caution);
+    }
+
+    #[test]
+    fn classify_topaz_is_caution_software() {
+        let hit = classify(r"C:\ProgramData\Topaz Labs LLC\Topaz Gigapixel AI\models");
+        assert_eq!(hit.category, Category::Software);
+        assert_eq!(hit.safety, Safety::Caution);
+    }
+
+    #[test]
+    fn classify_nvidia_app_is_caution_cache() {
+        let hit = classify(r"C:\ProgramData\NVIDIA Corporation\NVIDIA App\UpdateFramework");
+        assert_eq!(hit.category, Category::Cache);
+        assert_eq!(hit.safety, Safety::Caution);
+    }
+
+    #[test]
+    fn classify_lghub_is_caution_cache() {
+        let hit = classify(r"C:\ProgramData\LGHUB\cache");
+        assert_eq!(hit.category, Category::Cache);
+        assert_eq!(hit.safety, Safety::Caution);
+    }
+
+    #[test]
+    fn classify_memory_dmp_is_systemfile_keep() {
+        let hit = classify(r"C:\Windows\MEMORY.DMP");
+        assert_eq!(hit.category, Category::SystemFile);
         assert_eq!(hit.safety, Safety::Keep);
     }
 }
