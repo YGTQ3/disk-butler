@@ -29,5 +29,6 @@
 - [ ] `cargo test` + `tsc` 双绿；
 - [ ] CodeReview 子智能体审过 diff、问题已修；
 - [ ] 版本号三处一致（package.json / tauri.conf.json / Cargo.toml）；
+- [ ] NSIS 产物重命名：`Copy-Item "target\release\bundle\nsis\C盘管家_${version}_x64-setup.exe" "DiskButler_${version}_x64-setup.exe"`（GitHub 上传不支持中文文件名；⚠ Tauri2 无 `installerName` 配置字段，勿再臆造——build 产物名由 productName 决定，中文名靠此步改名）；
 - [ ] 提交已隔离、只含本次目标；
 - [ ] docs/07 待办 / docs/08 大事记 / docs/19 看板已同步。
