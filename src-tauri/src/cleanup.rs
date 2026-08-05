@@ -1155,8 +1155,41 @@ fn parse_dism_analyze(text: &str) -> DeepAnalyzeReport {
     }
 }
 
+fn dism_report_score(text: &str) -> usize {
+    let text = text.to_lowercase();
+    [
+        "备份和已禁用",
+        "组件存储清理",
+        "backups and disabled",
+        "component store cleanup",
+    ]
+    .iter()
+    .filter(|marker| text.contains(*marker))
+    .count()
+}
+
+fn decode_dism_output(bytes: &[u8]) -> String {
+    if bytes.starts_with(&[0xFF, 0xFE]) {
+        let (text, _, _) = encoding_rs::UTF_16LE.decode(&bytes[2..]);
+        return text.into_owned();
+    }
+    if bytes.starts_with(&[0xFE, 0xFF]) {
+        let (text, _, _) = encoding_rs::UTF_16BE.decode(&bytes[2..]);
+        return text.into_owned();
+    }
+
+    let bytes = bytes.strip_prefix(&[0xEF, 0xBB, 0xBF]).unwrap_or(bytes);
+    let utf8 = std::str::from_utf8(bytes).ok();
+    let (gbk, _, _) = encoding_rs::GBK.decode(bytes);
+
+    match utf8 {
+        Some(utf8) if dism_report_score(utf8) >= dism_report_score(&gbk) => utf8.to_string(),
+        Some(_) | None => gbk.into_owned(),
+    }
+}
+
 /// 只读分析：DISM /AnalyzeComponentStore，不做任何更改。
-/// 提权运行并把输出写入临时日志，完成后读回（中文系统日志为 GBK 编码）。
+/// 提权运行并把输出写入临时日志，完成后按 BOM/UTF-8/GBK 识别解码。
 pub fn deep_analyze() -> Result<DeepAnalyzeReport, String> {
     use std::os::windows::process::CommandExt;
     const CREATE_NO_WINDOW: u32 = 0x0800_0000;
@@ -1168,7 +1201,7 @@ pub fn deep_analyze() -> Result<DeepAnalyzeReport, String> {
     let log = std::env::temp_dir().join(format!("diskbutler-dism-a{:x}.log", nonce));
     let _ = std::fs::remove_file(&log);
 
-    // 用提权的 cmd 重定向输出到日志（cmd 重定向保持原始 ANSI/GBK 编码，便于统一解码）
+    // 用提权的 cmd 重定向输出到日志，保留 DISM 原始字节，随后统一解码。
     let ps = format!(
         r#"$p = Start-Process -Verb RunAs -Wait -PassThru -FilePath cmd.exe -ArgumentList '/d','/c','Dism /Online /Cleanup-Image /AnalyzeComponentStore > "{}" 2>&1'; exit $p.ExitCode"#,
         log.display()
@@ -1193,8 +1226,7 @@ pub fn deep_analyze() -> Result<DeepAnalyzeReport, String> {
         let _ = std::fs::remove_file(&log);
         format!("读取分析结果失败：{}", e)
     })?;
-    // 中文系统为 GBK；英文系统的 ASCII 内容用 GBK 解码同样无损
-    let (text, _, _) = encoding_rs::GBK.decode(&bytes);
+    let text = decode_dism_output(&bytes);
     let report = parse_dism_analyze(&text);
     let _ = std::fs::remove_file(&log); // 卫生：用完即删，不留残留在 %TEMP%
     if report.lines.is_empty() {
@@ -1230,11 +1262,11 @@ pub fn deep_clean() -> Result<DeepCleanReport, String> {
     let code = status.code().unwrap_or(-1);
     // 0 = 成功；3010 = 成功但需重启
     if code != 0 && code != 3010 {
-        // 附带日志尾部帮助定位（GBK 解码）
+        // 附带日志尾部帮助定位
         let tail = std::fs::read(&log)
             .ok()
             .map(|b| {
-                let (t, _, _) = encoding_rs::GBK.decode(&b);
+                let t = decode_dism_output(&b);
                 t.lines()
                     .rev()
                     .filter(|l| !l.trim().is_empty() && !l.starts_with('['))
@@ -1672,6 +1704,99 @@ mod tests {
         // 进度条和版本头应被过滤
         assert!(!r.lines.iter().any(|l| l.contains("100.0%")));
         assert!(!r.lines.iter().any(|l| l.starts_with("版本")));
+    }
+
+    fn dism_fixture() -> &'static str {
+        "组件存储的实际大小 : 27.76 GB\n\
+备份和已禁用的功能 : 19.24 GB\n\
+推荐使用组件存储清理 : 是\n"
+    }
+
+    #[test]
+    fn decode_dism_output_handles_utf8_chinese_bytes() {
+        let decoded = decode_dism_output(dism_fixture().as_bytes());
+        assert_eq!(decoded, dism_fixture());
+        let report = parse_dism_analyze(&decoded);
+        assert_eq!(report.recommended, Some(true));
+        assert!((report.backup_gb.unwrap() - 19.24).abs() < 0.01);
+    }
+
+    #[test]
+    fn decode_dism_output_handles_gbk_chinese_bytes() {
+        let (bytes, _, _) = encoding_rs::GBK.encode(dism_fixture());
+        let decoded = decode_dism_output(bytes.as_ref());
+        assert_eq!(decoded, dism_fixture());
+        let report = parse_dism_analyze(&decoded);
+        assert_eq!(report.recommended, Some(true));
+        assert!((report.backup_gb.unwrap() - 19.24).abs() < 0.01);
+    }
+
+    #[test]
+    fn decode_dism_output_handles_utf16le_bom() {
+        let mut bytes = vec![0xFF, 0xFE];
+        bytes.extend(
+            dism_fixture()
+                .encode_utf16()
+                .flat_map(|unit| unit.to_le_bytes()),
+        );
+        let decoded = decode_dism_output(&bytes);
+        assert_eq!(decoded, dism_fixture());
+        let report = parse_dism_analyze(&decoded);
+        assert_eq!(report.recommended, Some(true));
+        assert!((report.backup_gb.unwrap() - 19.24).abs() < 0.01);
+    }
+
+    #[test]
+    fn decode_dism_output_handles_utf16be_bom() {
+        let mut bytes = vec![0xFE, 0xFF];
+        bytes.extend(
+            dism_fixture()
+                .encode_utf16()
+                .flat_map(|unit| unit.to_be_bytes()),
+        );
+        assert_eq!(decode_dism_output(&bytes), dism_fixture());
+    }
+
+    #[test]
+    fn decode_dism_output_handles_utf8_bom() {
+        let mut bytes = vec![0xEF, 0xBB, 0xBF];
+        bytes.extend_from_slice(dism_fixture().as_bytes());
+        assert_eq!(decode_dism_output(&bytes), dism_fixture());
+    }
+
+    #[test]
+    fn decode_dism_output_handles_english_bytes() {
+        let sample = "Actual Size of Component Store : 27.76 GB\n\
+Backups and Disabled Features : 19.24 GB\n\
+Component Store Cleanup Recommended : Yes\n";
+        let decoded = decode_dism_output(sample.as_bytes());
+        assert_eq!(decoded, sample);
+        let report = parse_dism_analyze(&decoded);
+        assert_eq!(report.recommended, Some(true));
+        assert!((report.backup_gb.unwrap() - 19.24).abs() < 0.01);
+    }
+
+    #[test]
+    fn dism_report_score_is_case_insensitive_for_english_markers() {
+        assert_eq!(
+            dism_report_score("BACKUPS AND DISABLED FEATURES\nCOMPONENT STORE CLEANUP"),
+            2
+        );
+    }
+
+    #[test]
+    fn decode_dism_output_prefers_utf8_when_candidate_scores_tie() {
+        let sample = "UTF-8 原文 🦀\n";
+        let (gbk, _, _) = encoding_rs::GBK.decode(sample.as_bytes());
+        assert_eq!(dism_report_score(sample), dism_report_score(&gbk));
+        assert_eq!(decode_dism_output(sample.as_bytes()), sample);
+    }
+
+    #[test]
+    fn decode_dism_output_preserves_utf8_failure_tail() {
+        let bytes = "错误：组件存储清理未完成（退出码 87）。".as_bytes();
+        let text = decode_dism_output(bytes);
+        assert!(text.contains("组件存储清理未完成"));
     }
 
     #[test]
