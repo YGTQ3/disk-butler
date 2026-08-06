@@ -27,3 +27,6 @@ SKILL.md
 # Rule collection samples: contributor machine data, NEVER commit (privacy)
 samples/*
 !samples/README.md
+
+# CodeGraph local index (regenerable)
+.codegraph/

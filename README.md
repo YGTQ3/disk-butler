@@ -152,4 +152,6 @@ MIT License
 
 **如果它帮到了你，点个 ⭐ 就是最好的支持。**
 
+![Star History](star-history.svg)
+
 </div>
