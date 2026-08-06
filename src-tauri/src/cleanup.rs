@@ -548,6 +548,20 @@ fn candidates() -> Vec<Candidate> {
             ],
         });
 
+        // OneDrive 运行日志：纯日志，微软官方排障步骤即含删除该目录（OneDrive 会自动重建）。
+        // 20260806 样本实证：%LOCALAPPDATA%\Microsoft\OneDrive\logs。
+        let od_logs = local.join("Microsoft").join("OneDrive").join("logs");
+        if od_logs.exists() {
+            out.push(Candidate {
+                id: "onedrive-logs",
+                name: "OneDrive 日志",
+                description: "OneDrive 云盘客户端的运行日志（你同步的文件不在这里）。",
+                impact: "没有影响。OneDrive 会在运行中自动写新日志。",
+                safety: "safe",
+                paths: vec![od_logs],
+            });
+        }
+
         // 前端包管理器缓存（npm-cache 已单独列出）
         let mut jscache: Vec<PathBuf> = Vec::new();
         for p in [
@@ -935,7 +949,7 @@ fn kind_of(id: &str) -> &'static str {
     match id {
         "temp" | "updaters" | "crash-reports" | "androidstudio-logs" | "synology-logs"
         | "wps-old-versions" | "islide-logs" | "originlab-temp" | "teamviewer-logs"
-        | "game-logs" => "junk",
+        | "game-logs" | "onedrive-logs" => "junk",
         "idm-dwnldata" | "recycle-bin" => "data",
         _ => "cache",
     }

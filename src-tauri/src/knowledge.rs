@@ -512,6 +512,13 @@ const RULES: &[Rule] = &[
         safety: Safety::Keep,
     },
     Rule {
+        needle: "renpy",
+        category: Category::Personal,
+        friendly_name: "Ren'Py 游戏数据",
+        description: "Ren'Py 视觉小说引擎的游戏数据，含各游戏存档（saves）与设置，删了找不回，请勿删除。",
+        safety: Safety::Keep,
+    },
+    Rule {
         needle: "mailmasterdata",
         category: Category::Personal,
         friendly_name: "网易邮箱大师邮件数据",

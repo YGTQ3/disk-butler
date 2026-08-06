@@ -25,6 +25,7 @@
 | diskbutler-rule-report-20260801-1259（friend-f 学术/工程工作站 Win11 Home 23H2） | 2026-08-01 | 基础（软件内贡献 collector=app） | ✅ 已评估入库 | +islide-logs(2G)/miktex-cache/originlab-temp/teamviewer-logs/game-logs（Civ VI 等 7 款游戏日志）+gpu-cache 扩充 Steam ShaderCache(311M)；知识库 +13（iSlide/MiKTeX/OriginLab/TeamViewer/6 家游戏厂商 + Zotero/MathWorks Personal/Keep + com.adobe.dunamis Software/Keep）；拒 10 项（Package Cache×3/Tencent/MathWorks/Zotero/Downloaded Installations/com.adobe.dunamis/Python/本软件）。子智能体独立验证发现 2 处已覆盖判断错误（CEF/Steam ShaderCache），已修正。画像与观察名单见下方 |
 | disk-butler-webview2-report（用户机器 Win10 22H2 家庭版 x64） | 2026-08-03 | 诊断报告（`tools/webview2-diagnose.bat` 输出，非规则采集） | ✅ 已分析（根因：见下方「webview2 安装失败样本」） | 结论：仅 x86 老版 WebView2 Runtime 113.0.1774.35（随 32 位 Edge 113 附带、EdgeUpdate 停更），缺 x64 组件；Tauri 安装器按注册表 pv 判定"已装"而跳过自动安装 → x64 应用运行时初始化失败。建议：用户装 Evergreen x64 Runtime；诊断脚本 x64 判据修正（查 `Application\<ver>\EBWebView\x64` 子目录，勿查 `Program Files\Microsoft\EdgeWebView`） |
 | diskbutler-rule-report-20260804-1538（造价/石油办公+设计+游戏混合机 Win10 Pro 22H2） | 2026-08-05 | 完整 | ✅ 已评估入库 | 合法缓存类覆盖率≈100%（uv/pip/temp/CrashDumps/Steam ShaderCache/Doubao ShaderCache/WPS/electron 指纹/browser/adobe 全部命中）。大额剩余均为红线（Apple MobileSync 备份 14.8G/baidu 网盘 8G/Tencent 8.4G/Desktop\.accelerate 3.8G）或 ProgramData 边界外（Topaz 14.9G/NVIDIA App 2.9G/LGHUB 657M）。**知识库 +5 已实施**：`/.lingma`（Cache/Caution，含 Qoder CN 改名实证）、`topaz labs`、`nvidia app`、`lghub`（ProgramData 三条，只解释不动手）、`windows/memory.dmp`（SystemFile/Keep）；清理候选 `apple-logs` 评估后**弃**（收益未证实，14.8G 大头是 MobileSync 备份清不到）；观察名单新增 .accelerate、SAP/Listary/EA 等（见下） |
+| diskbutler-rule-report-20260806-1735（游戏/家用机 Win10 Pro 22H2，C盘剩5.8G/D盘剩1.5G） | 2026-08-06 | 基础（软件内贡献 collector=app） | ✅ 已评估入库 | **清理 +1**：onedrive-logs（`Microsoft\OneDrive\logs`，safe/junk，微软官方排障步骤佐证——补齐"知识库 onedrivetemp 说可清但白名单无对应"的断层）；**知识库 +1**：renpy（Personal/Keep，galgame 存档保护，.minecraft 同型）；**覆盖验证**：AMD RadeonSoftware cache(59M) 已由 gpu-cache 覆盖、QQ(591M)/QQEX(587M)/TapTap(169M)/kuaijiasu(79M) 三件套已由 electron-cache 收编、WPS(1.7G) 已覆盖、Roaming 大头全红线正确拦截（baidu 4.5G/Tencent 3.4G/C:\QQ文件 3.2G/D:\xwechat_files 12.4G/Desktop\Telegram 2.1G）；观察名单 +7（见下） |
 
 ## 观察名单（见过但未入库，等更多样本佐证）- ~~Electron 应用通用 Cache 模式~~ ✅ 已于 2026-07-28 以 electron-cache 指纹规则统一收编（Cache+Code Cache/GPUCache 同级并存才认定；Tencent 系仍排除）；
 - **QQ 缓存边界**（friend-c 样本）：QQ 顶层目录名为 `QQ`（非 Tencent），会被 electron-cache 指纹命中，但只取 Chromium 标准缓存三件套，QQ 聊天数据（nt_qq/Documents 树）不在其中——判定为安全，维持现状不排除；如后续样本发现 QQ 把用户数据混入 Cache 同级，再评估加排除；
@@ -42,6 +43,14 @@
 - **SAP GUI 缓存/Listary 缓存/EA AC 缓存/Anki2 logs/Nutstore logs/CNPC 会议日志**（20260804 样本）：均单样本小项（88M/321M 目录内/865M 目录内/1.2G 目录内/272M 目录内/148M 目录内），命名像缓存但需更多样本佐证，暂观察；
 - **Doubao Crashpad**（20260804 样本第二次出现）：`%LOCALAPPDATA%\Doubao\User Data\Crashpad`，维持"暂缓"决定（Crashpad 通常几十 MB 量级，第三样本若超 200M 再评估）；
 - **Roaming\Quark\Cache**(48M)：无 Chromium 三件套指纹，browser-cache 未覆盖，等佐证。
+- **Turbo 数据目录**（20260806）：`%LOCALAPPDATA%\Turbo`(1.58G) 带 `User Data\Crashpad + ShaderCache` 结构，软件列表有 "Turbo" 但身份不明（疑似加速器/浏览器类），1.58G 大头构成未明（cacheHits 只标了 Crashpad/ShaderCache），单样本，已建议用户自查；
+- **gtgzgh（高途高中规划）**（20260806）：`%LOCALAPPDATA%\gtgzgh`(872M)，教育软件课程数据，无缓存特征，单样本（学而思 XesCache 同型处理），等教育机佐证；
+- **NeatDM（Neat Download Manager）**（20260806）：`%APPDATA%\NeatDM`(307M)，下载管理器数据含下载历史/队列，倾向拒绝入白名单（下载工具数据目录，Postman 同型），等佐证；
+- **QQEX 边界**（20260806）：`%APPDATA%\QQEX`(587M) QQ 扩展组件，Chromium 三件套已由 electron-cache 收编（QQ 判定同型）；额外特征 `mega-converter\cache`、`Features\Cache` 不在三件套内，等佐证再评估；
+- **OneDrive StandaloneUpdater**（20260806）：`%LOCALAPPDATA%\Microsoft\OneDrive\StandaloneUpdater`，更新器目录无官方删除佐证，仅 logs 已入库（onedrive-logs），此目录等佐证；
+- **火绒 Sysdiag\log**（20260806）：`%ProgramData%\Huorong\Sysdiag\log`(122M)，火绒诊断日志，安全软件边界，单样本（friend-d 也装火绒未报此路径）；
+- **Roaming\baidu 画像**（20260806）：`%APPDATA%\baidu`(4.5G) 无缓存特征，网盘客户端数据红线不动；`BaiduYunGuanjia\logs`(78M)/`BaiduYunKernel`(34M) 同属 baidu 系，仅记录；
+- 小项画像（20260806，均单样本暂缓）：`Microsoft\Internet Explorer\CacheStorage`（browser-cache 未覆盖 IE）、`Microsoft\Olk`（Outlook 临时）、`Whale\temp`(50M)、`ProgramData\Kingsoft`(274M 无特征)、`cdsyy\Log`(188M)、`ETS`(337M)、`dsgame\cache+log`(32M)、`GameViewer`(77M)、`flutter_webview_windows`(64M)、`PC Manager Store`(35M)、`com.follow`(34M)、`NexBox\EBWebView`(90M，Crashpad 维持暂缓)；本机 `%LOCALAPPDATA%\Microsoft\Packages`(1.5G) 为 UWP 数据不动；D:\TapTap 游戏 20.5G/D:\xwechat 12.4G/C:\#4899\易语言 1.2G 为个人文件红线。
 - 永久拒绝：Tencent 系（聊天数据同树）、Postman（含 workspace）、Blackmagic/DaVinci（含项目库）、OCS/yuque/Gandownload（PERSONAL 标记）、Package Cache（Windows Installer 缓存，删了会破坏软件修复/卸载）。
 
 ## webview2 安装失败样本（2026-08-03 分析）
