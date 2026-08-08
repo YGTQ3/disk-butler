@@ -27,14 +27,22 @@ jobs:
       - name: Generate SVG
         run: python .github/scripts/star-history.py < star-times.txt > star-history.svg
 
-      - name: Commit if changed
+      - name: Generate SVG
+        run: python .github/scripts/star-history.py < star-times.txt > star-history.svg
+
+      # main 有"必须走 PR"分支保护，bot 直推被拒（2026-08-07 实测）；
+      # 产物改托管到不受保护的 star-history 分支（bot 专用产物分支，force 覆盖历史）
+      - name: Publish to star-history branch
         run: |
-          if ! git diff --quiet -- star-history.svg; then
+          git fetch origin star-history --depth 1 2>/dev/null || true
+          if git show origin/star-history:star-history.svg 2>/dev/null | cmp -s - star-history.svg; then
+            echo "no change, skip commit"
+          else
             git config user.name "github-actions[bot]"
             git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git checkout -B star-history
             git add star-history.svg
             git commit -m "chore(dev): 更新星数曲线"
-            git push
-          else
-            echo "no change, skip commit"
+            # ponytail: 分支即产物，force 推送；换值仅在星数变化时产生新提交
+            git push --force origin star-history:star-history
           fi

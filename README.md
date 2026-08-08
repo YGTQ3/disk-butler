@@ -152,6 +152,6 @@ MIT License
 
 **如果它帮到了你，点个 ⭐ 就是最好的支持。**
 
-![Star History](star-history.svg)
+![Star History](https://raw.githubusercontent.com/YGTQ3/disk-butler/star-history/star-history.svg)
 
 </div>
