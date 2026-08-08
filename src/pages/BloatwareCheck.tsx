@@ -86,11 +86,11 @@ const STOP_STEPS = ["准备", "授权", "停后台", "完成"];
 type Phase = "loading" | "ready";
 
 const TAG_STYLE: Record<string, { bg: string; fg: string }> = {
-  开机自启: { bg: "#EEF2FF", fg: "#3730A3" },
-  后台常驻: { bg: "#ECFEFF", fg: "#155E75" },
-  占用较大: { bg: "#F1F5F9", fg: "#475569" },
+  开机自启: { bg: "var(--color-tag-indigo-bg)", fg: "var(--color-tag-indigo-text)" },
+  后台常驻: { bg: "var(--color-tag-cyan-bg)", fg: "var(--color-tag-cyan-text)" },
+  占用较大: { bg: "var(--color-tag-bg)", fg: "var(--color-tag-text)" },
 };
-const DEFAULT_TAG = { bg: "#F1F5F9", fg: "#475569" };
+const DEFAULT_TAG = { bg: "var(--color-tag-bg)", fg: "var(--color-tag-text)" };
 
 /** MB 数 -> 人话大小；null 显示占位 */
 function sizeText(mb: number | null): string {
@@ -389,7 +389,7 @@ export default function BloatwareCheck() {
           {!e.security && e.residentMemMb > 0 && (
             <button
               onClick={() => stopSoftware(e)}
-              className="flex items-center gap-1.5 rounded-lg border border-[#FDE68A] bg-[#FFFBEB] px-3 py-1.5 text-xs font-medium text-[#92400E] transition-colors hover:bg-[#FEF3C7]"
+              className="flex items-center gap-1.5 rounded-lg border border-warn-border bg-warn-bg px-3 py-1.5 text-xs font-medium text-warn-text transition-colors hover:bg-warn-bg-strong"
             >
               <Power size={13} />
               停止后台运行
@@ -417,7 +417,7 @@ export default function BloatwareCheck() {
               {!!e.installLocation && (
                 <button
                   onClick={() => startForce(e)}
-                  className="flex items-center gap-1.5 rounded-lg border border-[#FCA5A5] px-3 py-1.5 text-xs font-medium text-[#B91C1C] transition-colors hover:bg-[#FEF2F2]"
+                  className="flex items-center gap-1.5 rounded-lg border border-danger-border bg-danger-bg-soft px-3 py-1.5 text-xs font-medium text-danger-dark transition-colors hover:bg-danger-bg"
                 >
                   <Flame size={13} />
                   强力卸载
@@ -482,7 +482,7 @@ export default function BloatwareCheck() {
     const steps = isForce ? FORCE_STEPS : isStop ? STOP_STEPS : NORMAL_STEPS;
     const headerTitle = isForce ? "强力卸载（高级）" : isStop ? "停止后台运行" : "卸载软件";
     const actionWord = isForce ? "强力卸载" : isStop ? "停止后台运行" : "卸载";
-    const accent = isForce ? "#B91C1C" : isStop ? "#B45309" : "var(--color-primary-dark)";
+    const accent = isForce ? "var(--color-danger-dark)" : isStop ? "var(--color-warn-text-strong)" : "var(--color-primary-dark)";
     // 完成后告知用户「后果」——它现在处于什么状态、之后会怎样
     const doneNote = isStop
       ? "它现在不再占用内存运行了。下次开机、或你手动打开它时，它可能会再次启动——如果想让它彻底别再自启，可以直接把它卸载掉。"
@@ -553,9 +553,9 @@ export default function BloatwareCheck() {
           {/* 头部 */}
           <div className="flex items-center gap-3 px-7 pt-6 pb-4">
             {isForce ? (
-              <Flame size={24} className="text-[#B91C1C]" />
+              <Flame size={24} className="text-danger-dark" />
             ) : isStop ? (
-              <Power size={24} className="text-[#B45309]" />
+              <Power size={24} className="text-warn-text-strong" />
             ) : (
               <Trash2 size={24} className="text-[var(--color-primary)]" />
             )}
@@ -586,7 +586,7 @@ export default function BloatwareCheck() {
                 </div>
 
                 {isForce && (
-                  <div className="flex items-center justify-center gap-1.5 text-sm font-semibold text-[#B91C1C]">
+                  <div className="flex items-center justify-center gap-1.5 text-sm font-semibold text-danger-dark">
                     <ShieldAlert size={16} />
                     第 3 步会删除文件，且不可撤销
                   </div>
@@ -634,7 +634,7 @@ export default function BloatwareCheck() {
               <div className="mx-auto flex h-full max-w-[440px] flex-col items-center justify-center gap-4 py-8 text-center">
                 <div
                   className="flex h-14 w-14 items-center justify-center rounded-full"
-                  style={{ background: isForce ? "#FEF2F2" : "var(--color-primary-soft)" }}
+                  style={{ background: isForce ? "var(--color-danger-bg-soft)" : "var(--color-primary-soft)" }}
                 >
                   <ShieldAlert size={28} style={{ color: accent }} />
                 </div>
@@ -719,7 +719,7 @@ export default function BloatwareCheck() {
                     <div className="text-sm text-[var(--color-text-secondary)]">正在处理，请稍等，马上就好…</div>
                   )}
                   {job.status === "fail" && (
-                    <div className="rounded-xl bg-[#FEF2F2] px-4 py-3 text-left text-sm leading-relaxed text-[#991B1B]">
+                    <div className="rounded-xl bg-danger-bg-soft px-4 py-3 text-left text-sm leading-relaxed text-danger-text">
                       {job.detail}
                     </div>
                   )}
@@ -734,7 +734,7 @@ export default function BloatwareCheck() {
               <div className="flex items-center gap-3">
                 <button
                   onClick={() => startForce(job.entry)}
-                  className="mr-auto flex items-center gap-1.5 rounded-xl bg-[#DC2626] px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-[#B91C1C]"
+                  className="mr-auto flex items-center gap-1.5 rounded-xl bg-danger px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-danger-dark"
                 >
                   <Flame size={15} />
                   改用强力卸载
@@ -752,7 +752,7 @@ export default function BloatwareCheck() {
                 <button onClick={closeJob} className="rounded-xl border border-[var(--color-line)] px-5 py-2.5 text-sm font-medium transition-colors hover:bg-[var(--color-bg)]">
                   取消
                 </button>
-                <button onClick={() => setJob({ ...job, status: "auth" })} className="rounded-xl bg-[#D97706] px-6 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-[#B45309]">
+                <button onClick={() => setJob({ ...job, status: "auth" })} className="rounded-xl bg-warn-icon px-6 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-warn-text-strong">
                   确认停止后台
                 </button>
               </div>
@@ -765,7 +765,7 @@ export default function BloatwareCheck() {
                 <button
                   disabled={!job.plan}
                   onClick={() => setJob({ ...job, status: "auth" })}
-                  className="rounded-xl bg-[#DC2626] px-6 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-[#B91C1C] disabled:opacity-50"
+                  className="rounded-xl bg-danger px-6 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-danger-dark disabled:opacity-50"
                 >
                   我已确认，强力卸载
                 </button>
@@ -800,7 +800,7 @@ export default function BloatwareCheck() {
                 {job.mode === "normal" && (
                   <button
                     onClick={() => startForce(job.entry)}
-                    className="mr-auto flex items-center gap-1.5 rounded-xl bg-[#DC2626] px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-[#B91C1C]"
+                    className="mr-auto flex items-center gap-1.5 rounded-xl bg-danger px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-danger-dark"
                   >
                     <Flame size={15} />
                     改用强力卸载
@@ -895,12 +895,12 @@ export default function BloatwareCheck() {
 
           {/* 浏览器主页提示（扫描级中性说明） */}
           {scan && scan.browserNotes.length > 0 && (
-            <div className="mb-5 rounded-2xl border border-[#FDE68A] bg-[#FFFBEB] p-4 shadow-[var(--shadow-card)]">
-              <div className="flex items-center gap-2 text-sm font-semibold text-[#92400E]">
+            <div className="mb-5 rounded-2xl border border-warn-border bg-warn-bg p-4 shadow-[var(--shadow-card)]">
+              <div className="flex items-center gap-2 text-sm font-semibold text-warn-text">
                 <AlertTriangle size={16} />
                 浏览器主页可能被更改
               </div>
-              <ul className="mt-2 space-y-1 text-xs leading-relaxed text-[#92400E]">
+              <ul className="mt-2 space-y-1 text-xs leading-relaxed text-warn-text">
                 {scan.browserNotes.map((n, i) => (
                   <li key={i}>{n}</li>
                 ))}
@@ -910,12 +910,12 @@ export default function BloatwareCheck() {
 
           {/* 多杀软共存提醒 */}
           {security.length >= 2 && (
-            <div className="mb-4 rounded-2xl border border-[#FCA5A5] bg-[#FEF2F2] p-4 shadow-[var(--shadow-card)]">
-              <div className="flex items-center gap-2 text-sm font-semibold text-[#B91C1C]">
+            <div className="mb-4 rounded-2xl border border-danger-border bg-danger-bg-soft p-4 shadow-[var(--shadow-card)]">
+              <div className="flex items-center gap-2 text-sm font-semibold text-danger-dark">
                 <ShieldAlert size={16} />
                 检测到 {security.length} 款安全 / 杀毒软件同时安装
               </div>
-              <div className="mt-1.5 text-xs leading-relaxed text-[#991B1B]">
+              <div className="mt-1.5 text-xs leading-relaxed text-danger-text">
                 多个杀毒软件共存通常会<b>互相冲突</b>：抢占系统进程、拖慢开机与日常运行、占用大量内存，甚至互相误判查杀。
                 <b>建议只保留 1 款</b>就够了，其余可以卸载；保留 0 款也行——Windows 自带的 Defender 已提供基础防护。
               </div>
@@ -1014,7 +1014,7 @@ export default function BloatwareCheck() {
               </div>
 
               <div className="flex-1 overflow-auto px-7 py-2">
-                <div className="rounded-xl bg-[#FEF2F2] px-4 py-3 text-sm leading-relaxed text-[#991B1B]">
+                <div className="rounded-xl bg-danger-bg-soft px-4 py-3 text-sm leading-relaxed text-danger-text">
                   <b>{guide.name}</b> 是安全 / 杀毒软件，带<b>内核级自我保护</b>——任何第三方（包括我们）都<b>无法替你静默停止或卸载</b>。这是杀软防止被恶意程序卸载的正常防护，<b>不是故障</b>。所以要你亲自在它自己的流程里完成。
                 </div>
 
@@ -1199,9 +1199,9 @@ export default function BloatwareCheck() {
             exit={{ opacity: 0, y: -16 }}
             className="pointer-events-none absolute inset-x-0 top-4 z-[60] flex justify-center px-6"
           >
-            <div className="pointer-events-auto flex max-w-xl items-start gap-2.5 rounded-xl border border-[#F59E0B] bg-[#FFFBEB] px-4 py-3 shadow-[var(--shadow-card-hover)]">
-              <AlertTriangle size={18} className="mt-0.5 shrink-0 text-[#B45309]" />
-              <div className="text-sm leading-relaxed text-[#92400E]">
+            <div className="pointer-events-auto flex max-w-xl items-start gap-2.5 rounded-xl border border-caution bg-warn-bg px-4 py-3 shadow-[var(--shadow-card-hover)]">
+              <AlertTriangle size={18} className="mt-0.5 shrink-0 text-warn-text-strong" />
+              <div className="text-sm leading-relaxed text-warn-text">
                 这个软件弹出了自己的卸载向导窗口（可能挡在屏幕中间）。请在
                 <b>那个窗口</b>上完成操作（点“下一步 / 卸载 / 是”），完成后这里会
                 <b>自动继续</b>，不用管本窗口。

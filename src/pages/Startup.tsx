@@ -10,19 +10,19 @@ const ADVICE_META = {
     title: "建议禁用",
     subtitle: "禁用后不影响手动使用，开机更快更省内存",
     icon: <Rocket size={15} />,
-    badge: { text: "建议禁用", bg: "#FEE2E2", fg: "#991B1B" },
+    badge: { text: "建议禁用", bg: "var(--color-danger-bg)", fg: "var(--color-danger-text)" },
   },
   neutral: {
     title: "看你习惯",
     subtitle: "有实际用途，按自己的使用频率决定",
     icon: <Scale size={15} />,
-    badge: { text: "看习惯", bg: "#FEF3C7", fg: "#92400E" },
+    badge: { text: "看习惯", bg: "var(--color-warn-bg-strong)", fg: "var(--color-warn-text)" },
   },
   keep: {
     title: "建议保留",
     subtitle: "系统功能、安全软件或轻量常用工具",
     icon: <ShieldCheck size={15} />,
-    badge: { text: "建议保留", bg: "#D1FAE5", fg: "#065F46" },
+    badge: { text: "建议保留", bg: "var(--color-good-bg)", fg: "var(--color-good-text)" },
   },
 } as const;
 

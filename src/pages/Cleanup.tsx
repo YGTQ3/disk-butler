@@ -319,7 +319,7 @@ export default function Cleanup() {
               </span>
             </div>
             {stats && stats.totalRuns > 1 && (
-              <div className="mt-2 inline-flex items-center gap-1.5 rounded-full bg-[#FEF3C7] px-3.5 py-1.5 text-xs text-[#B45309]">
+              <div className="mt-2 inline-flex items-center gap-1.5 rounded-full bg-warn-bg-strong px-3.5 py-1.5 text-xs text-warn-text-strong">
                 <ShieldCheck size={13} />
                 历史累计已释放 <b>{formatBytes(stats.totalFreed)}</b>（第 {stats.totalRuns} 次清理）
               </div>
@@ -367,14 +367,14 @@ export default function Cleanup() {
 
             {/* 累计清理成就：本地统计，金色盾牌荣誉感 */}
             {stats && stats.totalRuns > 0 && (
-              <div className="mb-5 flex items-center gap-3.5 rounded-2xl border border-[#FDE68A] bg-gradient-to-r from-[#FFFBEB] to-[var(--color-surface)] px-5 py-3.5 shadow-[var(--shadow-card)]">
-                <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-[#FBBF24] to-[#D97706] shadow-[0_2px_8px_rgba(217,119,6,0.35)]">
+              <div className="mb-5 flex items-center gap-3.5 rounded-2xl border border-warn-border bg-gradient-to-r from-warn-bg to-[var(--color-surface)] px-5 py-3.5 shadow-[var(--shadow-card)]">
+                <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-warn-gradient to-warn-icon shadow-[0_2px_8px_var(--color-warn-glow)]">
                   <ShieldCheck size={21} className="text-white" />
                 </span>
                 <div className="min-w-0">
                   <div className="text-sm">
                     累计已为你释放{" "}
-                    <span className="text-lg font-bold text-[#B45309]">
+                    <span className="text-lg font-bold text-warn-text-strong">
                       {formatBytes(stats.totalFreed)}
                     </span>
                   </div>
@@ -437,7 +437,7 @@ export default function Cleanup() {
               <div className="rounded-2xl bg-[var(--color-surface)] p-4 shadow-[var(--shadow-card)]">
                 <div className="flex items-center gap-2">
                   <span className="text-sm font-semibold">清理 Windows 更新旧版本备份 (WinSxS)</span>
-                  <span className="rounded-full bg-[#FEE2E2] px-2 py-0.5 text-[10px] font-medium text-[#991B1B]">
+                  <span className="rounded-full bg-danger-bg px-2 py-0.5 text-[10px] font-medium text-danger-text">
                     需要管理员
                   </span>
                   <span className="rounded-full bg-[var(--color-bg)] px-2 py-0.5 text-[10px] text-[var(--color-text-secondary)]">
@@ -521,7 +521,7 @@ export default function Cleanup() {
                   </div>
                 )}
                 {deepError && (
-                  <div className="mt-3 rounded-xl bg-[#FEF3C7] px-3.5 py-2.5 text-xs text-[#92400E]">
+                  <div className="mt-3 rounded-xl bg-warn-bg-strong px-3.5 py-2.5 text-xs text-warn-text">
                     {deepError}
                   </div>
                 )}
@@ -551,7 +551,7 @@ export default function Cleanup() {
               <div className="rounded-2xl bg-[var(--color-surface)] p-4 shadow-[var(--shadow-card)]">
                 <div className="flex items-center gap-2">
                   <span className="text-sm font-semibold">清理 Windows 系统临时文件 + 更新下载缓存</span>
-                  <span className="rounded-full bg-[#FEE2E2] px-2 py-0.5 text-[10px] font-medium text-[#991B1B]">
+                  <span className="rounded-full bg-danger-bg px-2 py-0.5 text-[10px] font-medium text-danger-text">
                     需要管理员
                   </span>
                 </div>
@@ -643,7 +643,7 @@ export default function Cleanup() {
                   </div>
                 )}
                 {sysError && (
-                  <div className="mt-3 rounded-xl bg-[#FEF3C7] px-3.5 py-2.5 text-xs text-[#92400E]">
+                  <div className="mt-3 rounded-xl bg-warn-bg-strong px-3.5 py-2.5 text-xs text-warn-text">
                     {sysError}
                   </div>
                 )}
@@ -720,7 +720,7 @@ export default function Cleanup() {
                                     </span>
                                     <span className="block break-all text-xs text-[var(--color-text-secondary)]">{o.path}</span>
                                     {o.note && (
-                                      <span className="mt-1.5 flex items-start gap-1.5 rounded-lg bg-[#FFFBEB] px-2.5 py-1.5 text-xs leading-relaxed text-[#92400E]">
+                                      <span className="mt-1.5 flex items-start gap-1.5 rounded-lg bg-warn-bg px-2.5 py-1.5 text-xs leading-relaxed text-warn-text">
                                         <AlertTriangle size={13} className="mt-0.5 shrink-0" />
                                         {o.note}
                                       </span>
@@ -741,7 +741,7 @@ export default function Cleanup() {
                           })}
                         </ul>
                         {orphan.phase === "confirm" && (
-                          <div className="mt-3 rounded-xl bg-[#FEF2F2] px-4 py-3 text-sm leading-relaxed text-[#991B1B]">
+                          <div className="mt-3 rounded-xl bg-danger-bg-soft px-4 py-3 text-sm leading-relaxed text-danger-text">
                             将永久删除勾选的 {orphan.checked.size} 个文件夹（不进回收站）。确定里面没有要留的东西了吗？
                           </div>
                         )}
@@ -787,7 +787,7 @@ export default function Cleanup() {
                       <button
                         disabled={cleaningOrphan || orphan.checked.size === 0}
                         onClick={doCleanOrphans}
-                        className="rounded-xl bg-[#DC2626] px-4 py-2 text-xs font-semibold text-white transition-colors hover:bg-[#B91C1C] disabled:opacity-50"
+                        className="rounded-xl bg-danger px-4 py-2 text-xs font-semibold text-white transition-colors hover:bg-danger-dark disabled:opacity-50"
                       >
                         {cleaningOrphan ? "清理中…" : "确认删除"}
                       </button>
@@ -853,13 +853,13 @@ export default function Cleanup() {
                           className={[
                             "rounded-xl border p-3",
                             i.safety === "caution"
-                              ? "border-[#FDE68A] bg-[#FFFBEB]"
+                              ? "border-warn-border bg-warn-bg"
                               : "border-[var(--color-line)] bg-[var(--color-bg)]",
                           ].join(" ")}
                         >
                           <div className="flex items-center gap-2">
                             {i.safety === "caution" ? (
-                              <AlertTriangle size={14} className="shrink-0 text-[#D97706]" />
+                              <AlertTriangle size={14} className="shrink-0 text-warn-icon" />
                             ) : (
                               <CheckCircle2 size={14} className="shrink-0 text-[var(--color-primary)]" />
                             )}
@@ -872,7 +872,7 @@ export default function Cleanup() {
                             className={[
                               "mt-1 pl-6 text-xs leading-relaxed",
                               i.safety === "caution"
-                                ? "text-[#92400E]"
+                                ? "text-warn-text"
                                 : "text-[var(--color-text-secondary)]",
                             ].join(" ")}
                           >
@@ -1009,8 +1009,8 @@ export default function Cleanup() {
                   onClick={(e) => e.stopPropagation()}
                 >
                   <div className="flex items-center gap-3">
-                    <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-[#FEE2E2]">
-                      <AlertTriangle size={24} className="text-[#DC2626]" />
+                    <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-danger-bg">
+                      <AlertTriangle size={24} className="text-danger" />
                     </span>
                     <span>
                       <span className="block text-lg font-semibold">确认执行系统深度清理？</span>
@@ -1032,15 +1032,15 @@ export default function Cleanup() {
                         </span>
                       </span>
                     </div>
-                    <div className="flex items-center gap-3.5 rounded-xl border border-[#FECACA] bg-[#FEF2F2] px-4 py-3.5">
-                      <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-[#DC2626] text-sm font-bold text-white">
+                    <div className="flex items-center gap-3.5 rounded-xl border border-danger-border bg-danger-bg-soft px-4 py-3.5">
+                      <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-danger text-sm font-bold text-white">
                         !
                       </span>
                       <span className="min-w-0">
-                        <span className="block text-base font-bold text-[#B91C1C]">
+                        <span className="block text-base font-bold text-danger-dark">
                           全程约 5~20 分钟，期间请勿关机
                         </span>
-                        <span className="mt-0.5 block text-xs text-[#B91C1C] opacity-80">
+                        <span className="mt-0.5 block text-xs text-danger-dark opacity-80">
                           中途断电可能损坏系统组件，这是唯一需要你保证的事
                         </span>
                       </span>
@@ -1067,7 +1067,7 @@ export default function Cleanup() {
                     </button>
                     <button
                       onClick={doDeepClean}
-                      className="flex-1 rounded-xl bg-[#DC2626] py-3 text-sm font-semibold text-white transition-colors hover:bg-[#B91C1C]"
+                      className="flex-1 rounded-xl bg-danger py-3 text-sm font-semibold text-white transition-colors hover:bg-danger-dark"
                     >
                       我已了解，开始清理
                     </button>
@@ -1123,7 +1123,7 @@ export default function Cleanup() {
                   )}
 
                   {stats && stats.totalRuns > 0 && (
-                    <div className="mt-4 inline-flex items-center gap-1.5 rounded-full bg-[#FEF3C7] px-4 py-1.5 text-xs text-[#B45309]">
+                    <div className="mt-4 inline-flex items-center gap-1.5 rounded-full bg-warn-bg-strong px-4 py-1.5 text-xs text-warn-text-strong">
                       <ShieldCheck size={13} />
                       历史累计已释放 <b>{formatBytes(stats.totalFreed)}</b>
                     </div>
@@ -1362,7 +1362,7 @@ export default function Cleanup() {
                   )}
 
                   {stats && stats.totalRuns > 0 && (
-                    <div className="mt-4 inline-flex items-center gap-1.5 rounded-full bg-[#FEF3C7] px-4 py-1.5 text-xs text-[#B45309]">
+                    <div className="mt-4 inline-flex items-center gap-1.5 rounded-full bg-warn-bg-strong px-4 py-1.5 text-xs text-warn-text-strong">
                       <ShieldCheck size={13} />
                       历史累计已释放 <b>{formatBytes(stats.totalFreed)}</b>
                     </div>
@@ -1414,7 +1414,7 @@ function ItemCard({
           <div className="flex items-center gap-2">
             <span className="text-sm font-semibold">{item.name}</span>
             {caution && (
-              <span className="rounded-full bg-[#FEF3C7] px-2 py-0.5 text-[10px] font-medium text-[#92400E]">
+              <span className="rounded-full bg-warn-bg-strong px-2 py-0.5 text-[10px] font-medium text-warn-text">
                 谨慎
               </span>
             )}

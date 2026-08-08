@@ -25,6 +25,38 @@
   --color-caution: #f59e0b;
   --color-keep: #64748b;
 
+  /* 告警/状态语义色（组件禁止再硬编码，深色模式由下方 media 查询统一翻转） */
+  /* 琥珀警告系 */
+  --color-warn-bg: #fffbeb;
+  --color-warn-bg-strong: #fef3c7;
+  --color-warn-accent: #fde9ce;
+  --color-warn-border: #fde68a;
+  --color-warn-icon: #d97706;
+  --color-warn-gradient: #fbbf24;
+  --color-warn-glow: rgba(217, 119, 6, 0.35);
+  --color-warn-text: #92400e;
+  --color-warn-text-strong: #b45309;
+  /* 红色危险系 */
+  --color-danger-bg: #fee2e2;
+  --color-danger-bg-soft: #fef2f2;
+  --color-danger-border: #fca5a5;
+  --color-danger: #dc2626;
+  --color-danger-dark: #b91c1c;
+  --color-danger-text: #991b1b;
+  /* 绿/蓝状态徽章系 */
+  --color-good-bg: #d1fae5;
+  --color-good-text: #065f46;
+  --color-info-bg: #dbeafe;
+  --color-info-text: #1e40af;
+  --color-alert: #ef4444;
+  /* 中性标签系 */
+  --color-tag-bg: #f1f5f9;
+  --color-tag-text: #475569;
+  --color-tag-indigo-bg: #eef2ff;
+  --color-tag-indigo-text: #3730a3;
+  --color-tag-cyan-bg: #ecfeff;
+  --color-tag-cyan-text: #155e75;
+
   /* 圆角 */
   --radius-card: 16px;
   --radius-btn: 12px;
@@ -49,6 +81,59 @@ body,
   line-height: 1.5;
   -webkit-font-smoothing: antialiased;
   user-select: none;
+}
+
+/* 暗色模式：跟随 Windows 系统主题（issue #5）。
+   Tailwind v4 的 utility 均引用 CSS 变量，这里统一翻转变量即整体换肤。 */
+@media (prefers-color-scheme: dark) {
+  :root {
+    color-scheme: dark;
+    /* 基础色 */
+    --color-bg: #0f172a;
+    --color-surface: #1e293b;
+    --color-primary: #2dd4bf;
+    --color-primary-dark: #14b8a6;
+    --color-primary-soft: #134e4a;
+    --color-text-main: #e2e8f0;
+    --color-text-secondary: #94a3b8;
+    --color-line: #334155;
+    /* 磁盘分类色：明亮色块在深底上依旧可读，仅微调偏亮的 other */
+    --color-cat-other: #94a3b8;
+    --color-keep: #94a3b8;
+    /* 琥珀警告系（深底用深琥珀底 + 亮琥珀字） */
+    --color-warn-bg: #451a03;
+    --color-warn-bg-strong: #78350f;
+    --color-warn-accent: #78350f;
+    --color-warn-border: #b45309;
+    --color-warn-icon: #fbbf24;
+    --color-warn-gradient: #f59e0b;
+    --color-warn-glow: rgba(251, 191, 36, 0.25);
+    --color-warn-text: #fde68a;
+    --color-warn-text-strong: #fcd34d;
+    /* 红色危险系 */
+    --color-danger-bg: #450a0a;
+    --color-danger-bg-soft: #7f1d1d;
+    --color-danger-border: #b91c1c;
+    --color-danger: #ef4444;
+    --color-danger-dark: #dc2626;
+    --color-danger-text: #fecaca;
+    /* 绿/蓝状态徽章系 */
+    --color-good-bg: #064e3b;
+    --color-good-text: #6ee7b7;
+    --color-info-bg: #1e3a8a;
+    --color-info-text: #93c5fd;
+    --color-alert: #f87171;
+    /* 中性标签系 */
+    --color-tag-bg: #334155;
+    --color-tag-text: #cbd5e1;
+    --color-tag-indigo-bg: #1e1b4b;
+    --color-tag-indigo-text: #a5b4fc;
+    --color-tag-cyan-bg: #083344;
+    --color-tag-cyan-text: #67e8f9;
+    /* 阴影在深底上加重 */
+    --shadow-card: 0 1px 3px rgb(0 0 0 / 0.4), 0 8px 24px rgb(0 0 0 / 0.3);
+    --shadow-card-hover: 0 2px 6px rgb(0 0 0 / 0.5), 0 12px 32px rgb(0 0 0 / 0.4);
+  }
 }
 
 /* 全局滚动条：细且柔和 */

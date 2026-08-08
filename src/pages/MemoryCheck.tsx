@@ -9,13 +9,13 @@ type Phase = "loading" | "ready";
 function healthLabel(percent: number): { text: string; color: string } {
   if (percent < 60) return { text: "健康", color: "var(--color-safe)" };
   if (percent < 80) return { text: "偏高", color: "var(--color-caution)" };
-  return { text: "紧张", color: "#EF4444" };
+  return { text: "紧张", color: "var(--color-alert)" };
 }
 
 const KIND_BADGE = {
-  system: { text: "系统", bg: "#DBEAFE", fg: "#1E40AF" },
-  closable: { text: "可退出", bg: "#D1FAE5", fg: "#065F46" },
-  unknown: { text: "未识别", bg: "#F1F5F9", fg: "#475569" },
+  system: { text: "系统", bg: "var(--color-info-bg)", fg: "var(--color-info-text)" },
+  closable: { text: "可退出", bg: "var(--color-good-bg)", fg: "var(--color-good-text)" },
+  unknown: { text: "未识别", bg: "var(--color-tag-bg)", fg: "var(--color-tag-text)" },
 } as const;
 
 export default function MemoryCheck() {
@@ -138,22 +138,22 @@ export default function MemoryCheck() {
 
           {/* 页面文件配置与实际不一致：黄条预警（正常时什么都不显示） */}
           {pagefile && pagefile.issues.length > 0 && (
-            <div className="mb-5 rounded-2xl border border-[#FDE68A] bg-[#FFFBEB] p-5 shadow-[var(--shadow-card)]">
-              <div className="flex items-center gap-2 text-sm font-semibold text-[#92400E]">
+            <div className="mb-5 rounded-2xl border border-warn-border bg-warn-bg p-5 shadow-[var(--shadow-card)]">
+              <div className="flex items-center gap-2 text-sm font-semibold text-warn-text">
                 <AlertTriangle size={16} />
                 页面文件配置有问题，值得处理一下
               </div>
-              <ul className="mt-2 space-y-1.5 text-xs leading-relaxed text-[#92400E]">
+              <ul className="mt-2 space-y-1.5 text-xs leading-relaxed text-warn-text">
                 {pagefile.issues.map((msg, idx) => (
                   <li key={idx}>{msg}</li>
                 ))}
               </ul>
-              <div className="mt-3 rounded-xl bg-white/70 px-3.5 py-2.5 text-xs leading-relaxed text-[#92400E]">
+              <div className="mt-3 rounded-xl bg-surface/70 px-3.5 py-2.5 text-xs leading-relaxed text-warn-text">
                 <b>怎么修：</b>按 Win 键搜索「查看高级系统设置」→ 性能「设置」→ 高级 →
                 虚拟内存「更改」→ 勾选最顶部的「自动管理所有驱动器的分页文件大小」→ 确定后重启。
                 这是最省心也最可靠的方案。
               </div>
-              <div className="mt-2 text-[11px] text-[#92400E] opacity-70">
+              <div className="mt-2 text-[11px] text-warn-text opacity-70">
                 检测依据：系统配置（注册表）与本次开机实际启用的页面文件（Win32_PageFileUsage）逐盘比对
               </div>
             </div>

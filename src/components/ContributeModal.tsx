@@ -199,13 +199,13 @@ export default function ContributeModal({ onClose }: { onClose: () => void }) {
                   ，用时 {result.elapsedSecs < 60 ? `${Math.max(1, result.elapsedSecs)} 秒` : `${Math.round(result.elapsedSecs / 60)} 分钟`}
                 </div>
               </div>
-              <div className="mt-4 space-y-2.5 rounded-xl bg-[#FFFBEB] p-4 text-sm leading-relaxed text-[#92400E]">
+              <div className="mt-4 space-y-2.5 rounded-xl bg-warn-bg p-4 text-sm leading-relaxed text-warn-text">
                 <div className="flex items-start gap-2.5">
-                  <span className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-[#FDE9CE] text-xs font-bold text-[#B45309]">1</span>
+                  <span className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-warn-accent text-xs font-bold text-warn-text-strong">1</span>
                   <div>可以先打开报告看一遍——分不分享，你说了算。</div>
                 </div>
                 <div className="flex items-start gap-2.5">
-                  <span className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-[#FDE9CE] text-xs font-bold text-[#B45309]">2</span>
+                  <span className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-warn-accent text-xs font-bold text-warn-text-strong">2</span>
                   <div>发送时，把桌面上的 <b>.json 文件</b>拖进邮件附件。</div>
                 </div>
               </div>
@@ -264,7 +264,7 @@ export default function ContributeModal({ onClose }: { onClose: () => void }) {
           {phase === "error" && (
             <>
               <div className="flex flex-col items-center pt-2">
-                <XCircle size={40} className="text-[#DC2626]" />
+                <XCircle size={40} className="text-danger" />
                 <div className="mt-3 text-base font-semibold">没能生成报告</div>
                 <div className="mt-2 max-h-32 overflow-y-auto rounded-lg bg-[var(--color-bg)] px-3 py-2 text-xs text-[var(--color-text-secondary)]">
                   {error}
