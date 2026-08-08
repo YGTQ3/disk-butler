@@ -352,7 +352,7 @@ fn candidates() -> Vec<Candidate> {
             }
         }
 
-        // 浏览器缓存（仅 Cache/Code Cache 目录，不碰账户与历史记录）
+        // 浏览器缓存（仅 Cache/Code Cache/Service Worker 缓存目录，不碰账户、历史记录与 SW 注册数据 Database）
         let mut browser: Vec<PathBuf> = Vec::new();
         let mut bases = vec![
             local.join("Microsoft").join("Edge").join("User Data").join("Default"),
@@ -366,7 +366,14 @@ fn candidates() -> Vec<Candidate> {
             bases.push(r.join("360se6").join("User Data").join("Default"));
         }
         for base in bases {
-            for sub in ["Cache", "Code Cache", "GPUCache"] {
+            for sub in [
+                "Cache",
+                "Code Cache",
+                "GPUCache",
+                // Service Worker 的纯缓存子目录；Database 是 SW 注册数据，绝不碰
+                "Service Worker\\CacheStorage",
+                "Service Worker\\ScriptCache",
+            ] {
                 let p = base.join(sub);
                 if p.exists() {
                     browser.push(p);
@@ -377,8 +384,8 @@ fn candidates() -> Vec<Candidate> {
             out.push(Candidate {
                 id: "browser-cache",
                 name: "浏览器缓存 (Edge/Chrome/360系/夸克等)",
-                description: "浏览器缓存的网页图片和脚本，只清缓存，不碰账户、密码和历史记录。",
-                impact: "几乎没有影响。常用网页首次打开会稍慢一点，浏览器使用中时部分文件会跳过。",
+                description: "浏览器缓存的网页图片、脚本和网页应用的离线缓存（含 Service Worker 缓存），只清缓存，不碰账户、密码和历史记录。",
+                impact: "几乎没有影响。常用网页首次打开会稍慢一点，网页应用的离线缓存会重新建立，浏览器使用中时部分文件会跳过。",
                 safety: "safe",
                 paths: browser,
             });
@@ -1642,6 +1649,29 @@ mod tests {
                 "wps-cache 只允许点名 cache/log 子目录: {}",
                 s
             );
+        }
+    }
+
+    #[test]
+    fn browser_cache_never_touches_service_worker_database() {
+        // 扩充 Service Worker 缓存后守护：browser-cache 的每条路径必须落在
+        // 浏览器 User Data 树内，且绝不碰 SW 注册数据 Database（防未来误扩大）
+        let c = candidates();
+        if let Some(bc) = c.iter().find(|x| x.id == "browser-cache") {
+            assert!(!bc.paths.is_empty());
+            for p in &bc.paths {
+                let s = p.to_string_lossy().to_lowercase().replace('\\', "/");
+                assert!(
+                    s.contains("/user data/"),
+                    "browser-cache 出现浏览器树外路径: {}",
+                    s
+                );
+                assert!(
+                    !s.ends_with("/database") && !s.contains("/database/"),
+                    "browser-cache 绝不允许碰 Service Worker 注册数据 Database: {}",
+                    s
+                );
+            }
         }
     }
 
