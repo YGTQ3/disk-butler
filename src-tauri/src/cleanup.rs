@@ -471,6 +471,8 @@ fn candidates() -> Vec<Candidate> {
             local.join("AMD").join("DxcCache"),
             local.join("AMD").join("GLCache"),
             local.join("AMD").join("Radeonsoftware").join("cache"),
+            local.join("AMD").join("AMDRSSrcExt").join("cache"),
+            local.join("AMD").join("PPC").join("temp"),
             local.join("Steam").join("htmlcache").join("ShaderCache"),
         ] {
             if p.exists() {

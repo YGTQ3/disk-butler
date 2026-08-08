@@ -280,6 +280,20 @@ const RULES: &[Rule] = &[
         safety: Safety::Safe,
     },
     Rule {
+        needle: "amdrssrcext/cache",
+        category: Category::Cache,
+        friendly_name: "AMD Radeon 软件扩展缓存",
+        description: "AMD 显卡设置组件（Source Extension）的缓存文件，可安全清理，会自动重建。",
+        safety: Safety::Safe,
+    },
+    Rule {
+        needle: "amd/ppc",
+        category: Category::Cache,
+        friendly_name: "AMD 用户体验计划临时文件",
+        description: "AMD 用户反馈计划的待上传遥测暂存文件。可安全清理，删除后 AMD 驱动会重新生成（顺带停止遥测上传）。",
+        safety: Safety::Safe,
+    },
+    Rule {
         needle: "appdata/roaming/code",
         category: Category::Software,
         friendly_name: "VS Code 数据",
@@ -655,6 +669,13 @@ const RULES: &[Rule] = &[
         category: Category::Cache,
         friendly_name: "罗技 G HUB 缓存",
         description: "Logitech G HUB 的固件与更新下载缓存。删除后重新下载即可，不影响设备设置。",
+        safety: Safety::Caution,
+    },
+    Rule {
+        needle: "programdata/ul/3dmark",
+        category: Category::Cache,
+        friendly_name: "3DMark 基准测试临时文件",
+        description: "3DMark 跑分测试的临时数据（ProgramData，可达数 GB）。跑分后残留，可安全清理，不影响已保存的成绩。",
         safety: Safety::Caution,
     },
     // ---------- 游戏/开发/AI 生态 ----------
@@ -1484,5 +1505,27 @@ mod tests {
         let hit = classify(r"C:\Windows\MEMORY.DMP");
         assert_eq!(hit.category, Category::SystemFile);
         assert_eq!(hit.safety, Safety::Keep);
+    }
+
+    // 20260807 三样本新增规则测试
+    #[test]
+    fn classify_amdrssrext_cache_is_safe() {
+        let hit = classify(r"C:\Users\abc\AppData\Local\AMD\AMDRSSrcExt\cache\foo.bin");
+        assert_eq!(hit.category, Category::Cache);
+        assert_eq!(hit.safety, Safety::Safe);
+    }
+
+    #[test]
+    fn classify_amd_ppc_is_safe_cache() {
+        let hit = classify(r"C:\Users\abc\AppData\Local\AMD\PPC\temp\A39F24CA.gz");
+        assert_eq!(hit.category, Category::Cache);
+        assert_eq!(hit.safety, Safety::Safe);
+    }
+
+    #[test]
+    fn classify_3dmark_tmp_is_caution_cache() {
+        let hit = classify(r"C:\ProgramData\UL\3DMark\tmp\benchmark");
+        assert_eq!(hit.category, Category::Cache);
+        assert_eq!(hit.safety, Safety::Caution);
     }
 }
