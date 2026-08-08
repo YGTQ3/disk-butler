@@ -150,3 +150,38 @@ npm run tauri dev                     # 真机验证
 **教训固化成的规则**：第 0 节问题 1/5、永久黑名单第一条、以及 knowledge.rs 中"下载类目录一律 Personal/Keep 且规则前置"。
 
 **记住**：目录名像缓存 ≠ 是缓存。判断依据永远是**内容归属**（程序自动生成 vs 用户主动获得），不是名字。
+
+---
+
+## 5. 样本命中统计方法（拿到样本先算这个，不用每次从头想）
+
+**目的**：量化"已有规则帮用户多少"——每个样本的 白名单可清 / 知识库解释 / 红线 三类体量。样本 JSON 只到**目录一级**（name/sizeMB/cacheHits/flags），没有子路径字节，所以一切数字都是**上限**；精确字节唯一途径是真机跑 `list_items()`（逐路径 dir_size）。
+
+**口径（四条铁律，顺序执行）**：
+
+1. **红线先排除**：目录名含 Tencent / QQ / QQEX / Baidu / baidunetdisk / WeChat / xwechat / 微信开发者 / Packages / Package Cache / Programs → 归「红线」，永不进可清。即使 cacheHits 命中解释规则也不代表能清。
+2. **ProgramData / USERPROFILE 顶层一律「解释」**：白名单全部基于 LOCALAPPDATA / APPDATA / USERPROFILE 子路径，ProgramData 条目（哪怕 UL\3DMark、Package Cache）只算 knowledge。
+3. **白名单可清判定**：目录名 + cacheHits 子串同时匹配下表才对得上规则。**命中子串 ≠ 整目录可删**——白名单只删列出的子路径（如 AMD 14.6G 只删 AMDRSSrcExt\cache + PPC\temp + Radeonsoftware\cache）。
+4. **黑名单重叠降级**：命中含 `TokenBroker` / `IdentityCache` / `Credentials` 的条目，即使有其他可清子路径也不上报「可清」（登录凭证风险 > 收益）。
+
+### 目录名 → 清理规则 速查表（按 cleanup.rs 白名单结构）
+
+| 规则 id | 命中条件（目录名 + cacheHits 子串） | 实际可清 |
+|---|---|---|
+| `temp` | 顶层 `Temp`（localAppData） | 整目录 |
+| `updaters` | 目录名含 updater（Quark/123pan/xmind/apifox/scnet/fiddler…） | 整目录，注意排除合法升级保留目录 |
+| `crash-reports` / `D3DSCache` | `CrashDumps` / `D3DSCache` | 整目录 |
+| `gpu-cache` | local 顶层 `AMD` 含 `AMDRSSrcExt\|PPC\|Radeonsoft`；`Steam` 含 `ShaderCache\|htmlcache`；`D3DSCache` | 只 AMD/Steam 下列出的子路径 |
+| `doubao-shadercache` | `Doubao` hits 含 `ShaderCache` | User Data\ShaderCache |
+| `androidstudio-logs` | `Google` hits 含 `AndroidStudio` | 各 AndroidStudio*\log、tmp |
+| `browser-cache` | `Microsoft\Edge`/`Google\Chrome`/`360Chrome`/`360se6`/`Quark` 等目录，hits 含 `Default\Cache|Code Cache|GPUCache` | **只清 User Data\Default 三件套**；hit 到 \ShaderCache/\temp/\log 不算可清 |
+| `wps-cache` | 顶层 `kingsoft`（local 及 roaming）hits 含 `office6\|kupdateUI\|wpsoffice` | 只出 cache/log 子目录 |
+| `electron-cache` | 任意非红线目录 hits 含 `blob_storage; Cache; Code Cache`（指纹三件套并存） | 只清三个 Cache 子目录（Chrome 指纹规则） |
+| `vscode-cache` | roaming `Code` hits 含 `CachedData` | CachedData、Code Cache、GPUCache 等 |
+| `onedrive-logs` | `Microsoft` hits 含 `OneDrive` | 仅 OneDrive\logs（注意命中里别混入 TokenBroker） |
+| `islide-logs` | roaming `iSlide` | iSlide Tools\Logs |
+
+### 一句话结论
+
+- 数字上报时**必须先声明口径**：「白名单可清=上限（目录级），真实值请见 list_items」，「知识库解释=只透传解释不可一键清」。
+- 红线 + ProgramData + TokenBroker 重叠检出，是每次统计的固定检查项。
