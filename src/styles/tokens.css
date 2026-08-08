@@ -83,10 +83,11 @@ body,
   user-select: none;
 }
 
-/* 暗色模式：跟随 Windows 系统主题（issue #5）。
+/* 主题（issue #5）：跟随 Windows 系统主题，用户也可手动锁定浅色/深色。
+   html[data-theme] 由 ThemeToggle 写入（auto 时移除属性回退到跟随系统）。
    Tailwind v4 的 utility 均引用 CSS 变量，这里统一翻转变量即整体换肤。 */
 @media (prefers-color-scheme: dark) {
-  :root {
+  :root:not([data-theme="light"]) {
     color-scheme: dark;
     /* 基础色 */
     --color-bg: #0f172a;
@@ -134,6 +135,49 @@ body,
     --shadow-card: 0 1px 3px rgb(0 0 0 / 0.4), 0 8px 24px rgb(0 0 0 / 0.3);
     --shadow-card-hover: 0 2px 6px rgb(0 0 0 / 0.5), 0 12px 32px rgb(0 0 0 / 0.4);
   }
+}
+
+/* 手动锁定深色（不依赖系统主题）：与上方深色变量保持一致，改动时两处同步 */
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --color-bg: #0f172a;
+  --color-surface: #1e293b;
+  --color-primary: #2dd4bf;
+  --color-primary-dark: #14b8a6;
+  --color-primary-soft: #134e4a;
+  --color-text-main: #e2e8f0;
+  --color-text-secondary: #94a3b8;
+  --color-line: #334155;
+  --color-cat-other: #94a3b8;
+  --color-keep: #94a3b8;
+  --color-warn-bg: #451a03;
+  --color-warn-bg-strong: #78350f;
+  --color-warn-accent: #78350f;
+  --color-warn-border: #b45309;
+  --color-warn-icon: #fbbf24;
+  --color-warn-gradient: #f59e0b;
+  --color-warn-glow: rgba(251, 191, 36, 0.25);
+  --color-warn-text: #fde68a;
+  --color-warn-text-strong: #fcd34d;
+  --color-danger-bg: #450a0a;
+  --color-danger-bg-soft: #7f1d1d;
+  --color-danger-border: #b91c1c;
+  --color-danger: #ef4444;
+  --color-danger-dark: #dc2626;
+  --color-danger-text: #fecaca;
+  --color-good-bg: #064e3b;
+  --color-good-text: #6ee7b7;
+  --color-info-bg: #1e3a8a;
+  --color-info-text: #93c5fd;
+  --color-alert: #f87171;
+  --color-tag-bg: #334155;
+  --color-tag-text: #cbd5e1;
+  --color-tag-indigo-bg: #1e1b4b;
+  --color-tag-indigo-text: #a5b4fc;
+  --color-tag-cyan-bg: #083344;
+  --color-tag-cyan-text: #67e8f9;
+  --shadow-card: 0 1px 3px rgb(0 0 0 / 0.4), 0 8px 24px rgb(0 0 0 / 0.3);
+  --shadow-card-hover: 0 2px 6px rgb(0 0 0 / 0.5), 0 12px 32px rgb(0 0 0 / 0.4);
 }
 
 /* 全局滚动条：细且柔和 */

@@ -6,6 +6,7 @@ import Startup from "./pages/Startup";
 import MemoryCheck from "./pages/MemoryCheck";
 import BloatwareCheck from "./pages/BloatwareCheck";
 import ContributeModal from "./components/ContributeModal";
+import ThemeToggle from "./components/ThemeToggle";
 
 type PageId = "insight" | "clean" | "startup" | "memory" | "bloatware";
 
@@ -90,6 +91,8 @@ function App() {
         </nav>
 
         <div className="mt-auto px-3 pb-2">
+          {/* 外观切换：跟随系统 / 浅色 / 深色 三态循环，选择持久化 */}
+          <ThemeToggle />
           {/* 社区贡献入口：本地生成报告，发不发由用户决定 */}
           <button
             onClick={() => setShowContribute(true)}
