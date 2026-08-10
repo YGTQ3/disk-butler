@@ -642,6 +642,14 @@ const RULES: &[Rule] = &[
         description: "MATLAB 的偏好设置、工作区布局和自定义工具栏，属于个人数据，请勿当垃圾清理。",
         safety: Safety::Keep,
     },
+    // 20260810 样本：Godot 游戏引擎编辑器数据（含用户项目，不可当缓存清理）
+    Rule {
+        needle: "appdata/roaming/godot",
+        category: Category::Personal,
+        friendly_name: "Godot 游戏引擎数据",
+        description: "Godot 游戏引擎的编辑器数据，含你的游戏项目、导出预设和素材库，属于个人数据，请勿当垃圾清理。",
+        safety: Safety::Keep,
+    },
     Rule {
         needle: "appdata/roaming",
         category: Category::Software,
@@ -906,6 +914,14 @@ const RULES: &[Rule] = &[
         friendly_name: "已安装软件",
         description: "已安装软件的本体，请通过卸载程序移除，而非手动删除。",
         safety: Safety::Keep,
+    },
+    // 20260810 样本：Cocos Creator 游戏引擎共享数据（ProgramData，含模板/插件/构建产物）
+    Rule {
+        needle: "programdata/cocos",
+        category: Category::Software,
+        friendly_name: "Cocos Creator 引擎数据",
+        description: "Cocos Creator 游戏引擎的共享数据（模板、插件、构建缓存等），删除后需要重新下载，请勿手动清理。",
+        safety: Safety::Caution,
     },
     Rule {
         needle: "programdata",
@@ -1526,6 +1542,21 @@ mod tests {
     fn classify_3dmark_tmp_is_caution_cache() {
         let hit = classify(r"C:\ProgramData\UL\3DMark\tmp\benchmark");
         assert_eq!(hit.category, Category::Cache);
+        assert_eq!(hit.safety, Safety::Caution);
+    }
+
+    // 20260810 三样本新增规则测试
+    #[test]
+    fn classify_godot_is_personal_keep() {
+        let hit = classify(r"C:\Users\x\AppData\Roaming\Godot\app_userdata");
+        assert_eq!(hit.category, Category::Personal);
+        assert_eq!(hit.safety, Safety::Keep);
+    }
+
+    #[test]
+    fn classify_cocos_is_software_caution() {
+        let hit = classify(r"C:\ProgramData\cocos\editors");
+        assert_eq!(hit.category, Category::Software);
         assert_eq!(hit.safety, Safety::Caution);
     }
 }

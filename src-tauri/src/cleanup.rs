@@ -702,6 +702,14 @@ fn candidates() -> Vec<Candidate> {
             safety: "caution",
             paths: vec![home.join(".cache").join("huggingface")],
         });
+        out.push(Candidate {
+            id: "cargo-cache",
+            name: "cargo 缓存",
+            description: "Rust 包管理器 cargo 下载的 crate 源码包缓存。",
+            impact: "没有影响。以后构建项目时会按需重新下载依赖包。",
+            safety: "safe",
+            paths: vec![home.join(".cargo").join("registry")],
+        });
     }
 
     if let Some(roaming) = &roaming {
