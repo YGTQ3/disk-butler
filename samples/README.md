@@ -32,6 +32,7 @@
 | diskbutler-rule-report-20260809-1258（游戏机 Win11 Pro 25H2） | 2026-08-10 | 基础（软件内贡献 collector=app） | ✅ 已评估入库 | 覆盖验证良好：AMD RadeonSoftware\cache 命中 gpu-cache、Steam ShaderCache 命中、WPS(kingsoft) 命中 wps-cache、leigod/Battle.net 命中 electron-cache、红线正确拦截（Microsoft TokenBroker/Packages/Tencent）；无新入库（机器空间充裕 C 盘 263G/300G，全部小额缓存已由现有规则覆盖） |
 | diskbutler-rule-report-20260809-2354（游戏机 Win11 Pro 25H2，C 盘剩 250G/447G） | 2026-08-10 | 基础（软件内贡献 collector=app） | ✅ 已评估入库 | **覆盖验证**：Steam ShaderCache/QuarkCloudDrive ShaderCache/QuarkCloudDriveUpdater 命中、electron-cache 收编 QQEX/QQ/heybox-pc-launcher/heybox-chat-electron/ACLOS、wps-cache 命中 kingsoft、onedrive-logs 命中、红线正确拦截（Tencent 2.5G/Packages/QQ/QQEX）；**新增观察**：**CapCut (2.2G，User Data\Cache+Log，非标准 Electron 指纹不匹配)**、oopz(1.1G 身份不明)/KOOK(883M 游戏语音)/PixPin(415M 截图工具 Crashpad+Temp)/Shandianshuo(895M Roaming logs)（见观察名单）；**知识库已加**：无（均为观察项） |
 | diskbutler-rule-report-20260810-1149（开发机 Win11 Pro 25H2，C 盘剩 157G/312G） | 2026-08-10 | 基础（软件内贡献 collector=app） | ✅ 已评估入库 | **清理 +1**：cargo-cache（`~/.cargo/registry`，safe——补齐 cargo 在清理白名单的空白）；**知识库 +2**：godot（Personal/Keep，游戏引擎含用户项目）、cocos（Software/Caution，ProgramData 5.6G 引擎共享数据）；**覆盖验证**：AndroidStudio2024.3 log+tmp 命中 androidstudio-logs、DingTalk_133 命中 dingtalk-cache、electron-cache 收编 CodeBuddy CN/QoderCN/Cursor/Code/CherryStudio/pc-link-app/r2modman 等 10+ 应用、Steam ShaderCache 命中、cargo 469M 新入清理白名单、红线正确拦截（微信开发者工具 1.3G/Packages 1.85G/Tencent 3.3G）；128 测试全绿；新增观察：BCUT(225M)/AzureFunctionsTools(917M VERSION-SIBLINGS)/node-gyp(59M)/Yodao(456M)（见观察名单） |
+| diskbutler-rule-report-20260809-0955（游戏+开发混合机 Win11 Home China 25H2，C 盘剩 71G/453G） | 2026-08-10 | 基础（软件内贡献 collector=app） | ✅ 已评估入库 | **规则成熟度验证样本**——覆盖率≈100%，无新入库。electron-cache 一网打尽 TRAE SOLO CN(9.7G)/kimi-desktop(950M)/Cindy(723M)/Coze/Cursor/maskfog/qq_guild/FeelFish 等 10+ Electron 应用；jetbrains-cache 7.7G、wps-cache 3.5G、hf-cache 7.98G(caution) 全部命中；红线正确拦截（Tencent 6.7G/Packages 1.8G/baidu 1.8G）；conda pkgs 2.95G 触发永久黑名单（硬链接）；oopz/node-gyp 获第二样本佐证（见观察名单） |
 
 ## 观察名单（见过但未入库，等更多样本佐证）- ~~Electron 应用通用 Cache 模式~~ ✅ 已于 2026-07-28 以 electron-cache 指纹规则统一收编（Cache+Code Cache/GPUCache 同级并存才认定；Tencent 系仍排除）；
 - **QQ 缓存边界**（friend-c 样本）：QQ 顶层目录名为 `QQ`（非 Tencent），会被 electron-cache 指纹命中，但只取 Chromium 标准缓存三件套，QQ 聊天数据（nt_qq/Documents 树）不在其中——判定为安全，维持现状不排除；如后续样本发现 QQ 把用户数据混入 Cache 同级，再评估加排除；
@@ -64,12 +65,12 @@
 - **ShadowBot**（1719）：`%LOCALAPPDATA%\ShadowBot`/`ShadowBotBrowser`(共 ~200M)，影刀 RPA 自动化工具，非缓存特征不确定，暂观察；
 - 小项画像（20260808，均单样本、身份待查）：`Okeanos`(NetEase 网易云 3.7G)、`KOOK`(1.8G→第二样本 883M，游戏语音)、`Qingfeng`(416M)、`Autodesk` Logs(422M)、`kfastpic_sogou`(200M)、`Battle.net`(136M)、`sogoupdf`(123M)、`clash-verge-rev`(76M)、`GameViewer`(87M)、`calabiyau`(63M)、`LCEDA-Pro`(48M)/`Bentley`(47M)/`betaflight-configurator`(30M)/`inav-configurator`(28M)/`ESRI`(15M)（1708 军工/测绘系）——均单样本，待佐证；
 - **CapCut**（2354 游戏机）：`%LOCALAPPDATA%\CapCut`(2.2G)，cacheHits=`User Data\Cache; User Data\Log`——只有 Cache+Log，缺 Code Cache/GPUCache，不满足 electron-cache 指纹规则；视频编辑器，User Data\Cache 可能含视频预览渲染缓存，单样本暂观察；
-- **oopz**（2354）：`%LOCALAPPDATA%\oopz`(1.1G)，无 cacheHits，身份不明，软件列表有 "Oopz"(712M) 但无描述；
+- **oopz**（2354 + 0955 双样本）：`%LOCALAPPDATA%\oopz`(1.1G+1.1G)，无 cacheHits，身份不明，两台不同机器均安装；
 - **PixPin**（2354）：`%LOCALAPPDATA%\PixPin`(416M)，截图工具，cacheHits=`Crashpad; Temp`；
 - **Shandianshuo（闪电说）**（2354）：`%APPDATA%\Shandianshuo`(895M，Roaming logs) + `%LOCALAPPDATA%\Shandianshuo`(69M，EBWebView Crashpad+ShaderCache)；系统优化/加速类工具；
 - **BCUT（必剪）**（1149 开发机）：`%LOCALAPPDATA%\BCUT`(225M)，B站视频编辑工具，cacheHits=`log; dd\cache`；
 - **AzureFunctionsTools**（1149）：`%LOCALAPPDATA%\AzureFunctionsTools`(917M)，VERSION-SIBLINGS 标记，Azure  Functions 本地开发工具多版本并存，可能适合版本残留清理但需确认目录结构；
-- **node-gyp**（1149）：`%LOCALAPPDATA%\node-gyp`(59M)，cacheHits=`Cache`，Node.js 原生模块编译缓存；
+- **node-gyp**（1149 + 0955 双样本）：`%LOCALAPPDATA%\node-gyp`(59M+51M)，cacheHits=`Cache`，Node.js 原生模块编译缓存，VERSION-SIBLINGS 标记；
 - **Yodao/有道**（1149）：`%LOCALAPPDATA%\Yodao`(456M) + `youdao`(340M)，有道词典/翻译，无缓存特征；
 - **r2modman**（1149）：`%APPDATA%\r2modmanPlus-local`(122M，RiskOfRain2 cache) + `%APPDATA%\r2modman`(29M，electron-cache 已收编)；游戏 mod 管理器，Roaming 部分含游戏 mod 缓存数据；
 - **KuGou8（酷狗音乐）**（2354）：`%APPDATA%\KuGou8`(468M)，cacheHits=`log; CefCache89\*`——非标准 CEF 缓存结构（带版本号目录 CefCache89），不匹配 electron-cache 指纹；
