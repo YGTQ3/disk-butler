@@ -189,6 +189,13 @@ const RULES: &[Rule] = &[
         safety: Safety::Caution,
     },
     Rule {
+        needle: "roaming/neatdm",
+        category: Category::Cache,
+        friendly_name: "NeatDM 下载数据",
+        description: "Neat Download Manager 的下载记录与未完成下载分块。直接删除会丢失断点续传进度，建议在软件内删除无用任务。",
+        safety: Safety::Caution,
+    },
+    Rule {
         needle: "appdata/local/jetbrains",
         category: Category::Cache,
         friendly_name: "JetBrains 索引缓存",
@@ -1175,6 +1182,12 @@ mod tests {
     #[test]
     fn idm_dwnldata_is_caution() {
         let hit = classify(r"C:\Users\l3268\AppData\Roaming\IDM\DwnlData");
+        assert_eq!(hit.safety, Safety::Caution);
+    }
+
+    #[test]
+    fn neatdm_is_caution() {
+        let hit = classify(r"C:\Users\l3268\AppData\Roaming\NeatDM");
         assert_eq!(hit.safety, Safety::Caution);
     }
 

@@ -721,6 +721,14 @@ fn candidates() -> Vec<Candidate> {
             safety: "caution",
             paths: vec![roaming.join("IDM").join("DwnlData")],
         });
+        out.push(Candidate {
+            id: "neatdm-cache",
+            name: "NeatDM 下载数据",
+            description: "Neat Download Manager 的下载记录与未完成任务的临时分块文件。",
+            impact: "⚠ 未完成的下载任务会丢失断点进度，需要从头下载。已完成的文件不受影响。",
+            safety: "caution",
+            paths: vec![roaming.join("NeatDM")],
+        });
 
         // VS Code 缓存：仅标准缓存子目录，设置与插件不在其中
         let mut vsc: Vec<PathBuf> = Vec::new();
@@ -967,7 +975,7 @@ fn kind_of(id: &str) -> &'static str {
         "temp" | "updaters" | "crash-reports" | "androidstudio-logs" | "synology-logs"
         | "wps-old-versions" | "islide-logs" | "originlab-temp" | "teamviewer-logs"
         | "game-logs" | "onedrive-logs" => "junk",
-        "idm-dwnldata" | "recycle-bin" => "data",
+        "idm-dwnldata" | "neatdm-cache" | "recycle-bin" => "data",
         _ => "cache",
     }
 }
@@ -1576,6 +1584,7 @@ mod tests {
         assert_eq!(kind_of("electron-cache"), "cache");
         assert_eq!(kind_of("recycle-bin"), "data");
         assert_eq!(kind_of("idm-dwnldata"), "data");
+        assert_eq!(kind_of("neatdm-cache"), "data");
     }
 
     #[test]

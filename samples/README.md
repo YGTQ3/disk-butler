@@ -33,6 +33,10 @@
 | diskbutler-rule-report-20260809-2354（游戏机 Win11 Pro 25H2，C 盘剩 250G/447G） | 2026-08-10 | 基础（软件内贡献 collector=app） | ✅ 已评估入库 | **覆盖验证**：Steam ShaderCache/QuarkCloudDrive ShaderCache/QuarkCloudDriveUpdater 命中、electron-cache 收编 QQEX/QQ/heybox-pc-launcher/heybox-chat-electron/ACLOS、wps-cache 命中 kingsoft、onedrive-logs 命中、红线正确拦截（Tencent 2.5G/Packages/QQ/QQEX）；**新增观察**：**CapCut (2.2G，User Data\Cache+Log，非标准 Electron 指纹不匹配)**、oopz(1.1G 身份不明)/KOOK(883M 游戏语音)/PixPin(415M 截图工具 Crashpad+Temp)/Shandianshuo(895M Roaming logs)（见观察名单）；**知识库已加**：无（均为观察项） |
 | diskbutler-rule-report-20260810-1149（开发机 Win11 Pro 25H2，C 盘剩 157G/312G） | 2026-08-10 | 基础（软件内贡献 collector=app） | ✅ 已评估入库 | **清理 +1**：cargo-cache（`~/.cargo/registry`，safe——补齐 cargo 在清理白名单的空白）；**知识库 +2**：godot（Personal/Keep，游戏引擎含用户项目）、cocos（Software/Caution，ProgramData 5.6G 引擎共享数据）；**覆盖验证**：AndroidStudio2024.3 log+tmp 命中 androidstudio-logs、DingTalk_133 命中 dingtalk-cache、electron-cache 收编 CodeBuddy CN/QoderCN/Cursor/Code/CherryStudio/pc-link-app/r2modman 等 10+ 应用、Steam ShaderCache 命中、cargo 469M 新入清理白名单、红线正确拦截（微信开发者工具 1.3G/Packages 1.85G/Tencent 3.3G）；128 测试全绿；新增观察：BCUT(225M)/AzureFunctionsTools(917M VERSION-SIBLINGS)/node-gyp(59M)/Yodao(456M)（见观察名单） |
 | diskbutler-rule-report-20260809-0955（游戏+开发混合机 Win11 Home China 25H2，C 盘剩 71G/453G） | 2026-08-10 | 基础（软件内贡献 collector=app） | ✅ 已评估入库 | **规则成熟度验证样本**——覆盖率≈100%，无新入库。electron-cache 一网打尽 TRAE SOLO CN(9.7G)/kimi-desktop(950M)/Cindy(723M)/Coze/Cursor/maskfog/qq_guild/FeelFish 等 10+ Electron 应用；jetbrains-cache 7.7G、wps-cache 3.5G、hf-cache 7.98G(caution) 全部命中；红线正确拦截（Tencent 6.7G/Packages 1.8G/baidu 1.8G）；conda pkgs 2.95G 触发永久黑名单（硬链接）；oopz/node-gyp 获第二样本佐证（见观察名单） |
+| diskbutler-rule-report-20260811-0823（政府环资部门工作站 Win11 Pro 25H2，6 盘位，C 盘剩 34.5G/112G） | 2026-08-11 | 基础（软件内贡献 collector=app） | ✅ 已评估入库 | **覆盖率≈95%**，无新入库。electron-cache 收编 QClaw/CodeBuddy/SodaMusic/TapTap/miHoYo 等 10+ 应用、wps-cache/dingtalk-cache/Steam ShaderCache/doubao-shadercache/onedrive-logs/huorong-logs 全部命中；红线正确拦截（Tencent 4.3G/Packages）。新观察：WinSxS\Temp\InFlight 5.76G（系统级不可自动清理）、.NET 预览版/RC 残留 ~800M（开发者机器）、QuarkCloudDrive 三版本 VERSION-SIBLINGS（D 盘非标准位置） |
+| diskbutler-rule-report-20260811-1001（GIS/环资专业工作站 Win11 Pro 25H2，C 盘剩 722G/930G） | 2026-08-11 | 基础（软件内贡献 collector=app） | ✅ 已评估入库 | **覆盖率≈90%，NeatDM 第四份佐证**。neatdm-cache 命中 1.3G（第四台机器确认）、electron-cache 收编 Code/QQEX/yuque/bilibili 等、pip cache/ESRI Staging 命中；红线正确拦截（Tencent 2.4G/baidu 2.2G/anaconda3 永久黑名单）。空间极充裕无清理压力。新观察：MathWorks ServiceHost\logs 第二佐证（1.24G）、OSGeo4W 2.99G（GIS 专业数据红线）、LocaSpace/TuxinEarth（国产 GIS 工具） |
+| diskbutler-rule-report-20260811-1221（视频剪辑/AI漫剧制作工作站 **Win10 LTSC 2021**，5 盘位，C 盘剩 220G/300G） | 2026-08-11 | 基础（软件内贡献 collector=app） | ✅ 已评估入库 | **覆盖率≈92%，无新入库**（候选均单样本）。jianying-cache 命中 977M（剪映第三台机器）、electron-cache 收编 Trae CN/Antigravity/OpenCode/obsidian/LolAICoach/Hanako、Twinkstar/npm-cache/nuget-cache/wps-cache 全命中；红线正确拦截（Tencent 3.2G/**Blackmagic 4.5G 永久拒绝第二佐证**/Package Cache 937M）。首份 LTSC 样本。画像：Adobe 2018+2022 便携版×12/DaVinci 双版本/AI 漫剧工具集 126G/虚拟机 470G/系统备份 421G。新观察：Buzz 8.2G/pypoetry/NuGet 第二路径/QuarkCloudDrive 多版本第二佐证/RunningCheeseChrome/Red Giant Logs（见下） |
+| diskbutler-rule-report-20260811-1644（轻量家用机 Win11 Home China 23H2，C 盘剩 136.9G/200G） | 2026-08-11 | 基础（软件内贡献 collector=app，driveTopDirs 空） | ✅ 已评估入库 | **覆盖率≈95%，无新入库**。wps-cache 命中 kingsoft 3.08G、electron-cache 收编 QQEX/QQ/qq_guild/subos/lx-music-desktop、pip 命中；红线正确拦截（Tencent 4.9G/Packages/Programs/Package Cache×2/TokenBroker）。新观察：顶层 EBWebView 257M（归属不明）、Intel Package Cache {GUID} 变体 274M（白名单架构天然守住）、NBTool 298M 身份不明、DigiDNA(iMazing) 233M 备份红线、GameViewer 第三佐证（见下） |
 
 ## 观察名单（见过但未入库，等更多样本佐证）- ~~Electron 应用通用 Cache 模式~~ ✅ 已于 2026-07-28 以 electron-cache 指纹规则统一收编（Cache+Code Cache/GPUCache 同级并存才认定；Tencent 系仍排除）；
 - **QQ 缓存边界**（friend-c 样本）：QQ 顶层目录名为 `QQ`（非 Tencent），会被 electron-cache 指纹命中，但只取 Chromium 标准缓存三件套，QQ 聊天数据（nt_qq/Documents 树）不在其中——判定为安全，维持现状不排除；如后续样本发现 QQ 把用户数据混入 Cache 同级，再评估加排除；
@@ -52,7 +56,7 @@
 - **Roaming\Quark\Cache**(48M)：无 Chromium 三件套指纹，browser-cache 未覆盖，等佐证。
 - **Turbo 数据目录**（20260806）：`%LOCALAPPDATA%\Turbo`(1.58G) 带 `User Data\Crashpad + ShaderCache` 结构，软件列表有 "Turbo" 但身份不明（疑似加速器/浏览器类），1.58G 大头构成未明（cacheHits 只标了 Crashpad/ShaderCache），单样本，已建议用户自查；
 - **gtgzgh（高途高中规划）**（20260806）：`%LOCALAPPDATA%\gtgzgh`(872M)，教育软件课程数据，无缓存特征，单样本（学而思 XesCache 同型处理），等教育机佐证；
-- **NeatDM（Neat Download Manager）**（20260806）：`%APPDATA%\NeatDM`(307M)，下载管理器数据含下载历史/队列，倾向拒绝入白名单（下载工具数据目录，Postman 同型），等佐证；
+- **NeatDM（Neat Download Manager）**（20260806 首现 307M → 20260810 双样本佐证 7.5G+896M）：`%APPDATA%\NeatDM`，含下载记录数据库 + 未完成下载分块，与 IDM `DwnlData` 同型。✅ 已入库 `neatdm-cache`（caution，data 类永不默认勾选）+ 知识库 `roaming/neatdm`；
 - **QQEX 边界**（20260806）：`%APPDATA%\QQEX`(587M) QQ 扩展组件，Chromium 三件套已由 electron-cache 收编（QQ 判定同型）；额外特征 `mega-converter\cache`、`Features\Cache` 不在三件套内，等佐证再评估；
 - **OneDrive StandaloneUpdater**（20260806）：`%LOCALAPPDATA%\Microsoft\OneDrive\StandaloneUpdater`，更新器目录无官方删除佐证，仅 logs 已入库（onedrive-logs），此目录等佐证；
 - **火绒 Sysdiag\log**（20260806）：`%ProgramData%\Huorong\Sysdiag\log`(122M)，火绒诊断日志，安全软件边界，单样本（friend-d 也装火绒未报此路径）；
@@ -74,6 +78,23 @@
 - **Yodao/有道**（1149）：`%LOCALAPPDATA%\Yodao`(456M) + `youdao`(340M)，有道词典/翻译，无缓存特征；
 - **r2modman**（1149）：`%APPDATA%\r2modmanPlus-local`(122M，RiskOfRain2 cache) + `%APPDATA%\r2modman`(29M，electron-cache 已收编)；游戏 mod 管理器，Roaming 部分含游戏 mod 缓存数据；
 - **KuGou8（酷狗音乐）**（2354）：`%APPDATA%\KuGou8`(468M)，cacheHits=`log; CefCache89\*`——非标准 CEF 缓存结构（带版本号目录 CefCache89），不匹配 electron-cache 指纹；
+- **MathWorks/MATLAB 日志**（1001 第二佐证）：`%LOCALAPPDATA%\MathWorks`(1.24G，含 ServiceHost\logs)，friend-f 也有出现。两份样本均含 logs 特征，但 1.24G 不全是日志还含 MATLAB 客户端数据。等第三份佐证确认 logs 子目录独立大小后再评估是否入 `matlab-logs`；
+- **WinSxS\Temp\InFlight**（0823）：`C:\Windows\WinSxS\Temp\InFlight`(5.76G)。Windows 组件存储事务性暂存目录，正常在 CBS 操作完成后自动清理。5.76G 说明有中断的 Windows Update/DISM 残留。**系统级目录不可做自动清理规则**（中途删除会破坏系统），仅建议用户手动跑 `Dism /Online /Cleanup-Image /StartComponentCleanup`；
+- **.NET Runtime 预览/RC 版本残留**（0823）：该机器装了 .NET 6/7/8/10/11 五个大版本，其中 11.0.0 Preview 4+5、10.0.0 RC 1、8.0.0 Preview 2、6.0.10(x86)、7.0.4(x86) 等预览/旧版合计 ~800MB+。开发者机器特有问题，删了可能影响依赖特定版本的开发项目。单样本、风险高，暂观察；
+- **QuarkCloudDrive VERSION-SIBLINGS**（0823）：`D:\Program Files\QuarkCloudDrive` 三版本并存（7.0.5/7.0.6/6.9.7，共 3.6G）。装在非标准位置（D 盘），现有 wps-old-versions 只覆盖注册表锚点型，需确认 QuarkCloudDrive 是否有注册表安装版本记录；
+- **OSGeo4W**（1001）：`%ProgramData%\OSGeo4W`(2.99G，含 var\log)。GIS 开源地理空间工具链，专业软件数据目录=红线区域，只记录画像不动；
+- **LocaSpace / TuxinEarth**（1001）：国产三维地球/遥感工具（Roaming 41M/381M），LocaSpace 含 Cache+Temp，TuxinEarth 含 CefCache 但非标准 electron 指纹不匹配。均单样本小项，暂观察；
+- **Buzz（Whisper 转写工具）**（1221）：`%LOCALAPPDATA%\Buzz`(8.24G)，cacheHits=`Cache; Logs`——开源语音转文字工具，8G 大头疑似 Whisper 模型文件，Cache 具体构成未明。等第二样本确认 Cache 内模型/缓存占比后再评估；
+- **pypoetry 缓存**（1221）：`%LOCALAPPDATA%\pypoetry`(698M)，cacheHits=`Cache; Cache\cache`（artifact 缓存，pip-cache 同型，理论 safe），单样本待佐证；
+- **NuGet 第二路径候选**（1221）：`%LOCALAPPDATA%\NuGet`(876M，无 cacheHits)——现有 nuget-cache 只收 `~/.nuget/packages`，此处为 VS/NuGet HTTP 缓存（v3-cache）形态。等佐证后评估扩充；
+- **QuarkCloudDrive 多版本第二佐证**（1221）：`D:\QuarkCloudDrive` 三版本并存（6.9.5.757/7.0.5.767/7.0.6.771 共 3.61G），与 0823 同型（均在 D 盘非标准位置）。两份样本坐实多版本残留模式，仍待确认注册表锚点可行性；
+- **RunningCheeseChrome 便携浏览器缓存**（1221）：`D:\RunningCheeseChrome_Win7\Cache`(1.77G)，奶酪便携 Chrome，自定义路径规则扫不到，仅记录画像；
+- **Red Giant ProgramData\Logs**（1221）：`%ProgramData%\Red Giant`(875M，Logs 命中)，AE/PR 专业插件系日志，ProgramData 专业软件边界，等佐证；
+- **顶层 EBWebView（归属不明）**（1644）：`%LOCALAPPDATA%\EBWebView`(257M)，带完整 Chromium 三件套（Default\Cache+Code Cache+GPUCache）——是某个未建专属目录的 WebView2 应用的共享数据区，清理技术上安全但无法归属到具体软件，单样本暂观察；
+- **Intel Package Cache {GUID} 变体**（1644）：`%ProgramData%\Intel Package Cache {1CEAC85D-...}`(274M)，Package Cache 家族首次出现 GUID 后缀变体。规则为白名单架构（无规则=永不删），误删风险天然不存在，仅记录画像；
+- **NBTool**（1644）：`%APPDATA%\NBTool`(298M)，无缓存特征，身份不明，单样本待查；
+- **DigiDNA/iMazing**（1644）：`%ProgramData%\DigiDNA`(233M)，iMazing iOS 设备管理/备份数据，个人数据红线不动（与 Apple MobileSync 同型）；
+- 小项画像（1644，均单样本暂缓）：`Oray\SunloginClientLite\log`(59M 向日葵精简版日志)、`Lenovo`(131M OEM 日志 devicecenter/ImController\Temp/Udc)、`ProgramData\Tencent\QQPinyin`(85M，cache/log/Temp 命中但 Tencent 系永拒不开例外)、`Foxmail7`(91M 邮件数据红线)、`GameViewer` 第三佐证(159M，网易 UU 远程，cache 命中仍小项)、`sogousdk`/`kdiskmgr_sogou`(共 56M 搜狗残留)、`ichat`(205M，CefLocalStorage 前缀非标准指纹不匹配)；
 - 永久拒绝：Tencent 系（聊天数据同树）、Postman（含 workspace）、Blackmagic/DaVinci（含项目库）、OCS/yuque/Gandownload（PERSONAL 标记）、Package Cache（Windows Installer 缓存，删了会破坏软件修复/卸载）。
 
 ## webview2 安装失败样本（2026-08-03 分析）
