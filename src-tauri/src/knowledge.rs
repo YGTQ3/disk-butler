@@ -58,6 +58,15 @@ struct Rule {
 /// 规则表：靠前的更具体，优先命中。约 30 条，全部来自实战经验。
 const RULES: &[Rule] = &[
     // ---------- 系统本体 ----------
+    // 20260811 样本实证：C:\Windows.old 39G（升级残留）。必须排在所有 windows/* 规则之前，
+    // 否则其内部子目录会被 winsxs/system32 等规则抢先命中。
+    Rule {
+        needle: "windows.old",
+        category: Category::System,
+        friendly_name: "旧系统残留 (Windows.old)",
+        description: "升级 Windows 后保留的回滚备份。系统会在升级约 10 天后自动删除；急着腾空间请走“磁盘清理→清理系统文件”，不要手动强删。",
+        safety: Safety::Caution,
+    },
     Rule {
         needle: "windows/winsxs",
         category: Category::System,
@@ -115,6 +124,15 @@ const RULES: &[Rule] = &[
         friendly_name: "内存转储文件 (MEMORY.DMP)",
         description: "系统崩溃时保存的内存快照，只对排查蓝屏问题有用。可手动删除，崩溃后会重新生成，不影响系统运行。",
         safety: Safety::Keep,
+    },
+    // 20260812 样本实证：C:\Windows\LiveKernelReports 1.54G（DripsWatchdog 硬件看门狗诊断转储）。
+    // 与 MEMORY.DMP 同型，必须排在 windows 兜底规则之前。
+    Rule {
+        needle: "windows/livekernelreports",
+        category: Category::SystemFile,
+        friendly_name: "内核诊断转储 (LiveKernelReports)",
+        description: "Windows 硬件看门狗生成的诊断转储，只对排查硬件/驱动问题有用。可手动删除，问题复现时会重新生成，不影响系统运行。",
+        safety: Safety::Caution,
     },
     Rule {
         needle: "windows",
@@ -395,6 +413,44 @@ const RULES: &[Rule] = &[
         friendly_name: "iSlide PPT 插件日志",
         description: "iSlide PowerPoint 插件的运行日志，可安全清理，不影响使用。",
         safety: Safety::Safe,
+    },
+    // 20260811/20260812 样本（重度游戏机/柳工办公机）新增规则
+    Rule {
+        needle: "larkshell",
+        category: Category::Personal,
+        friendly_name: "飞书桌面版数据 (LarkShell)",
+        description: "飞书/Lark 桌面版的聊天记录与协同文档缓存，属于工作数据，请勿删除；仅其 ShaderCache 等图形缓存可安全清理。",
+        safety: Safety::Keep,
+    },
+    Rule {
+        needle: "sogoupdf/log",
+        category: Category::Cache,
+        friendly_name: "搜狗 PDF 日志",
+        description: "搜狗 PDF 阅读器的运行日志，可安全清理，软件运行时会自动写新日志。",
+        safety: Safety::Safe,
+    },
+    // 20260812/20260813 双样本实证：美图秀秀 PC 版（MTXXAgent/MTXXPCL/XiuXiu）缓存
+    Rule {
+        needle: "appdata/local/meitu",
+        category: Category::Cache,
+        friendly_name: "美图秀秀缓存",
+        description: "美图秀秀 PC 版的运行缓存与临时文件，可安全清理；你的图片和作品不在缓存目录里。",
+        safety: Safety::Safe,
+    },
+    Rule {
+        needle: "huorong/sysdiag/log",
+        category: Category::Cache,
+        friendly_name: "火绒诊断日志",
+        description: "火绒安全软件的诊断日志，技术上可清，但位于 ProgramData 且属安全软件边界，不建议手动删除，体积一般会自行维持可控。",
+        safety: Safety::Caution,
+    },
+    // 20260812 样本实证：火绒隔离区 2.17G——拦截过的威胁样本，必须 Keep 防用户误删
+    Rule {
+        needle: "huorong/sysdiag/quarantine",
+        category: Category::SystemFile,
+        friendly_name: "火绒病毒隔离区",
+        description: "火绒拦截并隔离的威胁文件。请勿手动删除；如需释放空间，请在火绒软件内的“隔离区”里确认后再清空。",
+        safety: Safety::Keep,
     },
     Rule {
         needle: "miktex",
@@ -1398,6 +1454,54 @@ mod tests {
         let hit = classify(r"C:\Users\x\AppData\Roaming\iSlide\iSlide Tools\Logs");
         assert_eq!(hit.category, Category::Cache);
         assert_eq!(hit.safety, Safety::Safe);
+    }
+
+    // 20260811/20260812 样本新增规则测试
+    #[test]
+    fn classify_windows_old_beats_winsxs() {
+        // Windows.old 自身及其内部子目录都必须命中 windows.old 条目，
+        // 不能被 windows/winsxs、windows/system32 抢先。
+        let hit = classify(r"C:\Windows.old");
+        assert_eq!(hit.friendly_name, "旧系统残留 (Windows.old)");
+        let inner = classify(r"C:\Windows.old\WINDOWS\WinSxS");
+        assert_eq!(inner.friendly_name, "旧系统残留 (Windows.old)");
+    }
+
+    #[test]
+    fn classify_livekernelreports_is_system_file() {
+        let hit = classify(r"C:\Windows\LiveKernelReports\DripsWatchdog-20251010-1145.dmp");
+        assert_eq!(hit.friendly_name, "内核诊断转储 (LiveKernelReports)");
+        assert_eq!(hit.category, Category::SystemFile);
+        assert_eq!(hit.safety, Safety::Caution);
+    }
+
+    #[test]
+    fn classify_larkshell_is_personal_keep() {
+        let hit = classify(r"C:\Users\x\AppData\Roaming\LarkShell-ka-salgjx554\sdk_storage");
+        assert_eq!(hit.category, Category::Personal);
+        assert_eq!(hit.safety, Safety::Keep);
+    }
+
+    #[test]
+    fn classify_sogoupdf_log_is_safe_cache() {
+        let hit = classify(r"C:\Users\x\AppData\Local\sogoupdf\log");
+        assert_eq!(hit.category, Category::Cache);
+        assert_eq!(hit.safety, Safety::Safe);
+    }
+
+    #[test]
+    fn classify_meitu_is_safe_cache() {
+        let hit = classify(r"C:\Users\x\AppData\Local\Meitu\XiuXiu\Cache");
+        assert_eq!(hit.friendly_name, "美图秀秀缓存");
+        assert_eq!(hit.category, Category::Cache);
+        assert_eq!(hit.safety, Safety::Safe);
+    }
+
+    #[test]
+    fn classify_huorong_quarantine_is_keep() {
+        let hit = classify(r"C:\ProgramData\Huorong\Sysdiag\Quarantine");
+        assert_eq!(hit.friendly_name, "火绒病毒隔离区");
+        assert_eq!(hit.safety, Safety::Keep);
     }
 
     #[test]

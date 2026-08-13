@@ -571,6 +571,75 @@ fn candidates() -> Vec<Candidate> {
             });
         }
 
+        // 搜狗 PDF 运行日志：双样本佐证（123M → 1G），纯日志删了无影响。
+        // 20260812 样本实证：%LOCALAPPDATA%\sogoupdf\log。
+        let sogou_log = local.join("sogoupdf").join("log");
+        if sogou_log.exists() {
+            out.push(Candidate {
+                id: "sogoupdf-logs",
+                name: "搜狗 PDF 日志",
+                description: "搜狗 PDF 阅读器的运行日志。",
+                impact: "没有影响。软件运行时会自动写新日志。",
+                safety: "safe",
+                paths: vec![sogou_log],
+            });
+        }
+
+        // 美图秀秀 PC 版缓存：双样本佐证（20260812 MTXXAgent+XiuXiu / 20260813 MTXXPCL+XiuXiu）。
+        // MTXX = 美图秀秀；只点名 Cache/Temp 子目录，素材与用户作品不在其中。
+        let mut meitu: Vec<PathBuf> = Vec::new();
+        for p in [
+            local.join("Meitu").join("MTXXAgent").join("Cache"),
+            local.join("Meitu").join("MTXXPCL").join("Cache"),
+            local.join("Meitu").join("XiuXiu").join("Cache"),
+            local.join("Meitu").join("XiuXiu").join("Temp"),
+        ] {
+            if p.exists() {
+                meitu.push(p);
+            }
+        }
+        if !meitu.is_empty() {
+            out.push(Candidate {
+                id: "meitu-cache",
+                name: "美图秀秀缓存",
+                description: "美图秀秀 PC 版的运行缓存与临时文件（你的图片和作品不在这里）。",
+                impact: "几乎没有影响。美图秀秀下次使用时会自动重建。",
+                safety: "safe",
+                paths: meitu,
+            });
+        }
+
+        // 万兴 PDFelement 日志与临时文件：三样本佐证（20260813-0037/2257、20260812-1612）。
+        // 版本目录名可变（PDFelement/9/10/11/12），扫描 PDFelement* 与 PDFThumbnail 前缀，
+        // 只点名 Log/Temp 子目录，用户文档不在其中。
+        let mut ws: Vec<PathBuf> = Vec::new();
+        if let Some(r) = &roaming {
+            let ws_root = r.join("Wondershare");
+            if let Ok(read) = std::fs::read_dir(&ws_root) {
+                for e in read.flatten() {
+                    let n = e.file_name().to_string_lossy().to_lowercase();
+                    if n.starts_with("pdfelement") || n.starts_with("pdfthumbnail") {
+                        for sub in ["Log", "Temp"] {
+                            let p = e.path().join(sub);
+                            if p.exists() {
+                                ws.push(p);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        if !ws.is_empty() {
+            out.push(Candidate {
+                id: "wondershare-logs",
+                name: "万兴 PDF 日志与临时文件",
+                description: "万兴 PDFelement 等软件的运行日志和临时文件（你编辑的文档不在这里）。",
+                impact: "没有影响。软件下次运行时会自动写新日志。",
+                safety: "safe",
+                paths: ws,
+            });
+        }
+
         // 前端包管理器缓存（npm-cache 已单独列出）
         let mut jscache: Vec<PathBuf> = Vec::new();
         for p in [
@@ -847,6 +916,8 @@ fn candidates() -> Vec<Candidate> {
         for p in [
             roaming.join("kingsoft").join("office6").join("log"),
             roaming.join("kingsoft").join("PDF").join("Cache"),
+            // 20260812/20260813 双样本佐证扩充：WPS 图片（wpsphoto+）缓存
+            roaming.join("kingsoft").join("wpsphoto+").join("cache"),
         ] {
             if p.exists() {
                 wps.push(p);
@@ -887,6 +958,7 @@ fn candidates() -> Vec<Candidate> {
 
         // 游戏运行日志与崩溃转储：纯程序自动生成的调试信息，不影响游戏进度。
         // friend-f 样本实证：Civ VI / SpiritCity / Pal / ManorLords / SlayTheSpire2 / Paradox launcher 等。
+        // 20260811/20260813 双样本佐证扩充：TslGame（PUBG）/ NRC 的 Saved\Logs。
         // 注意：只点名 Logs/dumps/cache 子目录，不碰 Saved（存档）和 SaveGames。
         let mut game_logs: Vec<PathBuf> = Vec::new();
         // Civ VI
@@ -899,7 +971,7 @@ fn candidates() -> Vec<Candidate> {
         }
         // 其他游戏（Saved\Logs 模式）
         if let Some(l) = &local {
-            for name in ["SpiritCity", "Pal", "ManorLords"] {
+            for name in ["SpiritCity", "Pal", "ManorLords", "TslGame", "NRC"] {
                 let p = l.join(name).join("Saved").join("Logs");
                 if p.exists() { game_logs.push(p); }
             }
@@ -974,7 +1046,7 @@ fn kind_of(id: &str) -> &'static str {
     match id {
         "temp" | "updaters" | "crash-reports" | "androidstudio-logs" | "synology-logs"
         | "wps-old-versions" | "islide-logs" | "originlab-temp" | "teamviewer-logs"
-        | "game-logs" | "onedrive-logs" => "junk",
+        | "game-logs" | "onedrive-logs" | "sogoupdf-logs" | "wondershare-logs" => "junk",
         "idm-dwnldata" | "neatdm-cache" | "recycle-bin" => "data",
         _ => "cache",
     }
@@ -1591,6 +1663,9 @@ mod tests {
         assert_eq!(kind_of("recycle-bin"), "data");
         assert_eq!(kind_of("idm-dwnldata"), "data");
         assert_eq!(kind_of("neatdm-cache"), "data");
+        assert_eq!(kind_of("sogoupdf-logs"), "junk");
+        assert_eq!(kind_of("meitu-cache"), "cache");
+        assert_eq!(kind_of("wondershare-logs"), "junk");
     }
 
     #[test]
