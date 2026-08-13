@@ -1074,13 +1074,19 @@ pub fn list_items() -> CleanupScan {
     }
 }
 
+/// 挂载点是否为 C 盘根目录（issue #6：沙盒虚拟磁盘等文件夹挂载卷不得参与 C 盘容量统计）。
+fn is_c_drive_root(mount: &str) -> bool {
+    let m = mount.to_ascii_uppercase();
+    crate::scan::is_drive_root(&m) && m.starts_with('C')
+}
+
 fn c_drive_free() -> u64 {
     use sysinfo::Disks;
     let disks = Disks::new_with_refreshed_list();
     disks
         .list()
         .iter()
-        .find(|d| d.mount_point().to_string_lossy().to_uppercase().starts_with('C'.to_string().as_str()))
+        .find(|d| is_c_drive_root(&d.mount_point().to_string_lossy()))
         .map(|d| d.available_space())
         .unwrap_or(0)
 }
@@ -1091,7 +1097,7 @@ fn c_drive_total() -> u64 {
     disks
         .list()
         .iter()
-        .find(|d| d.mount_point().to_string_lossy().to_uppercase().starts_with('C'.to_string().as_str()))
+        .find(|d| is_c_drive_root(&d.mount_point().to_string_lossy()))
         .map(|d| d.total_space())
         .unwrap_or(0)
 }

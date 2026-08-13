@@ -71,13 +71,27 @@ struct SizeIndex {
     dir_profiles: HashMap<PathBuf, [u64; knowledge::EXT_GROUP_COUNT]>,
 }
 
-/// 枚举系统盘符。
+/// 挂载点是否为盘符根目录（形如 `C:\`）。
+/// 文件夹挂载卷（如 Windows 沙盒把虚拟磁盘挂到 C 盘下文件夹，issue #6）一律 false。
+pub fn is_drive_root(mount: &str) -> bool {
+    let bytes = mount.as_bytes();
+    matches!(bytes.len(), 2 | 3)
+        && bytes[0].is_ascii_alphabetic()
+        && bytes[1] == b':'
+        && (bytes.len() == 2 || bytes[2] == b'\\')
+}
+
+/// 枚举系统盘符（只收盘符根目录的卷，按盘符去重）。
 pub fn list_drives() -> Vec<DriveInfo> {
     use sysinfo::Disks;
     let disks = Disks::new_with_refreshed_list();
     let mut out = Vec::new();
     for disk in disks.list() {
         let mount = disk.mount_point().to_string_lossy().to_string();
+        // 只收盘符根目录的卷：挂载到文件夹的卷（沙盒虚拟磁盘等）不进入盘符列表
+        if !is_drive_root(&mount) {
+            continue;
+        }
         let letter = mount.chars().next().map(|c| c.to_string()).unwrap_or_default();
         let total = disk.total_space();
         let free = disk.available_space();
@@ -89,9 +103,10 @@ pub fn list_drives() -> Vec<DriveInfo> {
             used: total.saturating_sub(free),
         });
     }
-    // 去重（同一盘符可能出现多次），按盘符排序
+    // 按盘符去重兜底（同盘符多卷时保留首个，大小写归一），再按挂载点排序
     out.sort_by(|a, b| a.mount_point.cmp(&b.mount_point));
-    out.dedup_by(|a, b| a.mount_point == b.mount_point);
+    let mut seen = std::collections::HashSet::new();
+    out.retain(|d| seen.insert(d.letter.to_ascii_uppercase()));
     out
 }
 
@@ -360,12 +375,7 @@ fn build_tree(index: &SizeIndex, dir: &Path, depth: usize) -> TreeNode {
 
 /// 盘符根目录（如 "C:\\"）且文件系统为 NTFS 时，才能走 MFT 直读。
 fn is_ntfs_drive_root(root: &str) -> bool {
-    let bytes = root.as_bytes();
-    let is_root = matches!(bytes.len(), 2 | 3)
-        && bytes[0].is_ascii_alphabetic()
-        && bytes[1] == b':'
-        && (bytes.len() == 2 || bytes[2] == b'\\');
-    if !is_root {
+    if !is_drive_root(root) {
         return false;
     }
     use sysinfo::Disks;
@@ -462,6 +472,22 @@ pub fn scan(root: &str, app: Option<&AppHandle>) -> Result<TreeNode, String> {
 mod tests {
     use super::*;
     use std::time::{Duration, SystemTime};
+
+    #[test]
+    fn drive_root_judgement() {
+        // 盘符根目录：true（含不带尾斜杠、小写盘符）
+        assert!(is_drive_root("C:\\"));
+        assert!(is_drive_root("D:\\"));
+        assert!(is_drive_root("c:"));
+        // 文件夹挂载卷（issue #6：沙盒虚拟磁盘挂在 C 盘下文件夹）：false
+        assert!(!is_drive_root("C:\\Users\\x\\Sandbox\\base-layer"));
+        assert!(!is_drive_root("C:\\sandbox"));
+        // 边界输入：false
+        assert!(!is_drive_root(""));
+        assert!(!is_drive_root(":\\"));
+        assert!(!is_drive_root("1:\\"));
+        assert!(!is_drive_root("C:\\\\"));
+    }
 
     #[test]
     fn orphan_pagefile_judgement() {
