@@ -169,7 +169,7 @@
 
 **结论移交（对应 docs/14 反馈 S）**：①非代码 bug 结论维持；②**代码签名议题（docs/07 候选 2）新增真实佐证**——未签名 exe 被 EDR 拦提权是企业机场景的实际痛点；③降级方案（docs/07）价值维持；④用户侧建议：天擎/火绒信任白名单加 DiskButler（可能需 IT 管理员）；⑤S 机 UAC 关闭+完整管理员 → S 可手动清 C:\Windows\Temp（回复草稿已据此给手动步骤）。
 
-**小缺陷记录**：报告第 1 节只抓到 BIOS，OS 名称/版本行缺失（该机 systeminfo 输出未被过滤命中）。✅ 已修复（2026-08-13）：第 1 节改为直读注册表 `HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion`（ProductName/CurrentBuild/UBR/DisplayVersion）为主、systeminfo 兼容兜底，本机验证通过（BOM 完好）——反馈 W 若跑脚本不会再丢 OS 信息。
+**小缺陷记录**：报告第 1 节只抓到 BIOS，OS 名称/版本行缺失（该机 systeminfo 输出未被过滤命中）。🔧 修复已备好、待随后续提交入库（2026-08-13，属反馈领域收尾）：第 1 节改为直读注册表 `HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion`（ProductName/CurrentBuild/UBR/DisplayVersion）为主、systeminfo 兼容兜底，本机验证通过（BOM 完好）——入库后反馈 W 若跑脚本不会再丢 OS 信息。
 
 ## 外部模型评估实验记录（2026-07-27）
 

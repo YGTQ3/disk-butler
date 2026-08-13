@@ -243,6 +243,7 @@ fn collect_electron_caches(root: &Path, out: &mut Vec<PathBuf>) {
                     | "360se6"
                     | "code"
                     | "jianyingpro"
+                    | "meitu"
                     | "com.diskbutler.app"
                     | "temp"
                     | "packages"
