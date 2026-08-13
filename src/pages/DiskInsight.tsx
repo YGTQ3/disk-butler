@@ -56,6 +56,13 @@ export default function DiskInsight({ active = true }: Props) {
     }
   }
 
+  /** 只刷盘符容量列表（不动选中项与扫描结果）：回页/清理后/重扫时用 */
+  function refreshDrives() {
+    invoke<DriveInfo[]>("get_drives")
+      .then(setDrives)
+      .catch((e) => setError(String(e)));
+  }
+
   // 加载盘符，并优先恢复默认盘的上次扫描结果
   useEffect(() => {
     invoke<DriveInfo[]>("get_drives")
@@ -70,6 +77,19 @@ export default function DiskInsight({ active = true }: Props) {
       .catch((e) => setError(String(e)));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // 页面重新可见时刷新盘符容量（页面常驻挂载不销毁，清理后切回须见新剩余量）；
+  // 首次激活由上方初始 effect 负责，跳过避免重复请求
+  const firstActiveRef = useRef(true);
+  useEffect(() => {
+    if (!active) return;
+    if (firstActiveRef.current) {
+      firstActiveRef.current = false;
+      return;
+    }
+    refreshDrives();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [active]);
 
   // 监听扫描进度
   useEffect(() => {
@@ -122,6 +142,7 @@ export default function DiskInsight({ active = true }: Props) {
     setRoot(null);
     setStack([]);
     setSelectedNode(null);
+    refreshDrives(); // 重扫同步拉一次盘符容量，保证水位条反映最新剩余
     try {
       const tree = await invoke<TreeNode>("scan_drive", { root: target });
       setRoot(tree);
@@ -129,6 +150,7 @@ export default function DiskInsight({ active = true }: Props) {
       setScannedAt(Math.floor(Date.now() / 1000));
       setFromCache(false);
       setPhase("done");
+      refreshDrives(); // 长扫描期间磁盘可能变化，完成后再刷一次
     } catch (e) {
       setError(String(e));
       setPhase("idle");
