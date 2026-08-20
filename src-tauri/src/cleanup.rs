@@ -736,6 +736,20 @@ fn candidates() -> Vec<Candidate> {
                 paths: vec![tv_logs],
             });
         }
+
+        // OfficePLUS 临时文件：微软 PPT 模板插件的 Temp 目录，纯临时文件。
+        // 2026-08-20 双样本佐证（1908 样本 1.22G / 1918 样本 534M）。
+        let officeplus_tmp = local.join("OfficePLUS").join("Temp");
+        if officeplus_tmp.exists() {
+            out.push(Candidate {
+                id: "officeplus-temp",
+                name: "OfficePLUS 模板插件临时文件",
+                description: "OfficePLUS（微软 PPT 模板插件）运行时产生的临时文件。",
+                impact: "没有影响。插件下次使用时按需重新创建。",
+                safety: "safe",
+                paths: vec![officeplus_tmp],
+            });
+        }
     }
 
     // 用户主目录下的开发/AI 缓存（体积大、重下载成本高，均列为谨慎项）
@@ -971,8 +985,9 @@ fn candidates() -> Vec<Candidate> {
             }
         }
         // 其他游戏（Saved\Logs 模式）
+        // EpicGamesLauncher：2026-08-20 四样本佐证（2045/1509/0020/1918，单机最大 318M）。
         if let Some(l) = &local {
-            for name in ["SpiritCity", "Pal", "ManorLords", "TslGame", "NRC"] {
+            for name in ["SpiritCity", "Pal", "ManorLords", "TslGame", "NRC", "EpicGamesLauncher"] {
                 let p = l.join(name).join("Saved").join("Logs");
                 if p.exists() { game_logs.push(p); }
             }
@@ -1047,7 +1062,8 @@ fn kind_of(id: &str) -> &'static str {
     match id {
         "temp" | "updaters" | "crash-reports" | "androidstudio-logs" | "synology-logs"
         | "wps-old-versions" | "islide-logs" | "originlab-temp" | "teamviewer-logs"
-        | "game-logs" | "onedrive-logs" | "sogoupdf-logs" | "wondershare-logs" => "junk",
+        | "game-logs" | "onedrive-logs" | "sogoupdf-logs" | "wondershare-logs"
+        | "officeplus-temp" => "junk",
         "idm-dwnldata" | "neatdm-cache" | "recycle-bin" => "data",
         _ => "cache",
     }
@@ -1659,6 +1675,7 @@ mod tests {
         assert_eq!(kind_of("temp"), "junk");
         assert_eq!(kind_of("crash-reports"), "junk");
         assert_eq!(kind_of("wps-old-versions"), "junk");
+        assert_eq!(kind_of("officeplus-temp"), "junk");
         assert_eq!(kind_of("npm-cache"), "cache");
         assert_eq!(kind_of("electron-cache"), "cache");
         assert_eq!(kind_of("recycle-bin"), "data");
