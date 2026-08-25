@@ -1,5 +1,6 @@
 import { useState } from "react";
-import { HardDrive, Sparkles, Rocket, Cpu, ShieldCheck, ShieldAlert, HeartHandshake } from "lucide-react";
+import { HardDrive, Sparkles, Rocket, Cpu, ShieldCheck, ShieldAlert, HeartHandshake, ExternalLink } from "lucide-react";
+import { openUrl } from "@tauri-apps/plugin-opener";
 import DiskInsight from "./pages/DiskInsight";
 import Cleanup from "./pages/Cleanup";
 import Startup from "./pages/Startup";
@@ -7,6 +8,9 @@ import MemoryCheck from "./pages/MemoryCheck";
 import BloatwareCheck from "./pages/BloatwareCheck";
 import ContributeModal from "./components/ContributeModal";
 import ThemeToggle from "./components/ThemeToggle";
+
+/** 项目主页（issue#8 用户诉求）：opener 已在 capabilities 放行 github.com/** */
+const PROJECT_HOME = "https://github.com/YGTQ3/disk-butler";
 
 type PageId = "insight" | "clean" | "startup" | "memory" | "bloatware";
 
@@ -100,6 +104,14 @@ function App() {
           >
             <HeartHandshake size={20} />
             <span className="flex-1">帮它认识更多软件</span>
+          </button>
+          {/* 项目主页快捷入口（issue#8）：浏览器打开 GitHub，应用本体零网络请求（issue#8#issuecomment-5410456562 已承诺） */}
+          <button
+            onClick={() => openUrl(PROJECT_HOME).catch((e) => console.error("打开项目主页失败", e))}
+            className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-sm text-[var(--color-text-secondary)] transition-colors hover:bg-[var(--color-bg)] hover:text-[var(--color-text-main)]"
+          >
+            <ExternalLink size={20} />
+            <span className="flex-1">项目主页</span>
           </button>
         </div>
 
