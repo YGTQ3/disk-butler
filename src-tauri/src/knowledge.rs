@@ -1062,13 +1062,14 @@ pub fn ext_group(path: &std::path::Path) -> usize {
 /// 同 ext_group，但直接接收已小写的扩展名（MFT 扫描零分配路径使用）
 pub fn ext_group_of(ext: &str) -> usize {
     match ext {
-        "mp4" | "mkv" | "avi" | "mov" | "flv" | "wmv" | "ts" | "webm" | "mp3" | "wav" | "flac"
+        "mp4" | "mkv" | "avi" | "mov" | "flv" | "wmv" | "webm" | "mp3" | "wav" | "flac"
         | "aac" | "m4a" | "jpg" | "jpeg" | "png" | "gif" | "webp" | "heic" | "bmp" | "raw"
         | "psd" => G_MEDIA,
         "pdf" | "doc" | "docx" | "xls" | "xlsx" | "ppt" | "pptx" | "txt" | "md" | "epub"
         | "mobi" | "csv" => G_DOCS,
         "zip" | "rar" | "7z" | "tar" | "gz" | "xz" | "iso" | "img" => G_ARCHIVE,
         "exe" | "dll" | "msi" | "sys" | "ocx" | "so" | "node" | "pyd" | "winmd" | "mui" => G_PROGRAM,
+        // ".ts" 归代码组（TypeScript）：MPEG-TS 视频极少用 .ts 单扩展名，开发机样本中 TS 源码远更常见
         "js" | "ts" | "tsx" | "jsx" | "py" | "rs" | "java" | "c" | "cpp" | "h" | "hpp" | "go"
         | "cs" | "json" | "toml" | "yaml" | "yml" | "css" | "html" | "vue" | "lock" => G_CODE,
         "tmp" | "temp" | "log" | "cache" | "db" | "ldb" | "dat" | "etl" | "dmp" | "old" | "bak"
