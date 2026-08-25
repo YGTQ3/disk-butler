@@ -498,6 +498,20 @@ fn candidates() -> Vec<Candidate> {
             });
         }
 
+        // 极限竞速：地平线4 内嵌浏览器(CEF)缓存：双样本佐证（20260819-1918 2.38G / 20260824-2116 1.68G）。
+        // 游戏内商店/活动页的网页缓存，删后自动重建；存档在 Packages/steamapps，不在此。
+        let forza_cef = local.join("ForzaHorizon4").join("cef").join("cache");
+        if forza_cef.exists() {
+            out.push(Candidate {
+                id: "forza-cef-cache",
+                name: "极限竞速地平线4 网页缓存",
+                description: "极限竞速：地平线4 游戏内网页（商店/活动页）的缓存文件（存档不在这里）。",
+                impact: "没有影响。游戏下次打开相关页面时会自动重新下载。",
+                safety: "safe",
+                paths: vec![forza_cef],
+            });
+        }
+
         // Android Studio 日志/临时文件：目录名带版本号（AndroidStudio2024.3），代码枚举
         let mut asl: Vec<PathBuf> = Vec::new();
         if let Ok(read) = std::fs::read_dir(local.join("Google")) {

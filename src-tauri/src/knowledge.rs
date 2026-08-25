@@ -319,6 +319,13 @@ const RULES: &[Rule] = &[
         safety: Safety::Safe,
     },
     Rule {
+        needle: "forzahorizon4/cef/cache",
+        category: Category::Cache,
+        friendly_name: "极限竞速地平线4 网页缓存",
+        description: "游戏内网页（商店/活动页）的浏览器缓存，可安全清理，游戏会自动重新下载（存档不在这里）。",
+        safety: Safety::Safe,
+    },
+    Rule {
         needle: "appdata/roaming/code",
         category: Category::Software,
         friendly_name: "VS Code 数据",
