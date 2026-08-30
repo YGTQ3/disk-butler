@@ -287,7 +287,8 @@ fn best_file_name_raw(f: &NtfsFile, include_dos: bool) -> Option<RawName> {
         if rank == 0 && !include_dos {
             return;
         }
-        if rank > best_rank {
+        // rank 0（DOS）也要能落选：best 空时 0>0 恒假会致 DOS-only 记录取不到名（CodeReview 衍生 bug）
+        if rank > best_rank || best.is_none() {
             best_rank = rank;
             // 闭包内立即转 String：属性引用的生命周期不出 attributes 回调
             best = Some((parent, real_size, utf16_to_string(name_u16)));
@@ -1010,6 +1011,20 @@ mod tests {
         let mut reader: Option<Cursor<Vec<u8>>> = None;
         let n = resolve_name(&mft, &f, &mut reader, || None).unwrap();
         assert_eq!(n.name, "Documents and Settings");
+    }
+
+    /// 用例 D（DOS 排名锁）：仅 DOS 短名的记录也能取回名字（include_dos 语义，防 0>0 恒假回退）。
+    #[test]
+    fn resolve_name_accepts_dos_only_name() {
+        let mut attrs = resident_attr(0x30, &file_name_value(5, 1024, false, NS_DOS, "DOWNLO~1"));
+        attrs.extend(end_attr());
+        let rec = craft_record(0x0001, &attrs);
+        let (mft, _) = synth_mft(&[(77, rec)]);
+        let f = mft.get_record(77).unwrap();
+        let mut reader: Option<Cursor<Vec<u8>>> = None;
+        let n = resolve_name(&mft, &f, &mut reader, || None).unwrap();
+        assert_eq!(n.name, "DOWNLO~1");
+        assert_eq!(n.parent, 5);
     }
 
     /// 用例 C（扩展记录锁）：$FILE_NAME 仅在扩展记录，跟随驻留属性列表取回。

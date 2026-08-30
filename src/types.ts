@@ -191,6 +191,8 @@ export interface MemoryReport {
 }
 
 export interface ScanCache {
+  /** 缓存格式版本（后端旧版缓存直接视为未命中） */
+  version: number;
   scannedAt: number;
   root: string;
   tree: TreeNode;
