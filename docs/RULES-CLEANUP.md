@@ -32,7 +32,7 @@
 
 - 任何名字含 `download`（下载目录是**成品**，不是缓存）——真实事故：`BaiduNetdiskDownload` 曾被误判为缓存
 - `WeChat Files` / `WXWork Files` 等聊天软件数据目录（含聊天记录和收发文件）
-- 网盘同步目录（OneDrive / 百度网盘 / 坚果云 等）
+- 网盘同步目录（OneDrive / 百度网盘 / 坚果云 等）——**例外**：网盘客户端内嵌浏览器 web cache（Cache/Code Cache/GPUCache 三件套）不在此限。下载成品在独立目录（如 `BaiduNetdiskDownload`/`QuarkDownload`），web cache 可再生；`electron-cache` 规则命中后只清三件套，不碰用户数据/登录凭证（Cookies 在 `Network\` 独立目录）。现网实证：quark-cloud-drive 被 electron-cache 收编 3.3G（0827 样本），跑一个多月无事故
 - conda 的 `pkgs` 目录（与环境存在硬链接，删了会损坏环境）
 - 浏览器 `User Data` 下除 `Cache`/`Code Cache`/`GPUCache` 以外的任何目录（含密码、Cookie、历史）
 - 任何 `Documents` / `Desktop` / `Pictures` / `Videos` 下的路径
