@@ -31,5 +31,6 @@
 - [ ] CodeReview 子智能体审过 diff、问题已修；
 - [ ] 版本号三处一致（package.json / tauri.conf.json / Cargo.toml）；
 - [ ] NSIS 产物重命名：`Copy-Item "target\release\bundle\nsis\C盘管家_${version}_x64-setup.exe" "DiskButler_${version}_x64-setup.exe"`（GitHub 上传不支持中文文件名；⚠ Tauri2 无 `installerName` 配置字段，勿再臆造——build 产物名由 productName 决定，中文名靠此步改名）；
+- [ ] **永久链副本字节核对**：`Copy-Item "DiskButler_${version}_x64-setup.exe" "DiskButler-Setup.exe" -Force` 覆盖旧副本后，核 `(Get-FileHash DiskButler-Setup.exe).Hash -eq (Get-FileHash "DiskButler_${version}_x64-setup.exe").Hash` 返回 `True`，才允许 `gh release create` 上传——防“误取构建目录里遗留的旧永久链副本、加速链静默指向老版”（2026-09-02 排查：`src-tauri/target/release/bundle/nsis/` 里躺着 v0.7.4 时代旧副本未清，五版均未误取、未酿事故，但属发版链唯一没被机器卡点覆盖的红线）；
 - [ ] 提交已隔离、只含本次目标；
 - [ ] docs/07 待办 / docs/08 大事记 / docs/19 看板已同步。
