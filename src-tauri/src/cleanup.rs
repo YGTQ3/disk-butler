@@ -1336,6 +1336,43 @@ fn decode_dism_output(bytes: &[u8]) -> String {
     }
 }
 
+/// 日志路径进入 PowerShell 单引号字符串前的转义：`'` → `''`。
+/// 不转义时，含单引号的 %TEMP%（如用户名 O'Neil）会提前截断单引号串，
+/// 使整条命令在 PowerShell 层解析失败（exit 1），被误报成「已取消授权」（issue#10 排查实测）。
+fn ps_single_quote_escape(s: &str) -> String {
+    s.replace('\'', "''")
+}
+
+/// DISM 退出码的人话翻译（反馈 Y=5 / AE=87 同源缺口）：只翻有把握的，其余不猜。
+fn dism_exit_hint(code: i32) -> &'static str {
+    match code {
+        5 => "系统拒绝了 DISM 的写入：多为安全软件拦截、或 Windows Modules Installer 服务被禁用。可临时退出安全软件、或把该服务改回手动后重试。",
+        87 => "DISM 认为收到的命令参数无效：多为系统 servicing 状态异常（如挂起的更新）。可先重启一次让更新装完再重试。",
+        _ => "可稍后重试；若反复出现，请把下方「本次执行的命令」和退出码反馈给作者。",
+    }
+}
+
+/// 提权 cmd 里实际执行的 DISM 命令行（报错时原样展示，免得再向用户要证据）。
+/// DISM 用绝对路径：避免 PATH/当前目录同名物劫持（issue#10 残留嫌疑）。
+/// ⚠ 绝对路径**不加引号**：PS 5.1 Start-Process 不给参数补外层引号，若首字符是引号会触发
+/// cmd /c 的「剥首尾引号」规则，吃掉日志路径的闭引号（本地实测 exit=1）；%windir% 不含空格，无需引号。
+fn dism_inner_command(dism_args: &str, log: &std::path::Path) -> String {
+    let log_ps = ps_single_quote_escape(&log.display().to_string());
+    format!(r#"%windir%\System32\Dism.exe {dism_args} > "{log_ps}" 2>&1"#)
+}
+
+/// 包一层提权 PowerShell：同步等待、退出码透传。
+fn dism_ps_command(dism_args: &str, log: &std::path::Path) -> String {
+    let inner = dism_inner_command(dism_args, log);
+    format!("$p = Start-Process -Verb RunAs -Wait -PassThru -FilePath cmd.exe -ArgumentList '/d','/c','{inner}'; exit $p.ExitCode")
+}
+
+/// 回显用：cmd 实际看到的命令（日志路径**不**做 PS 转义），供报错文案展示，
+/// 免得用户拿带 `''` 的转义形态去手动复现反而被误导。
+fn dism_display_command(dism_args: &str, log: &std::path::Path) -> String {
+    format!(r#"%windir%\System32\Dism.exe {dism_args} > "{}" 2>&1"#, log.display())
+}
+
 /// 只读分析：DISM /AnalyzeComponentStore，不做任何更改。
 /// 提权运行并把输出写入临时日志，完成后按 BOM/UTF-8/GBK 识别解码。
 pub fn deep_analyze() -> Result<DeepAnalyzeReport, String> {
@@ -1348,12 +1385,10 @@ pub fn deep_analyze() -> Result<DeepAnalyzeReport, String> {
         .subsec_nanos();
     let log = std::env::temp_dir().join(format!("diskbutler-dism-a{:x}.log", nonce));
     let _ = std::fs::remove_file(&log);
+    let dism_args = "/Online /Cleanup-Image /AnalyzeComponentStore";
 
     // 用提权的 cmd 重定向输出到日志，保留 DISM 原始字节，随后统一解码。
-    let ps = format!(
-        r#"$p = Start-Process -Verb RunAs -Wait -PassThru -FilePath cmd.exe -ArgumentList '/d','/c','Dism /Online /Cleanup-Image /AnalyzeComponentStore > "{}" 2>&1'; exit $p.ExitCode"#,
-        log.display()
-    );
+    let ps = dism_ps_command(dism_args, &log);
     let status = std::process::Command::new("powershell")
         .args(["-NoProfile", "-Command", &ps])
         .creation_flags(CREATE_NO_WINDOW)
@@ -1366,7 +1401,12 @@ pub fn deep_analyze() -> Result<DeepAnalyzeReport, String> {
         return Err(if code == 1 {
             "已取消授权，未执行分析。".to_string()
         } else {
-            format!("分析未完成（退出码 {}），可稍后重试。", code)
+            format!(
+                "分析未完成（退出码 {}）。{} 本次执行的命令：{}",
+                code,
+                dism_exit_hint(code),
+                dism_display_command(dism_args, &log)
+            )
         });
     }
 
@@ -1396,11 +1436,9 @@ pub fn deep_clean() -> Result<DeepCleanReport, String> {
         .subsec_nanos();
     let log = std::env::temp_dir().join(format!("diskbutler-dism-c{:x}.log", nonce));
     let _ = std::fs::remove_file(&log);
+    let dism_args = "/Online /Cleanup-Image /StartComponentCleanup";
 
-    let ps = format!(
-        r#"$p = Start-Process -Verb RunAs -Wait -PassThru -FilePath cmd.exe -ArgumentList '/d','/c','Dism /Online /Cleanup-Image /StartComponentCleanup > "{}" 2>&1'; exit $p.ExitCode"#,
-        log.display()
-    );
+    let ps = dism_ps_command(dism_args, &log);
     let status = std::process::Command::new("powershell")
         .args(["-NoProfile", "-Command", &ps])
         .creation_flags(CREATE_NO_WINDOW)
@@ -1427,7 +1465,13 @@ pub fn deep_clean() -> Result<DeepCleanReport, String> {
         return Err(if code == 1 {
             "已取消授权，未执行清理。".to_string()
         } else {
-            format!("系统清理未完成（退出码 {}）。{}", code, tail)
+            format!(
+                "系统清理未完成（退出码 {}）。{} 原始信息：{} 本次执行的命令：{}",
+                code,
+                dism_exit_hint(code),
+                tail,
+                dism_display_command(dism_args, &log)
+            )
         });
     }
 
@@ -1676,6 +1720,54 @@ mod tests {
     fn encode_ps_command_is_utf16le_base64() {
         // -EncodedCommand 期望 UTF-16LE 后 Base64；"A中" => 41 00 2D 4E => "QQAtTg=="
         assert_eq!(encode_ps_command("A中"), "QQAtTg==");
+    }
+
+    #[test]
+    fn ps_single_quote_escape_doubles_apostrophes() {
+        // issue#10 排查实测：不转义时含单引号的 %TEMP% 会截断 PS 单引号串 → 误报「已取消授权」
+        assert_eq!(
+            ps_single_quote_escape(r"C:\Users\O'Neil\AppData\Local\Temp\d.log"),
+            r"C:\Users\O''Neil\AppData\Local\Temp\d.log"
+        );
+        assert_eq!(ps_single_quote_escape("plain.log"), "plain.log");
+    }
+
+    #[test]
+    fn dism_ps_command_uses_absolute_path_and_no_raw_apostrophe() {
+        let log = std::path::Path::new(r"C:\Users\O'Neil\AppData\Local\Temp\d.log");
+        let ps = dism_ps_command("/Online /Cleanup-Image /StartComponentCleanup", log);
+        // DISM 走绝对路径（防 PATH/当前目录劫持）；且首字符不得是引号（cmd /c 剥引号规则）
+        assert!(ps.contains(r#"%windir%\System32\Dism.exe /Online"#));
+        let body = ps
+            .split("'/d','/c','")
+            .nth(1)
+            .unwrap()
+            .strip_suffix("'; exit $p.ExitCode")
+            .unwrap();
+        assert!(!body.starts_with('\''), "命令体首字符不得是引号");
+        // 日志路径已转义
+        assert!(ps.contains(r"C:\Users\O''Neil\AppData\Local\Temp\d.log"));
+        // 去掉成对 '' 后不应再有落单单引号（落单的会截断 PS 单引号串）
+        let collapsed = body.replace("''", "");
+        assert!(!collapsed.contains('\''), "命令体内不应有落单单引号: {body}");
+    }
+
+    #[test]
+    fn dism_exit_hint_covers_known_codes_without_guessing() {
+        assert!(dism_exit_hint(5).contains("安全软件"));
+        assert!(dism_exit_hint(87).contains("参数无效"));
+        // 未知码不猜原因，只引导反馈
+        assert!(dism_exit_hint(12345).contains("反馈给作者"));
+    }
+
+    #[test]
+    fn dism_display_command_keeps_raw_apostrophe() {
+        // 回显版不转义（cmd 实际看到单 '），下发版转义为 ''——两者职责不同，不可合并
+        let log = std::path::Path::new(r"C:\Users\O'Neil\AppData\Local\Temp\d.log");
+        let shown = dism_display_command("/Online /Cleanup-Image /StartComponentCleanup", log);
+        assert!(shown.contains(r"C:\Users\O'Neil\AppData\Local\Temp\d.log"));
+        assert!(!shown.contains("O''Neil"));
+        assert!(dism_inner_command("/Online", log).contains("O''Neil"));
     }
 
     #[test]
