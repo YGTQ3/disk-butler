@@ -9,10 +9,7 @@ use std::io::Write as _;
 use std::time::Instant;
 
 use jwalk::WalkDir;
-use ntfs_reader::api::{NtfsAttributeType, ROOT_RECORD};
-use ntfs_reader::file::NtfsFile;
-use ntfs_reader::mft::Mft;
-use ntfs_reader::volume::Volume;
+use ntfs_reader::{DefaultPathCache, FileInfo, Mft, Volume};
 
 struct Summary {
     elapsed_secs: f64,
@@ -57,7 +54,7 @@ fn scan_mft(drive: char) -> Result<Summary, String> {
     let volume = Volume::new(format!("\\\\.\\{}:", drive))
         .map_err(|e| format!("open volume \\\\.\\{}: failed: {:?} (administrator required)", drive, e))?;
     let mft = Mft::new(volume).map_err(|e| format!("read $MFT failed: {:?}", e))?;
-    let mut cache = VecCache::default();
+    let mut cache = DefaultPathCache::new();
     let mut files: u64 = 0;
     let mut bytes: u64 = 0;
     let mut top_dirs: HashMap<String, u64> = HashMap::new();
@@ -65,19 +62,18 @@ fn scan_mft(drive: char) -> Result<Summary, String> {
     let mut multi_link_nominal: u64 = 0;
     let mut multi_link_dedup_est: u64 = 0;
     for file in mft.files() {
-        let info = FileInfo::with_cache(&mft, &file, &mut cache);
+        let info = FileInfo::with_cache(&file, &mut cache);
         if info.is_directory {
             continue;
         }
-        let ps = info.path.to_string_lossy();
+        let Some(path) = &info.path else { continue };
+        let ps = path.to_string_lossy();
         let Some(seg) = first_level_segment(&ps) else { continue };
         if skipped(&seg) {
             continue;
         }
-        // hardlink attribution: link_count sits in the packed record header;
-        // read_unaligned avoids UB on the packed field.
-        let link_count =
-            unsafe { std::ptr::addr_of!((*file.header).link_count).read_unaligned() };
+        // hardlink attribution: number of names that are real hard links (DOS 8.3 aliases skipped).
+        let link_count = file.hard_links().count();
         if link_count > 1 {
             multi_link_files += 1;
             multi_link_nominal += info.size;
