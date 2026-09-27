@@ -87,6 +87,7 @@
 | diskbutler-rule-report-20260904-2309（Unity/团结引擎开发+AI 工具重度机 Win10 Pro 22H2，C 盘剩 69.4G/180G；Unity+Clash Verge+LM Studio/open-webui/Cursor/AutoClaw+网盘全家桶画像） | 2026-09-11 | 基础（软件内贡献 collector=app） | ✅ 已评估入库 | **覆盖率≈90%，无新入库，updaters 大丰收 7 个 ≈2G**(lm-studio 617.6M/@guanjia-openclawelectron 611.3M/cursor 268.2M/bilibili 197.8M/tuanjiehub 147.2M/open-webui 105M/httpspidervideo 83.3M)+Temp 1130.9M(含 Clash Verge updater 包×3)+**uv-cache 2170M 大头**+npm-cache 255.8M/pip 120.2M/ms-playwright-go 89.7M 变体；electron-cache 收编 Trae 1029.3M/Code 799.4M/Cursor 359.2M/baidunetdisk 327.2M(web cache 裁决例外)/bilibili 229.9M/open-webui/CocosCreator/leigod 双目录/Hihonornote；Quark local 无三件套变体(仅 ShaderCache)再佐证；红线正确拦截（Tencent roaming 2333.5M 含 WeChat\log+xwechat\log/QQ/QQEX/Programs 4353.3M/**com.tencent.yuanbao 50.6M 永拒**/Packages）；ProgramData 只解释：Microsoft 异常大头**创新高 2143.9M**(EdgeUpdate\Log)/NVIDIA Corporation 846.1M/Timi **第四样本**/SGAIAssistant **第五样本**/Oray **第三样本**(AweSun+SunloginClientLite log)/火绒知识条目/Package Cache；佐证：**Unity local cache 单件第二样本坐实**(1521.8M，AssetStore 风险维持观察)、LuDaShi **第二样本**(427.8M Log 大头)、Reckfeng KK Battle **第二样本**；新观察：**UnityHubWebGLHost 386.8M+TuanjieWebGLHost 336.3M**(团结引擎 WebGL 宿主)、sso_cef_cache 14.3M 三件套变体、pyinstaller 45.3M（见下） |
 | diskbutler-rule-report-20260908-1458（AI 开发重度机 Win11 Home China 25H2，C 盘剩 117.9G/300G；TRAE SOLO CN 4.5G+Notion/Zoom/WeRead/koodo-reader/paperlib/jamovi+npm 1.2G/pnpm/pip/Playwright 画像） | 2026-09-11 | 基础（软件内贡献 collector=app） | ✅ 已评估入库 | **覆盖率≈90%，无新入库，白名单可清上限≈10.7G 本批最高**。temp 1174.5M(含 agent-browser-chrome GUID Crashpad+ShaderCache/QmProtector\Logs/WinGet\cache)/updaters 一网 5 个 ≈1.74G(autoclaw 701.4M/**@genieworkbuddy 第二台再现 462.9M**/@zcodedesktop 311.9M/«中文»-updater 215.6M/**QuarkUpdater 无连字符第 10 佐证** 48M)/npm-cache 1218.7M/pnpm 358.6M(js-pkg-cache)/pip 413.4M/playwright-browsers 701M/NuGet 第二路径/CrashDumps 56.2M/meitu-cache(XiuXiu\Cache 188.2M) 全命中；electron-cache 收编 TRAE SOLO CN 4501.6M/Notion 1008.9M/bilibili/jamovi/koodo-reader/quark-cloud-drive/autoclaw/Code/paperlib/desktop.dangbei.ai 等 12+，ZCode session\ 前缀变体再佐证(26.4M)；红线正确拦截（Tencent roaming **15295.9M 迄今最大单条** 含 WeChat\log+xwechat\log/Packages 2013.3M/Programs 5954.7M/Rime 词库红线/Thunderbird 邮件）；ProgramData 只解释：**Comms 5334.3M 荣耀工作站 Hn* 日志群新观察大头**/Anytxt log+temp **第二样本坐实** 1572M/**LogiOptionsPlus cache 1498.7M 新观察**/QI-ANXIN 天擎(反馈 S 同款)/Adobe/Lusun；佐证：Tabbit **2915.8M 创新高**(第四样本仍指纹不全维持观察)、Quark local 无三件套变体、Shandianshuo/SuYan 第三样本、ollama app.exe/WinSparkle/ccswitch/com.tag.lab 惯例；新观察：WeRead/kite.exe/wangscreenshot 等 Tauri EBWebView 群+5 成员、ChromeExtensionCache 137.5M、Zed 125.9M(logs+node\cache)、eudic cache\tmp 双目录、Komi-Store 301.3M logs（见下） |
 | diskbutler-rule-report-20260908-2153（荣耀笔记本重度游戏机 Win11 Home China 25H2，C 盘剩 152.3G/300G；NVIDIA 全家桶+Steam/Epic+GamePP 游戏加加+荣耀 Hn 系+雷神/SOLIDWORKS 画像） | 2026-09-11 | 基础（软件内贡献 collector=app） | ✅ 已评估入库 | **覆盖率≈90%，无新入库**。**Local NVIDIA 23344.4M 超大头创观察项系列新高**(21G→23.3G，无特征，建议贡献者自查)；D3DSCache 985.1M/CrashDumps 116.5M/temp 87.1M/gpu-cache(Steam htmlcache\ShaderCache 424.7M)/game-logs(EpicGamesLauncher **第七佐证** 248.1M)/updaters(hihonornote-updater 307.3M 荣耀笔记)/wps-cache(kingsoft office6\log 104.7M) 命中；electron-cache 收编 hclaw 66.6M/leigod 双目录(**第二台再现**)/Hihonornote 12.9M 第二台；flutter_webview_windows **第十一样本**；红线正确拦截（Tencent roaming 1800.8M 含 xwechat/QQ/QQEX/Packages/hclaw-pyinstaller 7181.8M 无特征超大头新观察）；ProgramData 只解释：**Comms 4902.5M 荣耀 Hn* 日志群第二台坐实**(两日两台荣耀机 5.3G/4.9G，行业候选)/Autodesk AdskLicensingService 556.4M/GamePPPublic 439M/SOLIDWORKS Visualize Log 355.5M/Epic Logs/QI-ANXIN 安全 SDK；新观察：magicore 87.8M 无特征（见下） |
+| disk-butler-winsxs-report（反馈 AD 用户机 · 联想笔记本 Ryzen 5800H/16G，Win11 Home China 25H2 **26200.9457**，账户 lenovo） | 2026-09-27 | 诊断报告（`tools/winsxs-diagnose.bat` 输出，非规则采集） | ✅ 已分析（详见下方专项小节 + docs/14 反馈 AD） | 结论：同款分析 **232s 跑完退出码 0**，采样示 TiWorker 单核≈92%、IO≈0（CBS 串行架构正常形态）——机器当前健康；dism.log 揭示 **09-22 00:13 组件存储成功清理过** + 09-16 装完 KB5129195 → 09-14 的 1.5h 卡死定性为「servicing 栈临时病态、已被更新+清理冲正常」（病态现场无留存日志，不钉死唯一根因）；当前可回收备份 7.75G、微软推荐清理=是 |
 
 ## 观察名单（见过但未入库，等更多样本佐证）- ~~Electron 应用通用 Cache 模式~~ ✅ 已于 2026-07-28 以 electron-cache 指纹规则统一收编（Cache+Code Cache/GPUCache 同级并存才认定；Tencent 系仍排除）；
 - **QQ 缓存边界**（friend-c 样本）：QQ 顶层目录名为 `QQ`（非 Tencent），会被 electron-cache 指纹命中，但只取 Chromium 标准缓存三件套，QQ 聊天数据（nt_qq/Documents 树）不在其中——判定为安全，维持现状不排除；如后续样本发现 QQ 把用户数据混入 Cache 同级，再评估加排除；
@@ -355,6 +356,22 @@
 1. 用户侧：装 Evergreen x64 Runtime（官网独立安装器）即可；装 x64 Edge 也会带上。
 2. 诊断脚本 `webview2-diagnose.bat` 判据修正：x64 组件存在性应查 `C:\Program Files (x86)\Microsoft\EdgeWebView\Application\<版本>\EBWebView\x64`（或 `msedgewebview2.exe` 位深度），现有"查 `Program Files\Microsoft\EdgeWebView`"必然报不存在、误导判断。
 3. 安装器侧（可选项）：NSIS 装前可加"pv 存在但缺 x64 组件"检查；或接受现状、靠诊断脚本+README 指引兜底。
+
+## WinSxS 卡死诊断样本（反馈 AD，2026-09-27 分析）
+
+**样本**：`disk-butler-winsxs-report.txt`——反馈 AD 用户（知乎，WinSxS 分析卡 1.5h + 整机卡顿 + 黑框不关，docs/14）跑 `tools/winsxs-diagnose.bat` 的回传报告。机器：联想笔记本（账户 lenovo，Ryzen 7 5800H/16G，SK Hynix NVMe SSD Healthy，C 盘 200G 剩 32G），Win11 Home China 25H2 **26200.9457**（报告时点；原反馈 09-14 自报 9168，期间 09-16 装 KB5129195 升级——与「每次更新后」时间线吻合）。
+
+**关键发现**：
+- 8 节全绿：无挂起更新/待重启、TrustedInstaller Running、仅联想电脑管家+Defender、近 7 天零 Servicing 事件、盘健康空间足——候选根因 a/b/c/e 全部排除（当前时点）。
+- **交叉验证：同款 AnalyzeComponentStore 232 秒完成、退出码 0**，与 CBS.log `Seconds spent performing analysis: 230` 精确互证。
+- **活体采样首次实战即定性**：前 193s TiWorker 每 10s 烧 ~9.2s CPU（≈单核 92%）而 IO≈0，末 40s IO 突发后完成——分析阶段是**单线程 CPU 密集**（CBS 事务型串行架构），非死锁非 I/O 瓶颈；单核满载属正常，5800H 其余 15 线程用不上是架构使然。
+- **dism.log 捡到历史痕迹**：`上次清理的日期: 2026-09-22 00:13`（CBS Last scavenge 互证）+ 09-24 18:56 cleanmgr.exe 调用 DISM 插件痕迹——故障时段（09-14）之后机器成功完成过组件存储清理。
+
+**定性（收口）**：机器当前健康、功能可用；1.5h 卡死为 servicing 栈临时病态，已被 09-16 更新 + 09-22 成功清理冲正常（病态现场无留存日志，不钉死唯一根因）。存储现状：实际 15.94G、可回收备份 7.75G、可回收包 3、微软推荐清理=是。
+
+**工具校准（移交功能开发，随 07 DISM 主线）**：①真机正常态分析 ≈4 分钟 → UI「约 1~3 分钟」失真实锤；②诊断脚本 300s 硬超时距正常值仅 68s 余量，建议放宽 ~420s；③README 判读表补「CPU 高但 IO≈0 = 分析阶段正常形态」。
+
+**隐私**：报告含用户目录名（lenovo）与装机清单，按本目录规矩永不提交（.gitignore 已覆盖）。
 
 ## 提权诊断样本（反馈 S，2026-08-12 分析）
 
