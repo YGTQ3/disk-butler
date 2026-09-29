@@ -5,13 +5,11 @@
 
 use crate::knowledge::{self, Category, Safety};
 use crate::scan::{TreeNode, MAX_DEPTH, TOP_N_PER_LEVEL};
-use ntfs_reader::api::{NtfsAttributeType, FIRST_NORMAL_RECORD, ROOT_RECORD};
-use ntfs_reader::attribute::DataRun;
-use ntfs_reader::file::NtfsFile;
-use ntfs_reader::mft::Mft;
-use ntfs_reader::volume::Volume;
+use ntfs_reader::{
+    Mft, NtfsAttributeType, NtfsFile, NtfsFileName, NtfsFileNamespace, Volume, FIRST_NORMAL_RECORD,
+    ROOT_RECORD,
+};
 use rayon::prelude::*;
-use std::io::{Read, Seek, SeekFrom};
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 
 /// 上溯父链的最大深度（防御 MFT 数据损坏导致的环）。
@@ -23,16 +21,6 @@ const PAR_CHUNK: usize = 8192;
 const NO_PARENT: u64 = u64::MAX;
 /// 非目录记录在稠密目录索引中的哨兵值。
 const NOT_DIR: u32 = u32::MAX;
-
-/// $FILE_NAME 属性值内的字段偏移（NTFS 磁盘布局，见 NtfsFileNameHeader）。
-const FN_PARENT: usize = 0;
-const FN_REAL_SIZE: usize = 48;
-const FN_NAME_LEN: usize = 64;
-const FN_NAMESPACE: usize = 65;
-const FN_NAME: usize = 66;
-const NS_DOS: u8 = 2;
-const NS_WIN32: u8 = 1;
-const NS_WIN32_DOS: u8 = 3;
 
 /// 全部 MFT 记录提炼出的信息（按记录号索引的稠密数组）。
 struct Records {
@@ -59,158 +47,18 @@ fn parse_root(root: &str) -> Result<(char, String), String> {
     Ok((letter, format!("{}:\\", letter)))
 }
 
-/// 从 UTF-16LE 原始名字节流中提取扩展名并归组（零堆分配）。
-fn ext_group_utf16(raw: &[u8]) -> usize {
-    let n = raw.len() / 2;
-    let ch = |i: usize| u16::from_le_bytes([raw[2 * i], raw[2 * i + 1]]);
-    let mut dot = None;
-    for i in (0..n).rev() {
-        if ch(i) == '.' as u16 {
-            dot = Some(i);
-            break;
-        }
-    }
-    let Some(d) = dot else {
-        return knowledge::EXT_GROUP_OTHER;
-    };
-    let len = n - d - 1;
-    if len == 0 || len > 12 {
-        return knowledge::EXT_GROUP_OTHER;
-    }
-    let mut buf = [0u8; 12];
-    for k in 0..len {
-        let c = ch(d + 1 + k);
-        if c >= 128 {
-            return knowledge::EXT_GROUP_OTHER;
-        }
-        buf[k] = (c as u8).to_ascii_lowercase();
-    }
-    knowledge::ext_group_of(std::str::from_utf8(&buf[..len]).unwrap_or(""))
-}
-
-/// 把一段磁盘连续区（data run）读进 out，8MB 大块顺序读，尾部不足一个对齐块时补齐读再裁剪。
-fn read_run<F: FnMut(u64)>(
-    raw: &mut std::fs::File,
-    lcn: u64,
-    want: u64,
-    out: &mut Vec<u8>,
-    on_read: &mut F,
-) -> Result<(), String> {
-    const CHUNK: u64 = 8 << 20;
-    const ALIGN: u64 = 4096;
-    raw.seek(SeekFrom::Start(lcn))
-        .map_err(|e| format!("定位 MFT 数据区失败：{}", e))?;
-    let mut left = want;
-    while left > 0 {
-        let n = left.min(CHUNK);
-        let aligned = n & !(ALIGN - 1);
-        if aligned > 0 {
-            let start = out.len();
-            out.resize(start + aligned as usize, 0);
-            raw.read_exact(&mut out[start..])
-                .map_err(|e| format!("读取 MFT 数据失败：{}", e))?;
-            left -= aligned;
-            on_read(aligned);
-        } else {
-            // 裸卷读取要求扇区对齐：尾部按对齐块读满再取所需部分
-            let mut tmp = [0u8; ALIGN as usize];
-            raw.read_exact(&mut tmp)
-                .map_err(|e| format!("读取 MFT 数据尾部失败：{}", e))?;
-            out.extend_from_slice(&tmp[..n as usize]);
-            on_read(n);
-            left = 0;
-        }
-    }
-    Ok(())
-}
-
-/// NTFS 记录的 USA 修正（update sequence array fixup）：
-/// 每扇区末 2 字节被 USN 占位，需用 USA 中的原值恢复；USN 不匹配说明记录撞写，作废处理。
-fn fixup_record(data: &mut [u8]) {
-    const SECTOR: usize = 512;
-    if data.len() < 48 || &data[0..4] != b"FILE" {
-        return;
-    }
-    let usa_off = u16::from_le_bytes([data[4], data[5]]) as usize;
-    let usa_len = u16::from_le_bytes([data[6], data[7]]) as usize;
-    if usa_len < 2 || usa_off + usa_len * 2 > data.len() {
-        data[0] = 0; // 破坏签名使 is_valid 判废
-        return;
-    }
-    let usn = [data[usa_off], data[usa_off + 1]];
-    for i in 1..usa_len {
-        let end = i * SECTOR;
-        if end > data.len() {
-            break;
-        }
-        if data[end - 2] != usn[0] || data[end - 1] != usn[1] {
-            data[0] = 0;
-            return;
-        }
-        let fix = usa_off + i * 2;
-        data[end - 2] = data[fix];
-        data[end - 1] = data[fix + 1];
-    }
-}
-
-/// 快速载入 MFT：绕开 ntfs-reader 内部 4KB 对齐小读（Mft::new 的主要耗时，
-/// GB 级 MFT 需八十万次卷读取），改用 8MB 大块顺序读 + 并行 fixup，并上报载入进度。
-/// 任何边界情况（$DATA 进属性列表等）回退到库的慢速但完备的 Mft::new。
-fn load_mft_fast<F: FnMut(u64, u64)>(volume: Volume, on_read: &mut F) -> Result<Mft, String> {
-    use ntfs_reader::aligned_reader::open_volume;
-
-    let fast = (|| -> Option<Mft> {
-        let mut reader = open_volume(&volume.path).ok()?;
-        let rec0 =
-            Mft::get_record_fs(&mut reader, volume.file_record_size, volume.mft_position).ok()?;
-        let f0 = NtfsFile::new(0, &rec0);
-        // $Bitmap 很小（每记录 1 bit），用库的常规路径读即可
-        let bitmap =
-            Mft::read_data_fs(&volume, &mut reader, &rec0, NtfsAttributeType::Bitmap).ok()??;
-        let data_attr = f0.get_attribute(NtfsAttributeType::Data)?;
-        let (size, runs) = data_attr.get_nonresident_data_runs(&volume).ok()?;
-
-        let mut raw = std::fs::File::open(&volume.path).ok()?;
-        let mut data = Vec::new();
-        data.try_reserve_exact(size as usize).ok()?;
-        let mut copied = 0u64;
-        let mut loaded = 0u64;
-        for run in &runs {
-            if copied >= size {
-                break;
-            }
-            match run {
-                DataRun::Data { lcn, length } => {
-                    let want = (*length).min(size - copied);
-                    read_run(&mut raw, *lcn, want, &mut data, &mut |n| {
-                        loaded += n;
-                        on_read(loaded, size);
-                    })
-                    .ok()?;
-                    copied += want;
-                }
-                DataRun::Sparse { length } => {
-                    let want = (*length).min(size - copied);
-                    data.resize(data.len() + want as usize, 0);
-                    copied += want;
-                }
-            }
-        }
-
-        let rs = volume.file_record_size as usize;
-        let max_record = data.len() as u64 / volume.file_record_size;
-        data.par_chunks_mut(rs).for_each(fixup_record);
-        Some(Mft {
-            volume: volume.clone(),
-            data,
-            bitmap,
-            max_record,
-        })
-    })();
-
-    match fast {
-        Some(mft) => Ok(mft),
-        None => Mft::new(volume).map_err(|e| format!("读取 MFT 失败：{:?}", e)),
+/// 从 NtfsFileName 提取扩展名并归组。ntfs-reader 0.5 的 NtfsFileName 不再暴露原始 UTF-16
+/// 字节（名字是内部私有数组），零堆分配的手写扫描不再可行，改走 to_os_string 一次分配 +
+/// Path::extension（与其余三个已迁移仓库的做法一致）。
+fn ext_group_of_name(name: &NtfsFileName) -> u8 {
+    let os = name.to_os_string();
+    let ext = std::path::Path::new(&os)
+        .extension()
+        .and_then(|s| s.to_str())
+        .map(|s| s.to_ascii_lowercase());
+    match ext {
+        Some(e) => knowledge::ext_group_of(&e) as u8,
+        None => knowledge::EXT_GROUP_OTHER as u8,
     }
 }
 
@@ -221,236 +69,66 @@ struct RecInfo {
     ext: u8,
 }
 
-/// $FILE_NAME 属性值解析结果（原始字节级，第一遍与取名共用）。
-struct RawName {
-    name: String,
-    parent: u64,
-    real_size: u64,
-}
-
-/// 解析单条 $FILE_NAME 驻留值字节：(命名空间排名, 父记录号, 真实大小, 名字 UTF-16 字节)。
-/// 排名 Win32/Win32Dos=2 > Posix=1 > DOS=0；不判 reparse 标志（取舍留给调用方）。
-fn parse_file_name_value(v: &[u8]) -> Option<(u8, u64, u64, &[u8])> {
-    if v.len() < FN_NAME {
-        return None;
-    }
-    let ns = v[FN_NAMESPACE];
-    let name_len = v[FN_NAME_LEN] as usize;
-    if FN_NAME + 2 * name_len > v.len() {
-        return None;
-    }
-    let rank = if ns == NS_WIN32 || ns == NS_WIN32_DOS {
-        2
-    } else if ns == NS_DOS {
-        0
-    } else {
-        1
-    };
-    let parent = u64::from_le_bytes(v[FN_PARENT..FN_PARENT + 8].try_into().unwrap())
-        & 0x0000_FFFF_FFFF_FFFF;
-    let real_size = u64::from_le_bytes(v[FN_REAL_SIZE..FN_REAL_SIZE + 8].try_into().unwrap());
-    Some((rank, parent, real_size, &v[FN_NAME..FN_NAME + 2 * name_len]))
-}
-
-fn utf16_to_string(b: &[u8]) -> String {
-    let u: Vec<u16> = b
-        .chunks_exact(2)
-        .map(|c| u16::from_le_bytes([c[0], c[1]]))
-        .collect();
-    String::from_utf16_lossy(&u)
-}
-
-/// 从基记录原始字节直解 $FILE_NAME（不走库 get_best_file_name）：
-/// 库遇非驻留属性列表直接 break（且属性列表排在 $FILE_NAME 之前）、并整体跳过 reparse 名字，
-/// 三类场景会退化成取名失败（见 docs/14 反馈 AC）。排名 Win32/Win32Dos > Posix > DOS（DOS 仅 include_dos 且无更高排名时）。
-fn best_file_name_raw(f: &NtfsFile, include_dos: bool) -> Option<RawName> {
-    let mut best_rank = 0u8;
-    let mut best: Option<(u64, u64, String)> = None; // (parent, real_size, 名字)
-    f.attributes(|att| {
-        if att.header.type_id != NtfsAttributeType::FileName as u32 || best_rank >= 2 {
-            return;
-        }
-        let Some(h) = att.resident_header() else {
-            return;
-        };
-        let off = h.value_offset as usize;
-        let len = h.value_length as usize;
-        let data = att.data();
-        if off + len > data.len() {
-            return;
-        }
-        let Some((rank, parent, real_size, name_u16)) =
-            parse_file_name_value(&data[off..off + len])
-        else {
-            return;
-        };
-        if rank == 0 && !include_dos {
-            return;
-        }
-        // rank 0（DOS）也要能落选：best 空时 0>0 恒假会致 DOS-only 记录取不到名（CodeReview 衍生 bug）
-        if rank > best_rank || best.is_none() {
-            best_rank = rank;
-            // 闭包内立即转 String：属性引用的生命周期不出 attributes 回调
-            best = Some((parent, real_size, utf16_to_string(name_u16)));
-        }
-    });
-    best.map(|(parent, real_size, name)| RawName {
-        name,
-        parent,
-        real_size,
-    })
-}
-
-/// 惰性打开的卷阅读器（read_data_fs 跟随属性列表用），具体类型（open_volume 返回型）。
-type VolumeReader = std::io::BufReader<ntfs_reader::aligned_reader::AlignedReader<std::fs::File>>;
-
-fn open_volume_reader(path: &std::path::Path) -> Option<VolumeReader> {
-    ntfs_reader::aligned_reader::open_volume(path).ok()
-}
-
-/// 三级取名：基记录原始直解 → 跟随属性列表取扩展记录名字（驻留列表内存自跟、非驻留列表走 read_data_fs）→ None。
-/// reader 惰性打开：仅“基记录无 $FILE_NAME 且列表非驻留”的极罕见情形才经 open 开一次卷句柄（测试可传假卷/不开）。
-fn resolve_name<R: Read + Seek>(
-    mft: &Mft,
-    f: &NtfsFile,
-    reader: &mut Option<R>,
-    open: impl Fn() -> Option<R>,
-) -> Option<RawName> {
-    if let Some(n) = best_file_name_raw(f, true) {
-        return Some(n);
-    }
-    if let Some(n) = follow_resident_attr_list(mft, f) {
-        return Some(n);
-    }
-    if reader.is_none() {
-        *reader = open();
-    }
-    let r = reader.as_mut()?;
-    let bytes = Mft::read_data_fs(&mft.volume, r, f.data, NtfsAttributeType::FileName).ok()??;
-    let (_, parent, real_size, name_u16) = parse_file_name_value(&bytes)?;
-    Some(RawName {
-        name: utf16_to_string(name_u16),
-        parent,
-        real_size,
-    })
-}
-
-/// 跟随**驻留**属性列表，从扩展记录取 $FILE_NAME。
-/// 库 read_data_fs 对驻留列表误用 as_resident_data（只认 $DATA 类型）而 break，故内存自跟；非驻留列表留给 read_data_fs。
-fn follow_resident_attr_list(mft: &Mft, f: &NtfsFile) -> Option<RawName> {
-    let entry_size = std::mem::size_of::<ntfs_reader::api::NtfsAttributeListEntry>();
-    let mut found: Option<RawName> = None;
-    f.attributes(|att| {
-        if found.is_some() || att.header.type_id != NtfsAttributeType::AttributeList as u32 {
-            return;
-        }
-        let Some(list) = att.get_resident() else {
-            return;
-        };
-        let mut off = 0usize;
-        while off + entry_size <= list.len() {
-            let type_id = u32::from_le_bytes(list[off..off + 4].try_into().unwrap());
-            let entry_len =
-                u16::from_le_bytes(list[off + 4..off + 6].try_into().unwrap()) as usize;
-            let reference =
-                u64::from_le_bytes(list[off + 16..off + 24].try_into().unwrap()) & 0x0000_FFFF_FFFF_FFFF;
-            if type_id == NtfsAttributeType::FileName as u32 {
-                if let Some(ext) = mft.get_record(reference) {
-                    if let Some(n) = best_file_name_raw(&ext, true) {
-                        found = Some(n);
-                        return;
-                    }
-                }
-            }
-            if entry_len == 0 {
-                break;
-            }
-            off = (off + entry_len + 7) & !7; // 条目 8 对齐，与库一致
-        }
-    });
-    found
-}
-
 /// 单条记录的单遍属性解析：一次遍历同时拿 $FILE_NAME（父目录/命名空间/扩展名）与 $DATA 大小。
-fn parse_record(mft: &Mft, f: &NtfsFile) -> Option<RecInfo> {
+/// attributes() 已覆盖属性列表指向的扩展记录（非驻留列表、reparse 名字、DOS-only 记录都在
+/// 0.5.0 一并修好，见 CHANGELOG Fixed），此前为绕过这些库缺陷手写的三级取名
+/// （best_file_name_raw/follow_resident_attr_list/resolve_name）不再需要。
+fn parse_record(f: &NtfsFile) -> Option<RecInfo> {
     let mut parent: Option<u64> = None;
     let mut best_rank = 0u8; // 0=未找到 1=Posix 2=Win32
     let mut ext = knowledge::EXT_GROUP_OTHER as u8;
-    let mut size = 0u64;
-    let mut size_found = false;
-    let mut name_real_size = 0u64;
-    let mut has_attr_list = false;
 
-    f.attributes(|att| {
-        let ty = att.header.type_id;
-        if ty == NtfsAttributeType::FileName as u32 {
-            if best_rank >= 2 {
-                return;
+    for att in f.attributes() {
+        match att.attribute_type() {
+            Some(NtfsAttributeType::FileName) => {
+                if best_rank >= 2 {
+                    continue;
+                }
+                let Some(n) = att.file_name() else {
+                    continue;
+                };
+                let rank = match n.namespace() {
+                    Some(NtfsFileNamespace::Dos) => continue, // DOS 短名是硬链接别名，跳过防止重复计数
+                    Some(NtfsFileNamespace::Win32 | NtfsFileNamespace::Win32AndDos) => 2,
+                    _ => 1,
+                };
+                if rank > best_rank {
+                    best_rank = rank;
+                    parent = Some(n.parent_number());
+                    ext = ext_group_of_name(&n);
+                }
             }
-            let Some(h) = att.resident_header() else {
-                return;
-            };
-            let off = h.value_offset as usize;
-            let len = h.value_length as usize;
-            let data = att.data();
-            if off + len > data.len() {
-                return;
-            }
-            let Some((rank, p, rs, name_u16)) = parse_file_name_value(&data[off..off + len])
-            else {
-                return;
-            };
-            if rank == 0 {
-                return; // DOS 短名是硬链接别名，跳过防止重复计数
-            }
-            if rank > best_rank {
-                best_rank = rank;
-                parent = Some(p);
-                name_real_size = rs;
-                ext = ext_group_utf16(name_u16) as u8;
-            }
-        } else if ty == NtfsAttributeType::Data as u32 {
-            // 只取第一个未命名 $DATA 流：命名流（ADS）不计入，避免大小虚高
-            if size_found || att.header.name_length != 0 {
-                return;
-            }
-            size_found = true;
-            size = if att.header.is_non_resident == 0 {
-                att.resident_header().map(|h| h.value_length as u64).unwrap_or(0)
-            } else {
-                att.nonresident_header().map(|h| h.data_size).unwrap_or(0)
-            };
-        } else if ty == NtfsAttributeType::AttributeList as u32 {
-            has_attr_list = true;
+            _ => {}
         }
-    });
+    }
 
     let parent = match parent {
         Some(p) => p,
         None => {
-            // 名字被挪进属性列表扩展记录（罕见）：走 resolve_name 慢路径解析
-            let mut local_reader = None;
-            let n = resolve_name(mft, f, &mut local_reader, || {
-                open_volume_reader(&mft.volume.path)
-            })?;
-            ext = knowledge::ext_group(std::path::Path::new(&n.name)) as u8;
-            name_real_size = n.real_size;
-            n.parent
+            // 没有非 DOS 名字（罕见）：退回库的 best_name
+            let n = f.best_name()?;
+            ext = ext_group_of_name(&n);
+            n.parent_number()
         }
     };
 
-    let is_dir = f.is_directory();
-    // $DATA 也可能整体在扩展记录里：用 $FILE_NAME 的 real_size 兜底（略滞后但远好于记 0）
-    if !is_dir && !size_found && has_attr_list {
-        size = name_real_size;
-    }
-    Some(RecInfo { parent, is_dir, size, ext })
+    // 默认（未命名）$DATA 流的大小：改走 data_streams()，而不是手动扫 $DATA 属性判断
+    // att.name().is_some()——name() 对「确实无名」和「声明了名字但读不出（记录损坏）」
+    // 都返回 None，两者无法用 name() 本身区分，会把损坏的命名流（ADS）错当成默认流计入大小。
+    // data_streams() 内部能看到属性头的原始 name_length，正确排除后一种情况。
+    let size = f
+        .data_streams()
+        .find(|s| s.name.is_none())
+        .map(|s| s.size)
+        .unwrap_or(0);
+
+    Some(RecInfo { parent, is_dir: f.is_directory(), size, ext })
 }
 
 /// 第一遍：rayon 并行解析全部 MFT 记录。
 /// progress(已发现文件数, 已统计字节数, 精确百分比)
 fn collect_records<F: FnMut(u64, u64, f32)>(mft: &Mft, progress: &mut F) -> Records {
-    let cap = mft.max_record as usize;
+    let cap = mft.record_count() as usize;
     let mut parent = vec![NO_PARENT; cap];
     let mut size = vec![0u64; cap];
     let mut is_dir = vec![false; cap];
@@ -476,17 +154,17 @@ fn collect_records<F: FnMut(u64, u64, f32)>(mft: &Mft, progress: &mut F) -> Reco
                     for i in 0..pc.len() {
                         let number = (base + i) as u64;
                         // 系统元记录（$MFT/$Bitmap 等，<24）不进树，与目录遍历行为一致
-                        if number < FIRST_NORMAL_RECORD || !mft.record_exists(number) {
+                        if number < FIRST_NORMAL_RECORD || !mft.is_allocated(number) {
                             continue;
                         }
-                        let Some(f) = mft.get_record(number) else {
+                        let Some(f) = mft.record(number) else {
                             continue;
                         };
                         // 扩展记录归属基记录，跳过避免重复计数
-                        if !f.is_used() || f.header.base_reference != 0 {
+                        if !f.is_used() || f.is_extension() {
                             continue;
                         }
-                        let Some(info) = parse_record(mft, &f) else {
+                        let Some(info) = parse_record(&f) else {
                             continue;
                         };
                         pc[i] = info.parent;
@@ -745,18 +423,11 @@ pub fn scan_mft<F: FnMut(u64, u64, f32, &str)>(
     mut progress: F,
 ) -> Result<TreeNode, String> {
     let (letter, root_norm) = parse_root(root)?;
-    // 载入整张 MFT（可达 GB 级）：大块顺序读，按已读字节上报真实进度
+    // 载入整张 MFT（可达 GB 级）
     progress(0, 0, 0.0, "正在载入文件表");
     let volume = Volume::new(format!("\\\\.\\{}:", letter))
         .map_err(|e| format!("打开卷失败（需要管理员权限）：{:?}", e))?;
-    let mut last_load = std::time::Instant::now();
-    let mft = load_mft_fast(volume, &mut |loaded, total| {
-        // 载入阶段自带节流（每 8MB 回调一次，再护一道 100ms）
-        if last_load.elapsed().as_millis() >= 100 || loaded >= total {
-            last_load = std::time::Instant::now();
-            progress(0, 0, (loaded as f32 / total.max(1) as f32) * 100.0, "正在载入文件表");
-        }
-    })?;
+    let mft = Mft::new(volume).map_err(|e| format!("读取 MFT 失败：{:?}", e))?;
 
     let mut last = (0u64, 0u64);
     let rec = collect_records(&mft, &mut |f, b, p| {
@@ -767,18 +438,12 @@ pub fn scan_mft<F: FnMut(u64, u64, f32, &str)>(
     progress(last.0, last.1, 100.0, "正在汇总目录");
     let index = aggregate(&rec);
 
-    // 名字仅为最终保留的少量节点解析：自解析优先、read_data_fs 兜底（见 resolve_name）；
+    // 名字仅为最终保留的少量节点解析（best_name 兼容属性列表等边界）；
     // #<记录号> 兜底只留给真正损坏的记录，并告警使残留可见
-    let name_reader = std::cell::RefCell::new(None::<VolumeReader>);
     let resolve = |n: u64| -> String {
-        mft.get_record(n)
-            .and_then(|f| {
-                let mut guard = name_reader.borrow_mut();
-                resolve_name(&mft, &f, &mut guard, || {
-                    open_volume_reader(&mft.volume.path)
-                })
-            })
-            .map(|nm| nm.name)
+        mft.record(n)
+            .and_then(|f| f.best_name())
+            .map(|nm| nm.to_string())
             .unwrap_or_else(|| {
                 eprintln!("[mft_scan] 记录 {n} 取名失败，回退 #{n}");
                 format!("#{}", n)
@@ -860,197 +525,5 @@ mod tests {
         assert!(parse_root("d:").is_ok());
         assert!(parse_root("C:\\Windows").is_err());
         assert!(parse_root("\\\\server\\share").is_err());
-    }
-
-    #[test]
-    fn ext_group_utf16_matches_path_version() {
-        let utf16 = |s: &str| s.encode_utf16().flat_map(|c| c.to_le_bytes()).collect::<Vec<u8>>();
-        assert_eq!(
-            ext_group_utf16(&utf16("视频.MP4")),
-            knowledge::ext_group(std::path::Path::new("视频.mp4"))
-        );
-        assert_eq!(
-            ext_group_utf16(&utf16("noext")),
-            knowledge::EXT_GROUP_OTHER
-        );
-        assert_eq!(
-            ext_group_utf16(&utf16("a.exe")),
-            knowledge::ext_group(std::path::Path::new("a.exe"))
-        );
-    }
-
-    // ---------- 取名回归：合成 NTFS 记录（三类缺陷，见 docs/14 反馈 AC） ----------
-
-    use std::io::Cursor;
-
-    const T_REC: usize = 1024;
-
-    /// 合成 1KB MFT 记录：FILE 魔数 + USA no-op fixup（length=1）+ 属性流（偏移 56 起）。
-    fn craft_record(flags: u16, attrs: &[u8]) -> Vec<u8> {
-        let used = 56 + attrs.len();
-        let mut rec = vec![0u8; T_REC];
-        rec[0..4].copy_from_slice(b"FILE");
-        rec[4..6].copy_from_slice(&48u16.to_le_bytes()); // update_sequence_offset
-        rec[6..8].copy_from_slice(&1u16.to_le_bytes()); // update_sequence_length=1 → fixup no-op
-        rec[20..22].copy_from_slice(&56u16.to_le_bytes()); // attributes_offset
-        rec[22..24].copy_from_slice(&flags.to_le_bytes());
-        rec[24..28].copy_from_slice(&(used as u32).to_le_bytes());
-        rec[56..used].copy_from_slice(attrs);
-        rec
-    }
-
-    /// 驻留属性（value_offset 固定 24，长度补 8 对齐）。
-    fn resident_attr(type_id: u32, value: &[u8]) -> Vec<u8> {
-        let len = 24 + value.len();
-        let mut a = vec![0u8; (len + 7) & !7];
-        a[0..4].copy_from_slice(&type_id.to_le_bytes());
-        a[4..8].copy_from_slice(&(len as u32).to_le_bytes());
-        a[8] = 0; // resident
-        a[16..20].copy_from_slice(&(value.len() as u32).to_le_bytes());
-        a[20..22].copy_from_slice(&24u16.to_le_bytes());
-        a[24..24 + value.len()].copy_from_slice(value);
-        a
-    }
-
-    /// 非驻留属性壳（仅头无数据运行）：模拟“属性被挪出基记录”。
-    fn nonresident_attr(type_id: u32) -> Vec<u8> {
-        let mut a = vec![0u8; 64];
-        a[0..4].copy_from_slice(&type_id.to_le_bytes());
-        a[4..8].copy_from_slice(&64u32.to_le_bytes());
-        a[8] = 1; // non-resident
-        a
-    }
-
-    fn end_attr() -> Vec<u8> {
-        let mut a = vec![0u8; 8];
-        a[0..4].copy_from_slice(&0xFFFF_FFFFu32.to_le_bytes());
-        a[4..8].copy_from_slice(&8u32.to_le_bytes());
-        a
-    }
-
-    /// $FILE_NAME 驻留值：parent/real_size/reparse 标志/命名空间/名字。
-    fn file_name_value(parent: u64, real_size: u64, reparse: bool, ns: u8, name: &str) -> Vec<u8> {
-        let u16s: Vec<u16> = name.encode_utf16().collect();
-        let mut v = vec![0u8; 66 + u16s.len() * 2];
-        v[0..8].copy_from_slice(&parent.to_le_bytes());
-        v[48..56].copy_from_slice(&real_size.to_le_bytes());
-        if reparse {
-            v[56..60].copy_from_slice(&0x400u32.to_le_bytes()); // FILE_ATTRIBUTE_REPARSE_POINT
-        }
-        v[64] = u16s.len() as u8;
-        v[65] = ns;
-        for (i, c) in u16s.iter().enumerate() {
-            v[66 + i * 2..68 + i * 2].copy_from_slice(&c.to_le_bytes());
-        }
-        v
-    }
-
-    /// 合成 Mft（字段全 pub，不碰真卷）；卷字节流一并返回（供 Cursor 当假卷）。
-    fn synth_mft(records: &[(u64, Vec<u8>)]) -> (Mft, Vec<u8>) {
-        let max_record = records.iter().map(|r| r.0).max().unwrap_or(0) + 1;
-        let mut volume_bytes = vec![0u8; max_record as usize * T_REC];
-        for (n, rec) in records {
-            volume_bytes[*n as usize * T_REC..(*n as usize + 1) * T_REC].copy_from_slice(rec);
-        }
-        let mft = Mft {
-            volume: Volume {
-                path: std::path::PathBuf::from("C:"),
-                boot_sector: ntfs_reader::api::BootSector {
-                    crap_0: [0; 11],
-                    sector_size: 512,
-                    sectors_per_cluster: 8,
-                    crap_1: [0; 26],
-                    total_sectors: 0,
-                    mft_lcn: 0,
-                    mft_lcn_mirror: 0,
-                    file_record_size_info: 0,
-                    crap_2: [0; 447],
-                },
-                cluster_size: 4096,
-                volume_size: volume_bytes.len() as u64,
-                file_record_size: T_REC as u64,
-                mft_position: 0,
-            },
-            data: volume_bytes.clone(),
-            bitmap: vec![0xFF; max_record as usize / 8 + 1],
-            max_record,
-        };
-        (mft, volume_bytes)
-    }
-
-    /// 用例 A（本例锁）：非驻留属性列表 + 基记录驻留 $FILE_NAME → 自解析取回真名。
-    #[test]
-    fn resolve_name_reads_name_despite_nonresident_attr_list() {
-        let mut attrs = nonresident_attr(0x20); // 属性列表排在 $FILE_NAME 前（磁盘序）且非驻留
-        attrs.extend(resident_attr(
-            0x30,
-            &file_name_value(5, 174_000_000_000, false, NS_WIN32, "Downloads"),
-        ));
-        attrs.extend(end_attr());
-        let rec = craft_record(0x0003, &attrs);
-        let (mft, _) = synth_mft(&[(4260, rec)]);
-        let f = mft.get_record(4260).unwrap();
-        let mut reader: Option<Cursor<Vec<u8>>> = None;
-        let n = resolve_name(&mft, &f, &mut reader, || None).unwrap();
-        assert_eq!(n.name, "Downloads");
-        assert_eq!(n.parent, 5);
-        assert_eq!(n.real_size, 174_000_000_000);
-    }
-
-    /// 用例 B（reparse 锁）：junction/符号链接名字不再被跳过。
-    #[test]
-    fn resolve_name_keeps_reparse_point_names() {
-        let mut attrs = resident_attr(
-            0x30,
-            &file_name_value(5, 0, true, NS_WIN32_DOS, "Documents and Settings"),
-        );
-        attrs.extend(end_attr());
-        let rec = craft_record(0x0003, &attrs);
-        let (mft, _) = synth_mft(&[(3000, rec)]);
-        let f = mft.get_record(3000).unwrap();
-        let mut reader: Option<Cursor<Vec<u8>>> = None;
-        let n = resolve_name(&mft, &f, &mut reader, || None).unwrap();
-        assert_eq!(n.name, "Documents and Settings");
-    }
-
-    /// 用例 D（DOS 排名锁）：仅 DOS 短名的记录也能取回名字（include_dos 语义，防 0>0 恒假回退）。
-    #[test]
-    fn resolve_name_accepts_dos_only_name() {
-        let mut attrs = resident_attr(0x30, &file_name_value(5, 1024, false, NS_DOS, "DOWNLO~1"));
-        attrs.extend(end_attr());
-        let rec = craft_record(0x0001, &attrs);
-        let (mft, _) = synth_mft(&[(77, rec)]);
-        let f = mft.get_record(77).unwrap();
-        let mut reader: Option<Cursor<Vec<u8>>> = None;
-        let n = resolve_name(&mft, &f, &mut reader, || None).unwrap();
-        assert_eq!(n.name, "DOWNLO~1");
-        assert_eq!(n.parent, 5);
-    }
-
-    /// 用例 C（扩展记录锁）：$FILE_NAME 仅在扩展记录，跟随驻留属性列表取回。
-    #[test]
-    fn resolve_name_follows_attribute_list_to_extension_record() {
-        let mut ext_attrs = resident_attr(
-            0x30,
-            &file_name_value(5, 43_000_000_000, false, NS_WIN32, "tdl"),
-        );
-        ext_attrs.extend(end_attr());
-        let ext_rec = craft_record(0x0003, &ext_attrs);
-
-        // 属性列表条目（26B 结构）：type=FileName，base_file_reference=20
-        let mut entry = vec![0u8; 32];
-        entry[0..4].copy_from_slice(&0x30u32.to_le_bytes());
-        entry[4..6].copy_from_slice(&26u16.to_le_bytes());
-        entry[16..24].copy_from_slice(&20u64.to_le_bytes());
-        let mut attrs = resident_attr(0x20, &entry);
-        attrs.extend(end_attr());
-        let base = craft_record(0x0003, &attrs);
-
-        let (mft, _) = synth_mft(&[(10, base), (20, ext_rec)]);
-        let f = mft.get_record(10).unwrap();
-        let mut reader: Option<Cursor<Vec<u8>>> = None;
-        let n = resolve_name(&mft, &f, &mut reader, || None).unwrap();
-        assert_eq!(n.name, "tdl");
-        assert_eq!(n.parent, 5);
     }
 }
