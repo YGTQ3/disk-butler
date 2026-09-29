@@ -116,7 +116,7 @@ function App() {
         </div>
 
         <div className="px-5 pb-4 text-[11px] leading-relaxed text-[var(--color-text-secondary)]">
-          v{__APP_VERSION__.split(".").slice(0, 2).join(".")} · 透视 / 清理 / 启动 / 内存
+          v{__APP_VERSION__} · 透视 / 清理 / 启动 / 内存
           <br />
           所有操作都会先告诉你“这是什么”
         </div>

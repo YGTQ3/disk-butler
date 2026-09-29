@@ -121,6 +121,10 @@ export default function Cleanup() {
   // 累计清理统计（本地持久化的成就感数字）
   const [stats, setStats] = useState<CleanupStats | null>(null);
 
+  // 事故下架（v0.7.11，docs/21）：残留检查曾把在用软件误判"已卸载"（误报，触碰宁漏报不误报），
+  // 确定可用前不再上架——入口隐藏 + 后端命令不注册。修复验证后改 true 重新上架。
+  const ORPHAN_FEATURE_ENABLED = false;
+
   // AppData 孤儿残留检查（已卸载软件遗留目录，"回头清存量"）
   const [orphan, setOrphan] = useState<{
     phase: "loading" | "ready" | "confirm";
@@ -659,8 +663,8 @@ export default function Cleanup() {
               </div>
             </div>
 
-            {/* 高级 · 残留检查（已卸载软件遗留目录） */}
-            <div className="mb-6">
+            {/* 高级 · 残留检查（已卸载软件遗留目录）——事故下架：ORPHAN_FEATURE_ENABLED=false 时隐藏 */}
+            <div className="mb-6" style={{ display: ORPHAN_FEATURE_ENABLED ? undefined : "none" }}>
               <div className="mb-2 flex items-center gap-2">
                 <span className="flex items-center gap-1.5 text-sm font-semibold">
                   <Box size={15} />

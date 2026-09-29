@@ -305,6 +305,8 @@ async fn open_official_uninstaller(id: String) -> Result<(), String> {
 }
 
 /// AppData 孤儿残留扫描：已卸载软件的遗留目录（知识库确证可清 + 未知只列出）。
+/// 事故下架（v0.7.11，docs/21）：误报在用软件，确定可用前不再上架——不注册进 invoke_handler。
+#[allow(dead_code)]
 #[tauri::command]
 async fn scan_orphan_dirs() -> Result<bloatware::OrphanScan, String> {
     tauri::async_runtime::spawn_blocking(bloatware::scan_orphans)
@@ -313,6 +315,8 @@ async fn scan_orphan_dirs() -> Result<bloatware::OrphanScan, String> {
 }
 
 /// 清理孤儿残留目录：只接受后端当场重扫确证的白名单路径。
+/// 事故下架（v0.7.11，docs/21）：随 scan_orphan_dirs 一并下架，不注册进 invoke_handler。
+#[allow(dead_code)]
 #[tauri::command]
 async fn clean_orphan_dirs(paths: Vec<String>) -> Result<bloatware::ResidueReport, String> {
     tauri::async_runtime::spawn_blocking(move || bloatware::clean_orphans(paths))
@@ -358,9 +362,7 @@ pub fn run() {
         bloatware_force_preview,
         force_uninstall_software,
         op_started,
-        open_official_uninstaller,
-        scan_orphan_dirs,
-        clean_orphan_dirs
+        open_official_uninstaller
     ]);
     #[cfg(not(feature_bloatware))]
     let builder = builder.invoke_handler(tauri::generate_handler![
@@ -384,9 +386,7 @@ pub fn run() {
         scan_service_available,
         repair_scan_service,
         open_apps_settings,
-        set_always_on_top,
-        scan_orphan_dirs,
-        clean_orphan_dirs
+        set_always_on_top
     ]);
 
     builder
