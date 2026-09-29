@@ -4,6 +4,7 @@
 
 | 版本 | 说明 |
 |---|---|
+| v0.7.11 | [release-notes-0.7.11.md](release-notes-0.7.11.md) |
 | v0.7.10 | [release-notes-0.7.10.md](release-notes-0.7.10.md) |
 | v0.7.8 | [release-notes-0.7.8.md](release-notes-0.7.8.md) |
 | v0.7.7 | [release-notes-0.7.7.md](release-notes-0.7.7.md) |
