@@ -42,7 +42,7 @@ windows-sys = { version = "0.59", features = [
 winreg = "0.52"
 encoding_rs = "0.8"
 # MFT 直读扫描（WizTree 同款原理）与后台服务
-ntfs-reader = "0.4"
+ntfs-reader = "0.5.3"
 windows-service = "0.8"
 rayon = "1"
 # 软件体检：图标提取后编码为 PNG（仅启用 png 编码器，控制体积）
