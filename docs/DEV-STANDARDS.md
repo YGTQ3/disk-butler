@@ -25,13 +25,16 @@
 11. **完工即回写跟踪文档**（教训：`deep_clean_system` v0.7.4 已落地但 docs/07 想法池未标注完成，导致后续会话误判为未开工）：任何功能/修复一旦合入代码，**当场**执行：① docs/07 对应条目标注 ✅已完成（或删除并指向 docs/08）；② 属里程碑则追加 docs/08 大事记；③ docs/19 看板销坑。不允许“先做下一个、回头再整理”——回写是完工的一部分，不是额外动作。
 12. **对外发布先经用户确认**（全会话红线，见 AGENTS §6）：GitHub issue/PR 回复与评论、公开邮件、Release 发布等对外动作，一律先起草给用户过目，**用户明确确认后才发送/发布**；对外内容撤不回来、成本高，宁可多一次确认（教训：2026-08-08 未经确认直接回复 issue#5，用户要求固化为规则）。
 
-## 三、发版前检查表（功能开发会话，正式发版必过）
+## 三、发版检查表（功能开发会话，正式发版必过）
 - [ ] 未定稿功能入口已隐藏（不设门控 env = 默认隐藏）；
 - [ ] `cargo test` + `tsc` 双绿；
-- [ ] CodeReview 子智能体审过 diff、问题已修；
+- [ ] CodeReview 子智能体审过 diff、问题已修（审计范围＝`origin/main..HEAD` 全量 diff，即 AGENTS §4 所指发版前对账）；
 - [ ] 版本号三处一致（package.json / tauri.conf.json / Cargo.toml）；
 - [ ] NSIS 产物重命名：`Copy-Item "target\release\bundle\nsis\C盘管家_${version}_x64-setup.exe" "DiskButler_${version}_x64-setup.exe"`（GitHub 上传不支持中文文件名；⚠ Tauri2 无 `installerName` 配置字段，勿再臆造——build 产物名由 productName 决定，中文名靠此步改名）；
 - [ ] **永久链副本字节核对**：`Copy-Item "DiskButler_${version}_x64-setup.exe" "DiskButler-Setup.exe" -Force` 覆盖旧副本后，核 `(Get-FileHash DiskButler-Setup.exe).Hash -eq (Get-FileHash "DiskButler_${version}_x64-setup.exe").Hash` 返回 `True`，才允许 `gh release create` 上传——防“误取构建目录里遗留的旧永久链副本、加速链静默指向老版”（2026-09-02 排查：`src-tauri/target/release/bundle/nsis/` 里躺着 v0.7.4 时代旧副本未清，五版均未误取、未酿事故，但属发版链唯一没被机器卡点覆盖的红线）；
 - [ ] 提交已隔离、只含本次目标；
 - [ ] 发布说明归档：`release-notes-X.Y.Z.md` 建在 `docs/release-notes/`（不再放仓库根目录，2026-09-27 起），并在该目录 README 索引表顶部加一行；
-- [ ] docs/07 待办 / docs/08 大事记 / docs/19 看板已同步。
+- [ ] docs/07 待办 / docs/08 大事记 / docs/19 看板已同步；
+- [ ] **发版后**：起子智能体做「SOP-现实一致性」只读审计（AGENTS §9.4：①作业卡步骤 vs 代码/命令漂移；②规则间矛盾；③`docs/00` 索引与磁盘一致；④看板/待办长期悬挂——只报不改，清单交用户过目）。
+
+> （经用户批准 · 2026-09-30 · 体系体检 B5：新增末条「发版后体检」；CodeReview 行补审计范围锚点；表名去「前」以涵盖发版后动作、与 AGENTS §1 称谓对齐。）
