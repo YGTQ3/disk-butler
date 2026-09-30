@@ -155,12 +155,12 @@ try {
 Log ''
 
 # ========== [5/8] DISM 只读分析交叉验证（带硬超时 + 活体采样）核心 ==========
-Write-Host '[5/8] 正在运行 DISM 只读分析交叉验证（正常 1~3 分钟，最多等 5 分钟）...'
+Write-Host '[5/8] 正在运行 DISM 只读分析交叉验证（正常 1~3 分钟，最多等 7 分钟）...'
 Write-Host '       若弹出 UAC 请点"是"；此步只分析、不更改系统。'
 Log '[5/8] DISM 只读分析交叉验证（核心）'
 Log '--------------------------------------------'
 Log '命令: Dism /Online /Cleanup-Image /AnalyzeComponentStore  （与 C盘管家同款，只读）'
-$maxSec = 300
+$maxSec = 420
 Log ('硬超时: ' + $maxSec + ' 秒（超过即判定为异常卡住，自动结束本次只读分析）')
 $dismOut = Join-Path $env:TEMP ('diskbutler-winsxs-analyze-' + [guid]::NewGuid().ToString('N') + '.txt')
 

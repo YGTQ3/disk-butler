@@ -66,6 +66,16 @@ const KIND_META = {
   },
 } as const;
 
+// DISM 体验批（0.8.0 #1/#2/#3）：进行中“已用时心跳”格式化 + 卡住软阈值。
+// 软阈值＝超过通常区间才提示（不早报狼来了）；仅安心提示，不自动杀进程（真取消属 P2，未做）。
+const DEEP_ANALYZE_STUCK_SEC = 300; // 分析通常 1~3 分钟，超 5 分钟提示
+const DEEP_CLEAN_STUCK_SEC = 1500; // 清理通常 5~20 分钟，超 25 分钟提示
+function fmtElapsed(sec: number): string {
+  const m = Math.floor(sec / 60);
+  const s = sec % 60;
+  return m > 0 ? `${m} 分 ${s.toString().padStart(2, "0")} 秒` : `${s} 秒`;
+}
+
 export default function Cleanup() {
   const [phase, setPhase] = useState<Phase>("loading");
   const [scan, setScan] = useState<CleanupScan | null>(null);
@@ -78,6 +88,7 @@ export default function Cleanup() {
   const [analyzeReport, setAnalyzeReport] = useState<DeepAnalyzeReport | null>(null);
   const [deepReport, setDeepReport] = useState<DeepCleanReport | null>(null);
   const [deepError, setDeepError] = useState("");
+  const [deepElapsed, setDeepElapsed] = useState(0); // DISM 分析/清理已用时（秒），心跳显示
   /** 深度清理完成后的结果弹窗（关闭后卡片内仍保留一行小结） */
   const [showDeepResult, setShowDeepResult] = useState(false);
 
@@ -265,6 +276,17 @@ export default function Cleanup() {
       setDeepPhase("idle");
     }
   }
+
+  // DISM 体验批 #1：分析/清理进行中每秒 tick “已用时”（心跳）；进入即清零、离开即停表
+  useEffect(() => {
+    if (deepPhase !== "analyzing" && deepPhase !== "running") {
+      setDeepElapsed(0);
+      return;
+    }
+    setDeepElapsed(0);
+    const t = setInterval(() => setDeepElapsed((s) => s + 1), 1000);
+    return () => clearInterval(t);
+  }, [deepPhase]);
 
   return (
     <div className="flex h-full flex-col">
@@ -457,12 +479,24 @@ export default function Cleanup() {
                   ⚠ 清理后将无法卸载/回滚现有的 Windows 更新（系统运行正常则基本无影响）。
                 </div>
 
-                {/* 分析中 */}
+                {/* 分析中（0.8.0 DISM 体验批 #1 已用时心跳 + #2 诚实文案 + #3 卡住软阈值） */}
                 {deepPhase === "analyzing" && (
-                  <div className="mt-3 flex items-center gap-2 rounded-xl bg-[var(--color-bg)] px-3.5 py-2.5 text-xs text-[var(--color-text-secondary)]">
-                    <Loader2 size={14} className="animate-spin text-[var(--color-primary)]" />
-                    正在分析中（只读，不做任何更改）……约 1~3 分钟。黑色终端窗口会自己关闭，请不要手动关它。
-                  </div>
+                  <>
+                    <div className="mt-3 flex items-start gap-2 rounded-xl bg-[var(--color-bg)] px-3.5 py-2.5 text-xs leading-relaxed text-[var(--color-text-secondary)]">
+                      <Loader2 size={14} className="mt-0.5 shrink-0 animate-spin text-[var(--color-primary)]" />
+                      <span>
+                        正在分析中（只读，不做任何更改）……通常几分钟，系统更新积压多时会更久。
+                        <b className="text-[var(--color-text-main)]">已用时 {fmtElapsed(deepElapsed)}</b>
+                        。黑色终端窗口会自己关闭，请不要手动关它。
+                      </span>
+                    </div>
+                    {deepElapsed >= DEEP_ANALYZE_STUCK_SEC && (
+                      <div className="mt-2 rounded-xl bg-warn-bg-strong px-3.5 py-2.5 text-xs leading-relaxed text-warn-text">
+                        ⏳ 已运行 {fmtElapsed(deepElapsed)}，比通常久。DISM 多半在啃大量旧组件、或撞上系统更新收尾——
+                        <b>它没有死，请再耐心等等、别关黑窗</b>。分析是只读的，若超过 30~40 分钟仍无动静，可放心重启一次（让挂起更新装完）再重试。
+                      </div>
+                    )}
+                  </>
                 )}
 
                 {(deepPhase === "analyzed" || deepPhase === "confirm") && analyzeReport && (
@@ -512,10 +546,22 @@ export default function Cleanup() {
                 )}
 
                 {deepPhase === "running" && (
-                  <div className="mt-3 flex items-center gap-2 rounded-xl bg-[var(--color-bg)] px-3.5 py-2.5 text-xs text-[var(--color-text-secondary)]">
-                    <Loader2 size={14} className="animate-spin text-[var(--color-primary)]" />
-                    正在清理系统组件（约 5~20 分钟）……进度窗口会自己关闭，请不要手动关它，也请勿关机。
-                  </div>
+                  <>
+                    <div className="mt-3 flex items-start gap-2 rounded-xl bg-[var(--color-bg)] px-3.5 py-2.5 text-xs leading-relaxed text-[var(--color-text-secondary)]">
+                      <Loader2 size={14} className="mt-0.5 shrink-0 animate-spin text-[var(--color-primary)]" />
+                      <span>
+                        正在清理系统组件……通常 5~20 分钟，视积压量可能更久。
+                        <b className="text-[var(--color-text-main)]">已用时 {fmtElapsed(deepElapsed)}</b>
+                        。进度窗口会自己关闭，请不要手动关它，也请勿关机。
+                      </span>
+                    </div>
+                    {deepElapsed >= DEEP_CLEAN_STUCK_SEC && (
+                      <div className="mt-2 rounded-xl bg-warn-bg-strong px-3.5 py-2.5 text-xs leading-relaxed text-warn-text">
+                        ⏳ 已运行 {fmtElapsed(deepElapsed)}，比通常久。清理大量旧组件确实可能很慢——
+                        <b>请勿关机、别关进度窗，耐心等它自己跑完</b>（清理途中强行断电/关窗有损坏组件存储的风险）。若超过 1 小时仍完全无进展，请把情况反馈给作者，别强行中断。
+                      </div>
+                    )}
+                  </>
                 )}
                 {deepPhase === "done" && deepReport && (
                   <div className="mt-3 rounded-xl bg-[var(--color-primary-soft)] px-3.5 py-2.5 text-xs">
@@ -960,7 +1006,7 @@ export default function Cleanup() {
                         3
                       </span>
                       <span className="min-w-0 text-sm">
-                        <span className="font-semibold">全程约 1~3 分钟</span>
+                        <span className="font-semibold">通常约 1~3 分钟，慢时更久</span>
                         <span className="mt-0.5 block text-xs text-[var(--color-text-secondary)]">
                           期间可以正常使用电脑
                         </span>
@@ -1042,7 +1088,7 @@ export default function Cleanup() {
                       </span>
                       <span className="min-w-0">
                         <span className="block text-base font-bold text-danger-dark">
-                          全程约 5~20 分钟，期间请勿关机
+                          通常 5~20 分钟，慢时更久，期间请勿关机
                         </span>
                         <span className="mt-0.5 block text-xs text-danger-dark opacity-80">
                           中途断电可能损坏系统组件，这是唯一需要你保证的事
