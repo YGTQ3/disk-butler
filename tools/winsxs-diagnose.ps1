@@ -28,7 +28,7 @@ Write-Host '  - 只读收集 8 项信息：系统与磁盘、挂起更新状态�
 Write-Host '    安全软件、DISM 只读分析交叉验证、DISM 日志、CBS 日志、系统事件日志'
 Write-Host '  - 会运行一次微软官方只读分析命令 Dism /AnalyzeComponentStore'
 Write-Host '    （与 C盘管家用的是同一条命令，只分析、不更改系统）'
-Write-Host '  - 该分析带 5 分钟硬超时：正常 1~3 分钟出结果；若超时说明它确实卡住了，'
+Write-Host '  - 该分析带 7 分钟硬超时：正常 1~3 分钟出结果；若超时说明它确实卡住了，'
 Write-Host '    脚本会自动结束这次只读分析（只读操作，中断安全）并记录卡在哪'
 Write-Host '  - 不修改任何系统设置，不删除任何文件，不联网'
 Write-Host '  - 不收集您的个人文件、账号、聊天记录'
