@@ -1361,10 +1361,23 @@ fn dism_inner_command(dism_args: &str, log: &std::path::Path) -> String {
     format!(r#"%windir%\System32\Dism.exe {dism_args} > "{log_ps}" 2>&1"#)
 }
 
+/// UAC 提权被用户取消时，外层 PowerShell 的专用退出码（Win32 ERROR_CANCELLED）。
+/// 用于与「提权脚本执行本身返回 1」区分——历史上两者都是 1，导致用户已同意授权、
+/// 但脚本执行的非 0 退出被误报成「已取消授权」（系统临时文件清理实测复现，issue#10 同源缺口）。
+/// 注：deep_clean_system / analyze_system_clean 的 inner 已 exit 0 兜底，1223 唯一来自外层 catch；
+/// DISM 版（dism_ps_command）原样透传 Dism.exe 退出码，理论上若 DISM 返回 1223 会有歧义，
+/// 但 1223 非 DISM 文档码、用户已同意授权时几乎不可能，属可接受（CodeReview 2026-10-08 记录）。
+const UAC_CANCELLED_EXIT: i32 = 1223;
+
 /// 包一层提权 PowerShell：同步等待、退出码透传。
+/// try/catch 精确捕获 UAC 取消（Start-Process -Verb RunAs 被拒会抛 Win32 异常）→ 专用码 UAC_CANCELLED_EXIT，
+/// 使「用户取消」与「提权脚本执行失败」可区分。
 fn dism_ps_command(dism_args: &str, log: &std::path::Path) -> String {
     let inner = dism_inner_command(dism_args, log);
-    format!("$p = Start-Process -Verb RunAs -Wait -PassThru -FilePath cmd.exe -ArgumentList '/d','/c','{inner}'; exit $p.ExitCode")
+    format!(
+        "try {{ $p = Start-Process -Verb RunAs -Wait -PassThru -FilePath cmd.exe -ArgumentList '/d','/c','{}'; exit $p.ExitCode }} catch {{ exit {} }}",
+        inner, UAC_CANCELLED_EXIT
+    )
 }
 
 /// 回显用：cmd 实际看到的命令（日志路径**不**做 PS 转义），供报错文案展示，
@@ -1396,18 +1409,18 @@ pub fn deep_analyze() -> Result<DeepAnalyzeReport, String> {
         .map_err(|e| format!("启动分析失败：{}", e))?;
 
     let code = status.code().unwrap_or(-1);
+    if code == UAC_CANCELLED_EXIT {
+        let _ = std::fs::remove_file(&log);
+        return Err("已取消授权，未执行分析。".to_string());
+    }
     if code != 0 {
         let _ = std::fs::remove_file(&log);
-        return Err(if code == 1 {
-            "已取消授权，未执行分析。".to_string()
-        } else {
-            format!(
-                "分析未完成（退出码 {}）。{} 本次执行的命令：{}",
-                code,
-                dism_exit_hint(code),
-                dism_display_command(dism_args, &log)
-            )
-        });
+        return Err(format!(
+            "分析未完成（退出码 {}）。{} 本次执行的命令：{}",
+            code,
+            dism_exit_hint(code),
+            dism_display_command(dism_args, &log)
+        ));
     }
 
     let bytes = std::fs::read(&log).map_err(|e| {
@@ -1446,6 +1459,10 @@ pub fn deep_clean() -> Result<DeepCleanReport, String> {
         .map_err(|e| format!("启动清理失败：{}", e))?;
 
     let code = status.code().unwrap_or(-1);
+    if code == UAC_CANCELLED_EXIT {
+        let _ = std::fs::remove_file(&log);
+        return Err("已取消授权，未执行清理。".to_string());
+    }
     // 0 = 成功；3010 = 成功但需重启
     if code != 0 && code != 3010 {
         // 附带日志尾部帮助定位
@@ -1462,17 +1479,13 @@ pub fn deep_clean() -> Result<DeepCleanReport, String> {
             })
             .unwrap_or_default();
         let _ = std::fs::remove_file(&log);
-        return Err(if code == 1 {
-            "已取消授权，未执行清理。".to_string()
-        } else {
-            format!(
-                "系统清理未完成（退出码 {}）。{} 原始信息：{} 本次执行的命令：{}",
-                code,
-                dism_exit_hint(code),
-                tail,
-                dism_display_command(dism_args, &log)
-            )
-        });
+        return Err(format!(
+            "系统清理未完成（退出码 {}）。{} 原始信息：{} 本次执行的命令：{}",
+            code,
+            dism_exit_hint(code),
+            tail,
+            dism_display_command(dism_args, &log)
+        ));
     }
 
     let _ = std::fs::remove_file(&log); // 卫生：用完即删
@@ -1534,7 +1547,7 @@ pub fn deep_clean_system() -> Result<SystemCleanReport, String> {
 
     // 提权内联脚本：先清系统 Temp 内容；无挂起更新时才停服务清更新缓存（finally 保证 wuauserv 拉回）
     let mut inner = String::from(
-        "$ErrorActionPreference='SilentlyContinue'; \
+        "$ErrorActionPreference='SilentlyContinue'; try { \
          Get-ChildItem -LiteralPath \"$env:SystemRoot\\Temp\" -Force | Remove-Item -Recurse -Force -ErrorAction SilentlyContinue;",
     );
     if !pending {
@@ -1544,10 +1557,16 @@ pub fn deep_clean_system() -> Result<SystemCleanReport, String> {
              finally { Start-Service wuauserv -ErrorAction SilentlyContinue }",
         );
     }
+    // 系统清理是「尽力而为」：占用跳过、服务停/启失败都不该让整次清理判失败。外层 try/catch 兜底
+    // 吞掉终止性错误并 exit 0，避免这些附带错误的非 0 退出被透传后误报（历史上被当成「已取消授权」）。
+    // 实际释放量由清理前后 C 盘空闲差体现，不依赖退出码。
+    inner.push_str(" } catch {} ; exit 0");
     let encoded = encode_ps_command(&inner);
+    // try/catch 精确捕获 UAC 取消（Start-Process -Verb RunAs 被拒抛 Win32 异常）→ 专用码，
+    // 与「提权脚本执行返回 1」区分，杜绝同意授权后仍误报「已取消授权」。
     let ps = format!(
-        r#"$p = Start-Process -Verb RunAs -Wait -PassThru -FilePath powershell.exe -ArgumentList '-NoProfile','-EncodedCommand','{}'; exit $p.ExitCode"#,
-        encoded
+        "try {{ $p = Start-Process -Verb RunAs -Wait -PassThru -FilePath powershell.exe -ArgumentList '-NoProfile','-EncodedCommand','{}'; exit $p.ExitCode }} catch {{ exit {} }}",
+        encoded, UAC_CANCELLED_EXIT
     );
     let status = std::process::Command::new("powershell")
         .args(["-NoProfile", "-Command", &ps])
@@ -1556,12 +1575,11 @@ pub fn deep_clean_system() -> Result<SystemCleanReport, String> {
         .map_err(|e| format!("启动系统清理失败：{}", e))?;
 
     let code = status.code().unwrap_or(-1);
+    if code == UAC_CANCELLED_EXIT {
+        return Err("已取消授权，未执行清理。".to_string());
+    }
     if code != 0 {
-        return Err(if code == 1 {
-            "已取消授权，未执行清理。".to_string()
-        } else {
-            format!("系统清理未完成（退出码 {}），可稍后重试。", code)
-        });
+        return Err(format!("系统清理未完成（退出码 {}），可稍后重试。", code));
     }
 
     let free_after = c_drive_free();
@@ -1598,9 +1616,10 @@ pub fn analyze_system_clean() -> Result<SystemAnalyzeReport, String> {
         log.to_string_lossy().replace('\'', "''")
     );
     let encoded = encode_ps_command(&inner);
+    // try/catch 精确捕获 UAC 取消 → 专用码，与「脚本执行返回 1」区分（见 dism_ps_command）。
     let ps = format!(
-        r#"$p = Start-Process -Verb RunAs -Wait -PassThru -FilePath powershell.exe -ArgumentList '-NoProfile','-EncodedCommand','{}'; exit $p.ExitCode"#,
-        encoded
+        "try {{ $p = Start-Process -Verb RunAs -Wait -PassThru -FilePath powershell.exe -ArgumentList '-NoProfile','-EncodedCommand','{}'; exit $p.ExitCode }} catch {{ exit {} }}",
+        encoded, UAC_CANCELLED_EXIT
     );
     let status = std::process::Command::new("powershell")
         .args(["-NoProfile", "-Command", &ps])
@@ -1609,12 +1628,11 @@ pub fn analyze_system_clean() -> Result<SystemAnalyzeReport, String> {
         .map_err(|e| format!("启动分析失败：{}", e))?;
 
     let code = status.code().unwrap_or(-1);
+    if code == UAC_CANCELLED_EXIT {
+        return Err("已取消授权，未执行分析。".to_string());
+    }
     if code != 0 {
-        return Err(if code == 1 {
-            "已取消授权，未执行分析。".to_string()
-        } else {
-            format!("分析未完成（退出码 {}），可稍后重试。", code)
-        });
+        return Err(format!("分析未完成（退出码 {}），可稍后重试。", code));
     }
 
     let text = std::fs::read_to_string(&log).map_err(|e| format!("读取分析结果失败：{}", e))?;
@@ -1738,11 +1756,12 @@ mod tests {
         let ps = dism_ps_command("/Online /Cleanup-Image /StartComponentCleanup", log);
         // DISM 走绝对路径（防 PATH/当前目录劫持）；且首字符不得是引号（cmd /c 剥引号规则）
         assert!(ps.contains(r#"%windir%\System32\Dism.exe /Online"#));
+        let suffix = format!("'; exit $p.ExitCode }} catch {{ exit {} }}", UAC_CANCELLED_EXIT);
         let body = ps
             .split("'/d','/c','")
             .nth(1)
             .unwrap()
-            .strip_suffix("'; exit $p.ExitCode")
+            .strip_suffix(&suffix)
             .unwrap();
         assert!(!body.starts_with('\''), "命令体首字符不得是引号");
         // 日志路径已转义
@@ -1750,6 +1769,20 @@ mod tests {
         // 去掉成对 '' 后不应再有落单单引号（落单的会截断 PS 单引号串）
         let collapsed = body.replace("''", "");
         assert!(!collapsed.contains('\''), "命令体内不应有落单单引号: {body}");
+    }
+
+    #[test]
+    fn elevated_ps_wraps_uac_cancel_in_try_catch() {
+        // 回归：UAC 取消必须走 try/catch 的专用码，与「提权脚本执行返回 1」区分；
+        // 否则用户同意授权后脚本的非 0 退出会被误报成「已取消授权」（系统临时文件清理实测 bug）。
+        assert_eq!(UAC_CANCELLED_EXIT, 1223);
+        let log = std::path::Path::new(r"C:\Temp\d.log");
+        let ps = dism_ps_command("/Online", log);
+        assert!(ps.starts_with("try {"), "提权脚本应以 try 开头以捕获 UAC 取消");
+        assert!(
+            ps.ends_with(&format!("catch {{ exit {} }}", UAC_CANCELLED_EXIT)),
+            "应以 catch 专用取消码收尾: {ps}"
+        );
     }
 
     #[test]
