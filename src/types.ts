@@ -198,6 +198,47 @@ export interface ScanCache {
   tree: TreeNode;
 }
 
+/** 透视页目录转移·只读预检结果（与后端 transfer.rs 一一对应） */
+export interface TransferPlan {
+  sourcePath: string;
+  sourceName: string;
+  /** 源目录递归总大小（字节） */
+  sourceSize: number;
+  fileCount: number;
+  dirCount: number;
+  /** 实际落位：目标目录\源目录名 */
+  destination: string;
+  targetLetter: string;
+  /** 目标盘当前剩余空间（字节） */
+  targetFree: number;
+  /** 非致命提示（如跳过的链接子项） */
+  warnings: string[];
+}
+
+/** 转移完成报告 */
+export interface TransferReport {
+  movedBytes: number;
+  /** 实际从源盘清掉的字节数 */
+  freedBytes: number;
+  fileCount: number;
+  skipped: string[];
+  /** 清理阶段残留字节（文件被占用时 >0，不影响已生效的链接） */
+  tempLeftover: number;
+  /** 有残留时的实际临时目录路径（临时名带后缀，可能是序号变体） */
+  tempLeftoverPath?: string;
+  durationSecs: number;
+}
+
+/** 转移进度事件（listen "transfer-progress"） */
+export interface TransferProgress {
+  phase: "copy" | "verify" | "swap" | "link" | "cleanup" | "done" | "error" | "cancelled";
+  percent: number;
+  currentPath: string;
+  message: string;
+  done: boolean;
+  report?: TransferReport;
+}
+
 /** 分类 -> 设计令牌色（与 tokens.css / DESIGN.md 一致） */
 export const CATEGORY_COLOR: Record<Category, string> = {
   system: "var(--color-cat-system)",

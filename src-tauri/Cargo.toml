@@ -22,6 +22,8 @@ tauri-build = { version = "2", features = [] }
 [dependencies]
 tauri = { version = "2", features = [] }
 tauri-plugin-opener = "2"
+# 透视页转移弹窗：系统原生「选择目录」对话框
+tauri-plugin-dialog = "2"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 jwalk = "0.8"
@@ -47,6 +49,8 @@ windows-service = "0.8"
 rayon = "1"
 # 软件体检：图标提取后编码为 PNG（仅启用 png 编码器，控制体积）
 image = { version = "0.25", default-features = false, features = ["png"] }
+# 透视页目录转移：创建目录联接（Junction）免管理员权限；windows-sys 已在依赖中复用
+junction = "1"
 
 [profile.dev]
 # 加快扫描相关依赖的运行速度；关闭调试信息以降低编译内存峰值（16GB 内存机器必需）

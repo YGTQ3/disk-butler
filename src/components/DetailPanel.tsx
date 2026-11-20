@@ -1,4 +1,4 @@
-import { Folder, File, Info, FolderOpen } from "lucide-react";
+import { Folder, File, Info, FolderOpen, FolderInput } from "lucide-react";
 import {
   TreeNode,
   CATEGORY_COLOR,
@@ -8,13 +8,27 @@ import {
   openInExplorer,
 } from "../types";
 
+/** 转移功能的下限：小于 100MB 的目录在资源管理器里直接挪就行，不值得走“复制→校验→建链”流水线 */
+const TRANSFER_MIN_SIZE = 100 * 1024 * 1024;
+
 interface Props {
   node: TreeNode | null;
   /** 根大小，用于计算占比 */
   rootSize: number;
+  /** 发起「转移到其他磁盘」（仅符合条件的目录出现入口） */
+  onTransfer?: (node: TreeNode) => void;
 }
 
-export default function DetailPanel({ node, rootSize }: Props) {
+/** 转移入口候选：目录、非聚合伪节点、够大（是否可转移还取决于安全等级，由按钮态区分） */
+function transferCandidate(node: TreeNode): boolean {
+  return (
+    node.isDir &&
+    !node.path.endsWith("::__others__") &&
+    node.size >= TRANSFER_MIN_SIZE
+  );
+}
+
+export default function DetailPanel({ node, rootSize, onTransfer }: Props) {
   if (!node) {
     return (
       <div className="flex h-full flex-col items-center justify-center gap-3 px-6 text-center">
@@ -90,13 +104,33 @@ export default function DetailPanel({ node, rootSize }: Props) {
           {node.path.replace(/::__others__$/, "（合并的小项目）")}
         </div>
         {!node.path.endsWith("::__others__") && (
-          <button
-            onClick={() => void openInExplorer(node.path, node.isDir)}
-            className="mt-2 flex w-full items-center justify-center gap-1.5 rounded-xl border border-[var(--color-line)] bg-[var(--color-surface)] px-3 py-2 text-xs font-medium text-[var(--color-primary-dark)] transition-colors hover:bg-[var(--color-bg)]"
-          >
-            <FolderOpen size={14} />
-            在文件夹中打开
-          </button>
+          <>
+            <button
+              onClick={() => void openInExplorer(node.path, node.isDir)}
+              className="mt-2 flex w-full items-center justify-center gap-1.5 rounded-xl border border-[var(--color-line)] bg-[var(--color-surface)] px-3 py-2 text-xs font-medium text-[var(--color-primary-dark)] transition-colors hover:bg-[var(--color-bg)]"
+            >
+              <FolderOpen size={14} />
+              在文件夹中打开
+            </button>
+            {transferCandidate(node) && onTransfer && (
+              <>
+                <button
+                  onClick={() => onTransfer(node)}
+                  className="mt-2 flex w-full items-center justify-center gap-1.5 rounded-xl bg-[var(--color-primary)] px-3 py-2 text-xs font-medium text-white transition-colors hover:bg-[var(--color-primary-dark)]"
+                  title="把整个目录搬到另一块磁盘，旧路径自动兼容，为当前盘腾出空间"
+                >
+                  <FolderInput size={14} />
+                  转移到其他磁盘
+                </button>
+                {node.safety === "keep" && (
+                  <p className="mt-1.5 px-1 text-[11px] leading-relaxed text-[var(--color-text-secondary)]">
+                    该目录被知识库标记为「请勿删除」。转移不删数据（旧路径仍可用），
+                    若它是系统目录，预检会拒绝并说明原因。
+                  </p>
+                )}
+              </>
+            )}
+          </>
         )}
       </div>
     </div>

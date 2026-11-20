@@ -1,12 +1,13 @@
 import { useEffect, useRef, useState, useLayoutEffect } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
-import { motion } from "framer-motion";
+import { AnimatePresence, motion } from "framer-motion";
 import { HardDrive, Search, ChevronRight, ChevronDown, Loader2, RotateCcw, AlertTriangle, Wrench } from "lucide-react";
 import { DriveInfo, TreeNode, ScanProgress, ScanCache, formatBytes, formatCount, formatAgo } from "../types";
 import CapacityBar from "../components/CapacityBar";
 import TreeMap from "../components/TreeMap";
 import DetailPanel from "../components/DetailPanel";
+import TransferDialog from "../components/TransferDialog";
 
 type Phase = "idle" | "scanning" | "done";
 
@@ -34,6 +35,8 @@ export default function DiskInsight({ active = true }: Props) {
   const [svcMissing, setSvcMissing] = useState(false);
   const [repairing, setRepairing] = useState(false);
   const [repairMsg, setRepairMsg] = useState<string>("");
+  /** 发起「转移到其他磁盘」的目录节点（非 null 时弹出转移向导） */
+  const [transferNode, setTransferNode] = useState<TreeNode | null>(null);
 
   const mapAreaRef = useRef<HTMLDivElement>(null);
   const [mapSize, setMapSize] = useState({ w: 640, h: 420 });
@@ -133,9 +136,10 @@ export default function DiskInsight({ active = true }: Props) {
   /** 准备阶段（还没有任何真实进度）：进度条改滑动动画，避免看起来卡死 */
   const indeterminate = phase === "scanning" && scanPct === 0;
 
-  async function startScan() {
+  async function startScan(target?: string) {
     if (!selected) return;
-    const target = selected; // 锁定本次扫描目标，避免扫描中切换下拉框干扰
+    // 默认扫下拉框选中盘；转移完成后可指定重扫“正在展示的盘”（两者可能不同）
+    const scanTarget = target ?? selected;
     setPhase("scanning");
     setProgress(null);
     setError("");
@@ -144,9 +148,9 @@ export default function DiskInsight({ active = true }: Props) {
     setSelectedNode(null);
     refreshDrives(); // 重扫同步拉一次盘符容量，保证水位条反映最新剩余
     try {
-      const tree = await invoke<TreeNode>("scan_drive", { root: target });
+      const tree = await invoke<TreeNode>("scan_drive", { root: scanTarget });
       setRoot(tree);
-      setScannedDrive(target);
+      setScannedDrive(scanTarget);
       setScannedAt(Math.floor(Date.now() / 1000));
       setFromCache(false);
       setPhase("done");
@@ -169,6 +173,23 @@ export default function DiskInsight({ active = true }: Props) {
       setRepairMsg(`修复未完成：${String(e)}`);
     } finally {
       setRepairing(false);
+    }
+  }
+
+  /** 转移成功收尾：刷盘符水位条；若当前视图就是源盘则重扫，让透视画面立刻反映腾出的空间 */
+  function onTransferred(sourceVolume: string) {
+    setTransferNode(null);
+    setRoot(null); // 旧树已失真，先清掉避免用过期数据误导
+    setStack([]);
+    setSelectedNode(null);
+    setFromCache(false);
+    refreshDrives();
+    if (selected === sourceVolume || scannedDrive === sourceVolume) {
+      startScan(sourceVolume);
+    } else {
+      setScannedDrive("");
+      setScannedAt(null);
+      setPhase("idle");
     }
   }
 
@@ -212,7 +233,7 @@ export default function DiskInsight({ active = true }: Props) {
   const crumbs = [root, ...stack].filter(Boolean) as TreeNode[];
 
   return (
-    <div className="flex h-full flex-col">
+    <div className="relative flex h-full flex-col">
       {/* 顶部标题 */}
       <header className="px-8 pt-6 pb-2">
         <h1 className="text-xl font-semibold">磁盘透视</h1>
@@ -261,7 +282,7 @@ export default function DiskInsight({ active = true }: Props) {
 
           {/* 扫描按钮 */}
           <button
-            onClick={startScan}
+            onClick={() => void startScan()}
             disabled={phase === "scanning" || !selected}
             className="flex items-center gap-2 rounded-xl bg-[var(--color-primary)] px-5 py-2.5 text-sm font-medium text-white transition-colors hover:bg-[var(--color-primary-dark)] disabled:opacity-50"
           >
@@ -416,11 +437,24 @@ export default function DiskInsight({ active = true }: Props) {
 
             {/* 详情卡 */}
             <div className="w-80 shrink-0 overflow-y-auto rounded-2xl bg-[var(--color-surface)] shadow-[var(--shadow-card)]">
-              <DetailPanel node={selectedNode} rootSize={current.size} />
+              <DetailPanel node={selectedNode} rootSize={current.size} onTransfer={setTransferNode} />
             </div>
           </>
         )}
       </div>
+
+      {/* 转移向导弹窗（沿用 ui-reference 三弹窗范式） */}
+      <AnimatePresence>
+        {transferNode && (
+          <TransferDialog
+            key={transferNode.path}
+            node={transferNode}
+            drives={drives}
+            onClose={() => setTransferNode(null)}
+            onTransferred={onTransferred}
+          />
+        )}
+      </AnimatePresence>
     </div>
   );
 }
