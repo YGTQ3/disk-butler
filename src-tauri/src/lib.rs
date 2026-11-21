@@ -15,6 +15,7 @@ mod startup;
 mod stats;
 pub mod svc;
 mod svc_client;
+mod transfer;
 
 use cache::ScanCache;
 use cleanup::{CleanupReport, CleanupScan, DeepAnalyzeReport, DeepCleanReport, SystemAnalyzeReport, SystemCleanReport};
@@ -22,6 +23,7 @@ use memory::MemoryReport;
 use scan::{DriveInfo, TreeNode};
 use startup::StartupItem;
 use stats::CleanupStats;
+use transfer::TransferPlan;
 
 /// 枚举系统盘符及容量。
 #[tauri::command]
@@ -324,9 +326,34 @@ async fn clean_orphan_dirs(paths: Vec<String>) -> Result<bloatware::ResidueRepor
         .map_err(|e| format!("清理失败：{}", e))
 }
 
+/// 透视页「转移到其他磁盘」只读预检：校验合法性、统计目录规模（不改任何文件）。
+#[tauri::command]
+async fn transfer_preflight(source: String, target: String) -> Result<TransferPlan, String> {
+    tauri::async_runtime::spawn_blocking(move || transfer::preflight(&source, &target))
+        .await
+        .map_err(|e| format!("预检任务失败：{}", e))?
+}
+
+/// 启动转移流水线（后台线程执行，进度经 transfer-progress 事件推送；立即返回）。
+/// 后端重跑全部校验，不信任前端直传路径（RULES-SECURITY 信任边界）。
+#[tauri::command]
+async fn start_transfer(app: tauri::AppHandle, source: String, target: String) -> Result<(), String> {
+    tauri::async_runtime::spawn_blocking(move || transfer::start(&app, &source, &target))
+        .await
+        .map_err(|e| format!("转移任务启动失败：{}", e))?
+}
+
+/// 请求取消当前转移（仅复制阶段生效；中断会清理半成品，源目录原样保留）。
+#[tauri::command]
+fn cancel_transfer() -> bool {
+    transfer::request_cancel()
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
-    let builder = tauri::Builder::default().plugin(tauri_plugin_opener::init());
+    let builder = tauri::Builder::default()
+        .plugin(tauri_plugin_opener::init())
+        .plugin(tauri_plugin_dialog::init());
 
     // 「软件体检」为未定稿大类功能：其命令仅在编译期开关 feature_bloatware 开启时注册，
     // 默认（公开包）不注册，与前端 __FEATURE_BLOATWARE__ 门控由同一环境变量驱动。
@@ -353,6 +380,9 @@ pub fn run() {
         repair_scan_service,
         open_apps_settings,
         set_always_on_top,
+        transfer_preflight,
+        start_transfer,
+        cancel_transfer,
         scan_bloatware,
         uninstall_software,
         scan_residue,
@@ -386,7 +416,10 @@ pub fn run() {
         scan_service_available,
         repair_scan_service,
         open_apps_settings,
-        set_always_on_top
+        set_always_on_top,
+        transfer_preflight,
+        start_transfer,
+        cancel_transfer
     ]);
 
     builder

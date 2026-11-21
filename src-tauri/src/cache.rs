@@ -62,6 +62,14 @@ pub fn save(app: &tauri::AppHandle, root: &str, tree: &TreeNode) {
     }
 }
 
+/// 删除某个盘的缓存（磁盘内容发生结构性变化后作废，如透视页完成目录转移）。
+/// 失败静默：下次命中旧缓存只是展示过期，用户手动重扫即可自愈。
+pub fn invalidate(app: &tauri::AppHandle, root: &str) {
+    if let Some(file) = cache_file(app, root) {
+        let _ = std::fs::remove_file(file);
+    }
+}
+
 /// 读取某个盘的缓存；文件不存在、损坏、版本不符或是空树（历史异常扫描的产物）返回 None。
 pub fn load(app: &tauri::AppHandle, root: &str) -> Option<ScanCache> {
     let file = cache_file(app, root)?;
